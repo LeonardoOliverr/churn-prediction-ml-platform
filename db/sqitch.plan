@@ -1,0 +1,12 @@
+%syntax-version=1.0.0
+%project=churn_prediction
+%uri=https://github.com/user/churn-prediction-ml-platform
+
+00_schema 2026-04-28T22:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Cria o schema churn
+01_tenants 2026-04-28T22:07:57Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Tabela de tenants
+02_projects 2026-04-28T22:09:47Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Tabela de projects
+03_customers 2026-04-28T22:11:30Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Tabela de customers
+04_models 2026-04-28T22:12:53Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Tabela de models
+05_project_model_config 2026-04-28T22:15:08Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Config de modelo por project
+06_predictions 2026-04-28T22:16:49Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Log de inferencias
+07_cost_analysis 2026-04-28T22:18:43Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Analises de custo por project
