@@ -37,6 +37,7 @@ IBM Telco Dataset ──► churn.customers (PostgreSQL)
 | Migrações | Sqitch (via Docker) | Versionamento do schema do banco |
 | Containerização | Docker + Docker Compose | Orquestração dos serviços |
 | Ingestão | kagglehub + pandas + SQLAlchemy | Download e carga do dataset no PostgreSQL |
+| EDA | Jupyter + matplotlib + seaborn + scikit-learn | Análise exploratória e relatório de negócio |
 | API de inferência | FastAPI | _(a implementar)_ |
 | Modelagem | PyTorch + Scikit-learn | _(a implementar)_ |
 
@@ -224,7 +225,9 @@ churn-prediction-ml-platform/
 ├── data/                           # arquivos locais opcionais (não versionados)
 ├── ml/                             # código de treinamento e avaliação — a implementar
 ├── models/                         # artefatos de modelos exportados — a implementar
-├── notebooks/                      # EDA e experimentos (Jupyter) — a implementar
+├── notebooks/
+│   ├── 01_eda.ipynb                # análise exploratória completa (13 visualizações)
+│   └── relatorio_negocio.md        # relatório executivo com achados e recomendações
 ├── tests/                          # testes automatizados — a implementar
 │
 ├── pipeline/
@@ -258,10 +261,31 @@ churn-prediction-ml-platform/
 | Infraestrutura (Docker + PostgreSQL + MLflow) | ✅ Completo |
 | Schema multi-tenant (Sqitch migrations) | ✅ Completo |
 | Pipeline de ingestão (IBM Telco → `churn.customers`) | ✅ Completo |
-| EDA (notebooks/) | 🔲 A implementar |
+| EDA (notebooks/) | ✅ Completo |
 | Treinamento (Baselines + MLP PyTorch) | 🔲 A implementar |
 | MLflow Model Registry | 🔲 A implementar |
 | API de inferência (FastAPI) | 🔲 A implementar |
+
+---
+
+## EDA e relatório de negócio
+
+O notebook [notebooks/01_eda.ipynb](notebooks/01_eda.ipynb) contém 13 análises exploratórias do dataset IBM Telco, cobrindo:
+
+- Distribuição de churn (~26,5% de cancelamento)
+- Missing values e correlações entre variáveis numéricas
+- Principais preditores: `tenure_months`, `contract`, `payment_method`, `internet_service`, `monthly_charges`
+- Segmentos de risco: clientes novos, usuários de fibra óptica, pagamento por cheque eletrônico e sêniors
+- Validação do `churn_score` IBM SPSS contra o `churn_value` real
+
+Para rodar o notebook:
+
+```bash
+source .venv/bin/activate
+jupyter notebook notebooks/
+```
+
+O [notebooks/relatorio_negocio.md](notebooks/relatorio_negocio.md) traduz os achados técnicos em linguagem executiva, com impacto financeiro ($7,7M em CLTV em risco) e recomendações de retenção.
 
 ---
 
