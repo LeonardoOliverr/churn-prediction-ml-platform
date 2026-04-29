@@ -3,13 +3,13 @@
 BEGIN;
 
 CREATE TABLE churn.models (
-    id              SERIAL PRIMARY KEY,
+    id              UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     name            VARCHAR(50)  NOT NULL,
     version         VARCHAR(50)  NOT NULL,
     scope           VARCHAR(10)  NOT NULL DEFAULT 'global'
                         CHECK (scope IN ('global', 'tenant', 'project')),
-    tenant_id       INTEGER      REFERENCES churn.tenants(id),
-    project_id      INTEGER      REFERENCES churn.projects(id),
+    tenant_id       UUID         REFERENCES churn.tenants(id),
+    project_id      UUID         REFERENCES churn.projects(id),
     mlflow_run_id   VARCHAR(100),
     accuracy        NUMERIC(6,4),
     f1_score        NUMERIC(6,4),
@@ -20,7 +20,7 @@ CREATE TABLE churn.models (
     UNIQUE (name, version)
 );
 
-COMMENT ON COLUMN churn.models.id              IS 'Identificador único do modelo.';
+COMMENT ON COLUMN churn.models.id              IS 'Identificador único do modelo (UUID v4).';
 COMMENT ON COLUMN churn.models.name            IS 'Nome do algoritmo/modelo. Ex: "MLP", "LogisticRegression", "XGBoost".';
 COMMENT ON COLUMN churn.models.version         IS 'Versão do modelo. Ex: "v1", "v2.1".';
 COMMENT ON COLUMN churn.models.scope           IS 'Escopo do modelo: global (treinado no dataset completo), tenant (fine-tune por empresa) ou project (fine-tune por projeto).';

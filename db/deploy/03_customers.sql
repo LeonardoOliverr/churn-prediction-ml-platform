@@ -3,9 +3,9 @@
 BEGIN;
 
 CREATE TABLE churn.customers (
-    id                SERIAL        PRIMARY KEY,
-    tenant_id         INTEGER       NOT NULL REFERENCES churn.tenants(id),
-    project_id        INTEGER       NOT NULL REFERENCES churn.projects(id),
+    id                UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id         UUID          NOT NULL REFERENCES churn.tenants(id),
+    project_id        UUID          NOT NULL REFERENCES churn.projects(id),
 
     -- Identificação
     customer_id       VARCHAR(20)   NOT NULL,

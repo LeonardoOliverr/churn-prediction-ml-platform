@@ -3,10 +3,10 @@
 BEGIN;
 
 CREATE TABLE churn.cost_analysis (
-    id                  SERIAL PRIMARY KEY,
-    tenant_id           INTEGER       NOT NULL REFERENCES churn.tenants(id),
-    project_id          INTEGER       NOT NULL REFERENCES churn.projects(id),
-    model_id            INTEGER       NOT NULL REFERENCES churn.models(id),
+    id                  UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id           UUID          NOT NULL REFERENCES churn.tenants(id),
+    project_id          UUID          NOT NULL REFERENCES churn.projects(id),
+    model_id            UUID          NOT NULL REFERENCES churn.models(id),
     false_positive_cost NUMERIC(10,2) NOT NULL,
     false_negative_cost NUMERIC(10,2) NOT NULL,
     total_cost          NUMERIC(12,2) NOT NULL,
@@ -14,7 +14,7 @@ CREATE TABLE churn.cost_analysis (
     evaluated_at        TIMESTAMPTZ   DEFAULT NOW()
 );
 
-COMMENT ON COLUMN churn.cost_analysis.id                  IS 'Identificador único da análise de custo.';
+COMMENT ON COLUMN churn.cost_analysis.id                  IS 'Identificador único da análise de custo (UUID v4).';
 COMMENT ON COLUMN churn.cost_analysis.tenant_id           IS 'Tenant ao qual a análise pertence.';
 COMMENT ON COLUMN churn.cost_analysis.project_id          IS 'Projeto ao qual a análise pertence. Cada projeto pode ter custos de FP/FN diferentes.';
 COMMENT ON COLUMN churn.cost_analysis.model_id            IS 'Modelo avaliado nesta análise de custo.';
