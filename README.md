@@ -38,8 +38,9 @@ IBM Telco Dataset ──► churn.customers (PostgreSQL)
 | Containerização | Docker + Docker Compose | Orquestração dos serviços |
 | Ingestão | kagglehub + pandas + SQLAlchemy | Download e carga do dataset no PostgreSQL |
 | EDA | Jupyter + matplotlib + seaborn + scikit-learn | Análise exploratória e relatório de negócio |
+| Modelagem | Scikit-learn | Baseline: DummyClassifier + Logistic Regression |
+| Modelagem (deep learning) | PyTorch | _(a implementar)_ |
 | API de inferência | FastAPI | _(a implementar)_ |
-| Modelagem | PyTorch + Scikit-learn | _(a implementar)_ |
 
 ---
 
