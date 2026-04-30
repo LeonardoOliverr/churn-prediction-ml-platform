@@ -33,7 +33,7 @@ IBM Telco Dataset ──► churn.customers (PostgreSQL)
 |---|---|---|
 | Dataset | [IBM Telco Customer Churn](https://www.kaggle.com/datasets/yeanzc/telco-customer-churn-ibm-dataset/data) | Base de dados de referência (~7k clientes) |
 | Banco de dados | PostgreSQL 16 | Dados de clientes, modelos, predições e análise de custo |
-| Experiment tracking | MLflow 2.14 | Rastreamento de runs, métricas e artefatos de modelos |
+| Experiment tracking | MLflow 3.11.1 | Rastreamento de runs, métricas e artefatos de modelos |
 | Migrações | Sqitch (via Docker) | Versionamento do schema do banco |
 | Containerização | Docker + Docker Compose | Orquestração dos serviços |
 | Ingestão | kagglehub + pandas + SQLAlchemy | Download e carga do dataset no PostgreSQL |
@@ -221,9 +221,17 @@ churn-prediction-ml-platform/
 │   └── mlflow.Dockerfile           # MLflow + psycopg2 (driver PostgreSQL)
 │
 ├── requirements.txt                # dependências Python do projeto
+├── GLOSSARY.md                     # dicionário de todos os termos técnicos e de negócio
+├── MODEL_COMPARISON.md             # comparativo de experimentos e critérios de decisão
 ├── app/                            # API de inferência (FastAPI) — a implementar
 ├── data/                           # arquivos locais opcionais (não versionados)
-├── ml/                             # código de treinamento e avaliação — a implementar
+├── estudos/                        # exercícios de fixação de conceitos de ML
+├── ml/                             # pipeline de treinamento multi-tenant (ver ml/README.md)
+│   ├── README.md                   # documentação do módulo e uso da CLI
+│   ├── config.py                   # constantes e feature lists
+│   ├── preprocessing.py            # carregamento com filtro por escopo + preprocessor sklearn
+│   ├── baseline.py                 # treino, avaliação e registro (CLI multi-tenant)
+│   └── BASELINE.md                 # resultados do experimento baseline
 ├── models/                         # artefatos de modelos exportados — a implementar
 ├── notebooks/
 │   ├── 01_eda.ipynb                # análise exploratória completa (13 visualizações)
@@ -261,9 +269,10 @@ churn-prediction-ml-platform/
 | Infraestrutura (Docker + PostgreSQL + MLflow) | ✅ Completo |
 | Schema multi-tenant (Sqitch migrations) | ✅ Completo |
 | Pipeline de ingestão (IBM Telco → `churn.customers`) | ✅ Completo |
-| EDA (notebooks/) | ✅ Completo |
-| Treinamento (Baselines + MLP PyTorch) | 🔲 A implementar |
-| MLflow Model Registry | 🔲 A implementar |
+| EDA (`notebooks/`) | ✅ Completo |
+| Baseline multi-tenant (`ml/`) — DummyClassifier + Logistic Regression | ✅ Completo |
+| Próximos experimentos (`ml/`) — Random Forest, XGBoost | 🔲 Pendente |
+| MLflow Model Registry (artifact storage) | 🔲 Pendente |
 | API de inferência (FastAPI) | 🔲 A implementar |
 
 ---
@@ -299,6 +308,28 @@ O script [pipeline/load_ibm_telco.py](pipeline/load_ibm_telco.py) realiza a carg
 4. **Carga** — bulk insert de ~7.000 registros com `chunksize=500`
 
 O script resolve `tenant_id` e `project_id` pelo slug antes de inserir, garantindo o isolamento multi-tenant.
+
+---
+
+## Treinamento de modelos (ml/)
+
+O módulo `ml/` implementa o pipeline de treinamento com suporte nativo a multi-tenant. Ver documentação completa em [ml/README.md](ml/README.md).
+
+```bash
+# escopo global — treina com dados de todos os tenants
+python ml/baseline.py
+
+# escopo tenant
+python ml/baseline.py --tenant ibm-telco
+
+# escopo project (mais específico)
+python ml/baseline.py --tenant ibm-telco --project telco-churn-2018
+
+# simulação sem gravar nada
+python ml/baseline.py --tenant ibm-telco --project telco-churn-2018 --dry-run
+```
+
+Resultados do baseline e critérios para os próximos experimentos: [MODEL_COMPARISON.md](MODEL_COMPARISON.md).
 
 ---
 
