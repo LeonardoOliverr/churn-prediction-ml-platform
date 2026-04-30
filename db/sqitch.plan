@@ -10,3 +10,5 @@
 05_project_model_config 2026-04-28T22:15:08Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Config de modelo por project
 06_predictions 2026-04-28T22:16:49Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Log de inferencias
 07_cost_analysis 2026-04-28T22:18:43Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Analises de custo por project
+08_models_unique_constraint [04_models] 2026-04-30T03:16:13Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Corrige UNIQUE constraint em churn.models para suporte multi-tenant
+09_models_status [04_models] 2026-04-30T03:40:47Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona status (active/shadow/archived) em churn.models
