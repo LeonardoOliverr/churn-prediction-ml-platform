@@ -237,7 +237,7 @@ churn-prediction-ml-platform/
 ├── notebooks/
 │   ├── 01_eda.ipynb                # análise exploratória completa (13 visualizações)
 │   └── relatorio_negocio.md        # relatório executivo com achados e recomendações
-├── tests/                          # testes automatizados — a implementar
+├── tests/                          # testes automatizados (unit, smoke, schema, api)
 │
 ├── pipeline/
 │   └── load_ibm_telco.py           # download via kagglehub + bulk insert em churn.customers
