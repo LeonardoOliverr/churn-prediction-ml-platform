@@ -78,6 +78,7 @@ def fetch_dataset() -> pd.DataFrame:
 
 
 def transform(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
     # Yes/No → bool
     for col in YES_NO_COLS:
         df[col] = df[col].str.strip().str.lower().map({"yes": True, "no": False})
@@ -104,7 +105,7 @@ def resolve_ids(engine, tenant_slug: str, project_slug: str) -> tuple[str, str]:
     return tenant_id, project_id
 
 
-def load(df: pd.DataFrame, engine, tenant_id: int, project_id: int):
+def load(df: pd.DataFrame, engine, tenant_id: str, project_id: str):
     df = df.copy()
     df["tenant_id"] = tenant_id
     df["project_id"] = project_id

@@ -105,7 +105,8 @@ O agente deve respeitar as seguintes regras:
 | Pipeline de ingestão (`pipeline/load_ibm_telco.py`) | ✅ Completo |
 | EDA (`notebooks/01_eda.ipynb`) | ✅ Completo |
 | Relatório de negócio (`notebooks/relatorio_negocio.md`) | ✅ Completo |
-| Treinamento (`ml/`) | 🔲 Próximo passo |
+| Treinamento baseline (`ml/`) — DummyClassifier + Logistic Regression | ✅ Completo |
+| Testes automatizados (`tests/`) — unit, smoke, schema, api | ✅ Completo |
 | API de inferência (`app/`) | 🔲 A implementar |
 
 ---
