@@ -79,7 +79,8 @@ O schema `public` é reservado para as tabelas internas do MLflow.
 
 ## Configuração do ambiente Python
 
-Os componentes de ML (EDA, treinamento, API) requerem um ambiente Python isolado.
+Os componentes locais de ML (EDA, ingestão e testes) requerem um ambiente Python isolado.
+O treinamento de modelos deve rodar pelo serviço Docker `trainer`, para usar a mesma rede do PostgreSQL/MLflow e o mesmo volume de artefatos.
 
 ```bash
 python -m venv .venv
@@ -169,6 +170,8 @@ O script baixa o dataset IBM Telco via `kagglehub` (cache local após a primeira
 |---|---|---|
 | MLflow UI | http://localhost:5000 | — |
 | PostgreSQL | localhost:5434 | conforme `.env` |
+
+O Compose também define o serviço `trainer`, usado para jobs de treinamento. Ele fica no profile `tools` e não sobe no `docker compose up -d` padrão.
 
 ### 9. Parar o ambiente
 
@@ -314,21 +317,33 @@ O script resolve `tenant_id` e `project_id` pelo slug antes de inserir, garantin
 
 ## Treinamento de modelos (ml/)
 
-O módulo `ml/` implementa o pipeline de treinamento com suporte nativo a multi-tenant. Ver documentação completa em [ml/README.md](ml/README.md).
+O módulo `ml/` implementa o pipeline de treinamento com suporte nativo a multi-tenant.
+Os jobs de treino rodam pelo serviço Docker `trainer`, separado da API, para manter o isolamento de responsabilidades:
+
+```
+trainer  → treina modelos e registra métricas/artefatos no MLflow
+mlflow   → armazena runs, métricas e artefatos
+api      → carrega modelos registrados para inferência
+postgres → armazena dados, catálogo de modelos e logs de predição
+```
+
+O serviço `trainer` monta o volume `mlflow_artifacts` em `/mlflow/artifacts`, acessa o PostgreSQL por `postgres:5432` e usa `MLFLOW_TRACKING_URI=http://mlflow:5000`. Por isso, evite rodar `ml/baseline.py` diretamente na máquina local para treinos que geram artefatos.
 
 ```bash
 # escopo global — treina com dados de todos os tenants
-python ml/baseline.py
+docker compose --profile tools run --rm trainer python ml/baseline.py
 
 # escopo tenant
-python ml/baseline.py --tenant ibm-telco
+docker compose --profile tools run --rm trainer python ml/baseline.py --tenant ibm-telco
 
 # escopo project (mais específico)
-python ml/baseline.py --tenant ibm-telco --project telco-churn-2018
+docker compose --profile tools run --rm trainer python ml/baseline.py --tenant ibm-telco --project telco-churn-2018
 
 # simulação sem gravar nada
-python ml/baseline.py --tenant ibm-telco --project telco-churn-2018 --dry-run
+docker compose --profile tools run --rm trainer python ml/baseline.py --tenant ibm-telco --project telco-churn-2018 --dry-run
 ```
+
+Após o treino, o script registra cada modelo em `churn.models` com o `mlflow_run_id` correspondente. Para colocar um modelo em produção para um projeto, vincule o `model_id` desejado em `churn.project_model_config`; a API de inferência passa a carregar o artefato MLflow em `runs:/<mlflow_run_id>/model`.
 
 Resultados do baseline e critérios para os próximos experimentos: [MODEL_COMPARISON.md](MODEL_COMPARISON.md).
 
