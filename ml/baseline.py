@@ -21,6 +21,7 @@ import os
 import sys
 
 import mlflow
+import mlflow.sklearn
 import numpy as np
 from sklearn.dummy import DummyClassifier
 from sklearn.linear_model import LogisticRegression
@@ -86,7 +87,7 @@ def _cv_metrics(pipeline: Pipeline, X, y) -> dict[str, float]:
 
 
 def _run_model(name: str, model, X, y, dry_run: bool) -> tuple[str, dict]:
-    """Treina, avalia e loga métricas no MLflow. Retorna (run_id, metrics)."""
+    """Treina, avalia, salva o artefato no MLflow e retorna (run_id, metrics)."""
     pipeline = Pipeline([
         ("preprocessor", build_preprocessor()),
         ("classifier", model),
@@ -112,6 +113,14 @@ def _run_model(name: str, model, X, y, dry_run: bool) -> tuple[str, dict]:
             "class_weight": getattr(model, "class_weight", "none"),
         })
         mlflow.log_metrics(metrics)
+
+        # Treina o pipeline final em todos os dados para uso em inferência.
+        pipeline.fit(X, y)
+        mlflow.sklearn.log_model(
+            sk_model=pipeline,
+            artifact_path="model",
+        )
+
         run_id = run.info.run_id
 
     return run_id, metrics
