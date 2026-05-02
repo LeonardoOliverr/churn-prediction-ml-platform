@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  pull_request:
+
+env:
+  POSTGRES_USER: churn_user
+  POSTGRES_PASSWORD: churn_pass
+  POSTGRES_DB: churn_dev
+  POSTGRES_HOST: localhost
+  POSTGRES_PORT: "5434"
+  DATABASE_URL: postgresql+psycopg2://churn_user:churn_pass@localhost:5434/churn_dev
+  MLFLOW_TRACKING_URI: http://localhost:5000
+  APP_SECRET_KEY: test-secret
+  JWT_EXPIRE_MINUTES: "30"
+  API_KEY_CACHE_TTL_SECONDS: "60"
+  MODEL_CACHE_TTL_SECONDS: "300"
+  BCRYPT_ROUNDS: "4"
+  MAX_BATCH_SIZE: "100"
+  LOG_LEVEL: INFO
+  PYTHONPATH: ${{ github.workspace }}
+
+jobs:
+  tests:
+    name: Python tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run pytest
+        run: pytest
+
+  compose:
+    name: Docker Compose config
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate default compose config
+        run: docker compose config
+
+      - name: Validate tools profile compose config
+        run: docker compose --profile tools config
+
+  database:
+    name: Database migrations
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Start PostgreSQL
+        run: docker compose up -d postgres
+
+      - name: Wait for PostgreSQL healthcheck
+        run: |
+          container_id="$(docker compose ps -q postgres)"
+          for attempt in {1..30}; do
+            status="$(docker inspect --format='{{.State.Health.Status}}' "$container_id")"
+            if [ "$status" = "healthy" ]; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs postgres
+          exit 1
+
+      - name: Deploy Sqitch migrations
+        working-directory: db
+        run: |
+          docker run --rm --network host \
+            --mount "type=bind,src=${PWD},dst=/repo" \
+            --workdir /repo \
+            -e PGUSER="$POSTGRES_USER" \
+            -e PGPASSWORD="$POSTGRES_PASSWORD" \
+            -e PGDATABASE="$POSTGRES_DB" \
+            sqitch/sqitch:latest deploy
+
+      - name: Verify Sqitch migrations
+        working-directory: db
+        run: |
+          docker run --rm --network host \
+            --mount "type=bind,src=${PWD},dst=/repo" \
+            --workdir /repo \
+            -e PGUSER="$POSTGRES_USER" \
+            -e PGPASSWORD="$POSTGRES_PASSWORD" \
+            -e PGDATABASE="$POSTGRES_DB" \
+            sqitch/sqitch:latest verify
+
+      - name: Stop services
+        if: always()
+        run: docker compose down
