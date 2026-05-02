@@ -254,8 +254,8 @@ Define a fixture `fake_customers_df` — um `DataFrame` com 12 linhas (6 `churn=
 | **`_parse_args()`** | `test_parse_args_*` | Defaults, flags CLI e erro de `--project` sem `--tenant` |
 | **`_run_model()`** | `test_run_model_*` | dry_run retorna sentinel; sem dry_run chama MLflow com params e metrics |
 | **`_next_version()`** | `test_next_version_*` | `count=0 → v1`, `count=3 → v4`, parâmetros corretos na query |
-| **`_register_in_db()`** | `test_register_in_db_*` | dry_run não escreve no DB; `active` dispara UPDATE+INSERT; `shadow` só INSERT |
-| **`main()`** | `test_main_*` | Chama todos os modelos; MLflow ausente no dry_run; best model marcado como `active` |
+| **`_register_in_db()`** | `test_register_in_db_*` | dry_run não escreve no DB; status técnico faz apenas INSERT, sem controlar produção |
+| **`main()`** | `test_main_*` | Chama todos os modelos; MLflow ausente no dry_run; best model marcado como `approved` |
 
 ---
 

@@ -1,6 +1,6 @@
-# ml/ — Pipeline de Treinamento
+# ml/ - Pipeline de Treinamento
 
-Módulo de treinamento multi-tenant. Suporta três escopos de modelo, dry-run e registro automático em `churn.models`.
+Módulo de treinamento multi-tenant. Suporta três escopos de modelo, dry-run e registro automático no catálogo técnico `churn.models`.
 
 ---
 
@@ -21,36 +21,36 @@ O pipeline respeita a hierarquia multi-tenant da plataforma:
 
 | Escopo | `--tenant` | `--project` | Dados usados | Experimento MLflow |
 |---|---|---|---|---|
-| `global` | — | — | Todos os tenants | `global/baseline` |
-| `tenant` | ✓ | — | Só esse tenant | `{tenant}/baseline` |
-| `project` | ✓ | ✓ | Só esse projeto | `{tenant}/{project}/baseline` |
+| `global` | - | - | Todos os tenants | `global/baseline` |
+| `tenant` | sim | - | Só esse tenant | `{tenant}/baseline` |
+| `project` | sim | sim | Só esse projeto | `{tenant}/{project}/baseline` |
 
-> **Aviso sobre escopo global:** treina com dados de todos os tenants misturados. Útil como cold-start para tenants novos. Em produção, prefira `tenant` ou `project`.
+> Escopo define onde o modelo foi treinado/catalogado. Produção não é definida por `scope`; produção é definida por `churn.project_model_config`.
 
 ---
 
 ## Uso
 
-```bash
-# Ativar o ambiente
-source .venv/bin/activate
+O treinamento deve rodar pelo serviço Docker `trainer`, para usar a rede interna do Compose e o volume de artefatos do MLflow.
 
+```bash
 # Escopo global
-python ml/baseline.py
-python ml/baseline.py --dry-run
+docker compose --profile tools run --rm trainer python ml/baseline.py
+docker compose --profile tools run --rm trainer python ml/baseline.py --dry-run
 
 # Escopo tenant
-python ml/baseline.py --tenant <tenant-slug>
-python ml/baseline.py --tenant <tenant-slug> --dry-run
+docker compose --profile tools run --rm trainer python ml/baseline.py --tenant <tenant-slug>
+docker compose --profile tools run --rm trainer python ml/baseline.py --tenant <tenant-slug> --dry-run
 
 # Escopo project
-python ml/baseline.py --tenant <tenant-slug> --project <project-slug>
-python ml/baseline.py --tenant <tenant-slug> --project <project-slug> --dry-run
+docker compose --profile tools run --rm trainer python ml/baseline.py --tenant <tenant-slug> --project <project-slug>
+docker compose --profile tools run --rm trainer python ml/baseline.py --tenant <tenant-slug> --project <project-slug> --dry-run
 ```
 
 ### Dry-run
 
-O flag `--dry-run` executa treino e avaliação completos, mas **não grava nada**:
+O flag `--dry-run` executa treino e avaliação completos, mas não grava nada:
+
 - Sem criação de runs no MLflow
 - Sem insert em `churn.models`
 - Imprime o payload exato que seria gravado
@@ -71,28 +71,39 @@ Use para validar configuração antes de comprometer resultados.
 ## O que é registrado
 
 ### MLflow
-- **Parâmetros:** tipo do modelo, folds, estratégia de CV, class_weight
-- **Métricas:** F1, ROC-AUC, Recall, Precision (média e desvio padrão dos 5 folds)
+
+- Parâmetros: tipo do modelo, folds, estratégia de CV, class_weight
+- Métricas: F1, ROC-AUC, Recall, Precision (média e desvio padrão dos 5 folds)
+- Artefato do modelo em `artifact_path="model"`
 
 ### churn.models
-**Todos os modelos do run** são registrados (não apenas o melhor):
 
-| Situação | Status atribuído |
+`churn.models` é o catálogo técnico de modelos treinados. Todos os modelos do run são registrados, não apenas o melhor:
+
+| Situação | Status técnico |
 |---|---|
-| Melhor modelo do run (maior F1) | `active` |
-| Demais modelos do run | `shadow` |
-| `active` anterior ao novo `active` | `archived` (automático, mesma transação) |
+| Melhor modelo do run (maior F1) | `approved` |
+| Demais modelos do run | `trained` |
 
 Cada registro inclui:
+
 - `scope` derivado dos argumentos CLI
 - `tenant_id` / `project_id` de acordo com o escopo (NULL para global)
 - `version` auto-incremental: `v1`, `v2`, ... por `(scope, tenant_id, project_id, name)`
 - `mlflow_run_id` para rastreabilidade
 - Métricas do cross-validation (F1, ROC-AUC, Recall, Precision)
 
-**Invariante garantida pelo banco:** no máximo um `active` por `(scope, tenant_id, project_id, name)`.
+`status='approved'` indica que o modelo é tecnicamente elegível para servir. Isso não significa que ele esteja em produção.
 
-> **Próximos passos:** resolver de modelo com fallback automático `project → tenant → global` para a camada de inferência.
+### churn.project_model_config
+
+`churn.project_model_config` é a fonte de verdade da produção por projeto:
+
+- `model_id` aponta para o modelo aprovado que será servido.
+- `is_active=true` indica a configuração atualmente ativa do projeto.
+- Apenas uma configuração ativa por projeto é permitida (índice único parcial no banco).
+
+A API resolve o modelo com cascade: configuração do projeto → configuração do tenant → modelo global (`churn.models` com `scope='global'`). O `scope` do modelo treinado não determina onde ele pode ser servido — isso é definido pela configuração em `project_model_config`.
 
 ---
 
