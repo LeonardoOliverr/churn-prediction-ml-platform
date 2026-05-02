@@ -323,7 +323,7 @@ def test_run_model_dry_run_does_not_call_mlflow(fake_customers_df):
 
 
 def test_run_model_not_dry_run_returns_mlflow_run_id(fake_customers_df):
-    """dry_run=False retorna o run_id do MLflow e registra métricas e params."""
+    """dry_run=False retorna o run_id do MLflow e registra métricas, params e artefato."""
     from ml.baseline import _run_model
 
     X = fake_customers_df.drop(columns=[TARGET])
@@ -339,13 +339,16 @@ def test_run_model_not_dry_run_returns_mlflow_run_id(fake_customers_df):
     with patch("ml.baseline._cv_metrics", return_value=_FAKE_METRICS), \
          patch("ml.baseline.mlflow.start_run", return_value=mock_ctx), \
          patch("ml.baseline.mlflow.log_params") as mock_log_params, \
-         patch("ml.baseline.mlflow.log_metrics") as mock_log_metrics:
+         patch("ml.baseline.mlflow.log_metrics") as mock_log_metrics, \
+         patch("ml.baseline.mlflow.sklearn.log_model") as mock_log_model:
         run_id, metrics = _run_model("dummy_stratified", model, X, y, dry_run=False)
 
     assert run_id == "mlflow-abc-123"
     assert metrics == _FAKE_METRICS
     mock_log_params.assert_called_once()
     mock_log_metrics.assert_called_once_with(_FAKE_METRICS)
+    mock_log_model.assert_called_once()
+    assert mock_log_model.call_args.kwargs["artifact_path"] == "model"
 
 
 # ---------------------------------------------------------------------------
