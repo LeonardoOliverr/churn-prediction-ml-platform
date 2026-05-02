@@ -425,7 +425,7 @@ def test_register_in_db_dry_run_no_db_writes(capsys):
             scope="global",
             tenant_slug=None,
             project_slug=None,
-            status="active",
+            status="approved",
             dry_run=True,
         )
 
@@ -435,8 +435,8 @@ def test_register_in_db_dry_run_no_db_writes(capsys):
     mock_conn.execute.assert_not_called()
 
 
-def test_register_in_db_active_status_executes_update_and_insert():
-    """status='active' executa UPDATE de arquivamento + INSERT do novo modelo."""
+def test_register_in_db_approved_status_executes_only_insert():
+    """status='approved' executa apenas INSERT do novo modelo."""
     from ml.baseline import _register_in_db
 
     mock_engine, mock_conn = _make_mock_engine()
@@ -450,16 +450,16 @@ def test_register_in_db_active_status_executes_update_and_insert():
             scope="global",
             tenant_slug=None,
             project_slug=None,
-            status="active",
+            status="approved",
             dry_run=False,
         )
 
-    # UPDATE (archive anterior) + INSERT (novo modelo)
-    assert mock_conn.execute.call_count == 2
+    # Produção é controlada por project_model_config, então não há arquivamento automático.
+    assert mock_conn.execute.call_count == 1
 
 
-def test_register_in_db_shadow_status_executes_only_insert():
-    """status='shadow' executa apenas INSERT, sem UPDATE de arquivamento."""
+def test_register_in_db_trained_status_executes_only_insert():
+    """status='trained' executa apenas INSERT, sem UPDATE de arquivamento."""
     from ml.baseline import _register_in_db
 
     mock_engine, mock_conn = _make_mock_engine()
@@ -473,7 +473,7 @@ def test_register_in_db_shadow_status_executes_only_insert():
             scope="global",
             tenant_slug=None,
             project_slug=None,
-            status="shadow",
+            status="trained",
             dry_run=False,
         )
 
@@ -496,7 +496,7 @@ def test_register_in_db_dry_run_includes_version_in_output(capsys):
             scope="global",
             tenant_slug=None,
             project_slug=None,
-            status="active",
+            status="approved",
             dry_run=True,
         )
 
@@ -525,7 +525,7 @@ def test_register_in_db_tenant_scope_calls_resolve_tenant_id():
             scope="tenant",
             tenant_slug="ibm-telco",
             project_slug=None,
-            status="active",
+            status="approved",
             dry_run=True,
         )
 
@@ -550,7 +550,7 @@ def test_register_in_db_project_scope_calls_both_resolvers():
             scope="project",
             tenant_slug="ibm-telco",
             project_slug="telco-churn-2018",
-            status="active",
+            status="approved",
             dry_run=True,
         )
 
@@ -575,15 +575,15 @@ def test_register_in_db_tenant_scope_not_dry_run_executes_writes():
             scope="tenant",
             tenant_slug="ibm-telco",
             project_slug=None,
-            status="active",
+            status="approved",
             dry_run=False,
         )
 
-    assert mock_conn.execute.call_count == 2
+    assert mock_conn.execute.call_count == 1
 
 
-def test_register_in_db_project_scope_not_dry_run_shadow_executes_only_insert():
-    """Escopo project, dry_run=False, status='shadow' executa apenas INSERT."""
+def test_register_in_db_project_scope_not_dry_run_trained_executes_only_insert():
+    """Escopo project, dry_run=False, status='trained' executa apenas INSERT."""
     from ml.baseline import _register_in_db
 
     mock_engine, mock_conn = _make_mock_engine()
@@ -599,7 +599,7 @@ def test_register_in_db_project_scope_not_dry_run_shadow_executes_only_insert():
             scope="project",
             tenant_slug="ibm-telco",
             project_slug="telco-churn-2018",
-            status="shadow",
+            status="trained",
             dry_run=False,
         )
 
@@ -656,8 +656,8 @@ def test_main_dry_run_does_not_configure_mlflow(fake_customers_df):
     mock_exp.assert_not_called()
 
 
-def test_main_not_dry_run_marks_best_model_as_active(fake_customers_df):
-    """main() sem dry_run marca logistic_regression (maior f1) como 'active' e dummy como 'shadow'."""
+def test_main_not_dry_run_marks_best_model_as_approved(fake_customers_df):
+    """main() sem dry_run marca logistic_regression como 'approved' e dummy como 'trained'."""
     from ml.baseline import main
 
     fake_args = argparse.Namespace(tenant=None, project=None, dry_run=False)
@@ -673,8 +673,8 @@ def test_main_not_dry_run_marks_best_model_as_active(fake_customers_df):
         main()
 
     statuses = {c.kwargs["name"]: c.kwargs["status"] for c in mock_register.call_args_list}
-    assert statuses["logistic_regression"] == "active"
-    assert statuses["dummy_stratified"] == "shadow"
+    assert statuses["logistic_regression"] == "approved"
+    assert statuses["dummy_stratified"] == "trained"
 
 
 def test_main_not_dry_run_configures_mlflow(fake_customers_df):

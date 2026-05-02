@@ -12,3 +12,4 @@
 07_cost_analysis 2026-04-28T22:18:43Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Analises de custo por project
 08_models_unique_constraint [04_models] 2026-04-30T03:16:13Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Corrige UNIQUE constraint em churn.models para suporte multi-tenant
 09_models_status [04_models] 2026-04-30T03:40:47Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona status (active/shadow/archived) em churn.models
+11_models_status_and_project_config_semantics [05_project_model_config 09_models_status] 2026-05-02T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Separa status tecnico de modelos da configuracao de producao por projeto

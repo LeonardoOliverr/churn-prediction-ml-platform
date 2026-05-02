@@ -7,22 +7,43 @@ Plataforma de machine learning end-to-end para previsão de churn de clientes em
 ## Visão Geral
 
 ```
-IBM Telco Dataset ──► churn.customers (PostgreSQL)
-                              │
-                              ▼
-                        Ingestão & EDA
-                              │
-                              ▼
-                  Treinamento (Baselines + MLP PyTorch)
-                              │
-                              ▼
-                  MLflow Tracking ──► Model Registry
-                              │
-                              ▼
-                    FastAPI (Inference API)
-                              │
-                              ▼
-              churn.predictions + churn.cost_analysis
+[1] INGESTÃO
+    IBM Telco Dataset (~7k clientes)
+    └── pipeline/load_ibm_telco.py
+        └── churn.customers (PostgreSQL)
+                │
+                ▼
+[2] EXPLORAÇÃO
+    notebooks/01_eda.ipynb
+    └── análise de churn, preditores e segmentos de risco
+                │
+                ▼
+[3] TREINAMENTO
+    ml/baseline.py  (roda via Docker trainer)
+    ├── MLflow      → artefatos + métricas por run
+    └── churn.models → catálogo técnico
+                        ├── melhor modelo  → status: approved
+                        └── demais modelos → status: trained
+                │
+                │  promoção manual
+                │  INSERT em churn.project_model_config
+                ▼
+[4] CONFIGURAÇÃO DE PRODUÇÃO
+    churn.project_model_config
+    └── define modelo ativo + threshold por projeto
+        (única config ativa por projeto — garantido pelo banco)
+                │
+                ▼
+[5] INFERÊNCIA
+    FastAPI  POST /predict  |  POST /predict/batch
+    ├── autentica via churn.api_keys (x-api-key)
+    ├── resolve modelo com cascade:
+    │     1º project_model_config do projeto  (API key com project_id)
+    │     2º project_model_config do tenant   (API key sem project_id)
+    │     3º churn.models scope=global        (modelo global aprovado)
+    ├── carrega artefato do MLflow
+    ├── churn.predictions   → log de cada predição
+    └── churn.cost_analysis → análise de custo FP/FN
 ```
 
 ---
@@ -52,8 +73,8 @@ O schema `churn` segue uma hierarquia de isolamento multi-tenant:
 tenant        →  isolamento por empresa/cliente
   └── project →  isolamento por produto ou caso de uso
         ├── customers            replica fiel do schema IBM Telco (ver dataset)
-        ├── models               registro de modelos (global / tenant / project)
-        ├── project_model_config threshold e modelo ativo por project
+        ├── models               catálogo técnico de modelos treinados
+        ├── project_model_config configuração de produção ativa por project
         ├── predictions          log de inferências da API
         └── cost_analysis        análise de custo FP/FN por project
 ```
@@ -62,6 +83,83 @@ tenant        →  isolamento por empresa/cliente
 
 O schema `sqitch` é gerenciado automaticamente pelo Sqitch para controle de migrações.
 O schema `public` é reservado para as tabelas internas do MLflow.
+
+### churn.models — catálogo técnico
+
+`churn.models` registra todos os modelos treinados. Cada registro representa um artefato MLflow versionado e carrega seu estado técnico via `status`:
+
+| Status | Significado |
+|---|---|
+| `trained` | Modelo recém-registrado após o treino |
+| `validated` | Modelo avaliado e testado manualmente |
+| `approved` | Elegível para servir em produção |
+| `archived` | Descontinuado — não deve ser selecionado |
+
+O pipeline de treinamento (`ml/baseline.py`) atribui `approved` ao modelo de melhor F1 do run e `trained` aos demais. A promoção entre status (`trained → validated → approved`) é uma decisão operacional, feita manualmente ou via automação.
+
+> `status='approved'` indica elegibilidade técnica. **Não significa que o modelo está em produção.** Produção é definida exclusivamente por `churn.project_model_config`.
+
+### churn.project_model_config — configuração de produção
+
+`churn.project_model_config` é a fonte de verdade sobre qual modelo está servindo cada projeto. A API de inferência resolve o modelo ativo consultando esta tabela — nunca diretamente `churn.models`.
+
+Regras garantidas pelo banco:
+
+- Apenas **uma configuração `is_active=true`** por projeto (índice único parcial)
+- O `model_id` referenciado deve existir em `churn.models`
+- O `model_id` referenciado deve ter `status='approved'` para ser carregado pela API
+
+Campos relevantes:
+
+| Campo | Descrição |
+|---|---|
+| `model_id` | Modelo aprovado que será servido pelo projeto |
+| `threshold` | Threshold de decisão aplicado (padrão: 0.500) |
+| `is_active` | `true` = configuração atualmente em produção |
+| `environment` | `production`, `staging` ou `dev` |
+| `configured_by` | Identificador de quem ativou a configuração |
+| `activation_reason` | Motivo operacional da ativação |
+
+### Resolução de modelo em produção (cascade)
+
+A API resolve qual modelo carregar seguindo três níveis em ordem de especificidade:
+
+```
+API Key com project_id
+        │
+        ▼
+1º  project_model_config WHERE project_id = :project_id AND is_active = TRUE
+        │ não encontrou
+        ▼
+2º  project_model_config WHERE tenant_id = :tenant_id AND is_active = TRUE
+    (config ativa mais recente do tenant — API key sem project_id)
+        │ não encontrou
+        ▼
+3º  churn.models WHERE scope = 'global' AND status = 'approved'
+    (modelo global aprovado mais recente)
+        │ não encontrou
+        ▼
+    404 model_not_found
+```
+
+O nível 3 consulta `churn.models` diretamente — é o único caso em que a API não passa por `project_model_config`. O threshold aplicado nesse caso é o padrão (`0.5`).
+
+### Fluxo de promoção de modelo
+
+```
+treino → churn.models (status=approved)
+                │
+                │  INSERT em project_model_config
+                │  com is_active=true
+                ▼
+   churn.project_model_config
+                │
+                │  API resolve via cascade
+                ▼
+         inferência em produção
+```
+
+Ao ativar uma nova configuração, a anterior deve ter `is_active` definido como `false` e `deactivated_at` preenchido. O banco garante que apenas uma configuração ativa existe por projeto via índice único parcial.
 
 ---
 
@@ -259,7 +357,10 @@ churn-prediction-ml-platform/
     │   ├── 04_models.sql
     │   ├── 05_project_model_config.sql
     │   ├── 06_predictions.sql
-    │   └── 07_cost_analysis.sql
+    │   ├── 07_cost_analysis.sql
+    │   ├── 08_models_unique_constraint.sql
+    │   ├── 09_models_status.sql    # status técnico: trained, validated, approved, archived
+    │   └── 11_models_status_and_project_config_semantics.sql  # semântica de produção via project_model_config
     ├── revert/                     # scripts de rollback
     └── verify/                     # scripts de verificação pós-deploy
 ```
@@ -275,9 +376,10 @@ churn-prediction-ml-platform/
 | Pipeline de ingestão (IBM Telco → `churn.customers`) | ✅ Completo |
 | EDA (`notebooks/`) | ✅ Completo |
 | Baseline multi-tenant (`ml/`) — DummyClassifier + Logistic Regression | ✅ Completo |
+| Semântica de status técnico (`churn.models`) e configuração de produção (`churn.project_model_config`) | ✅ Completo |
+| API de inferência (FastAPI) — predição individual e em lote | 🔲 Em progresso |
 | Próximos experimentos (`ml/`) — Random Forest, XGBoost | 🔲 Pendente |
-| MLflow Model Registry (artifact storage) | 🔲 Pendente |
-| API de inferência (FastAPI) | 🔲 A implementar |
+| Análise de custo (`churn.cost_analysis`) | 🔲 Pendente |
 
 ---
 
@@ -343,7 +445,28 @@ docker compose --profile tools run --rm trainer python ml/baseline.py --tenant i
 docker compose --profile tools run --rm trainer python ml/baseline.py --tenant ibm-telco --project telco-churn-2018 --dry-run
 ```
 
-Após o treino, o script registra cada modelo em `churn.models` com o `mlflow_run_id` correspondente. Para colocar um modelo em produção para um projeto, vincule o `model_id` desejado em `churn.project_model_config`; a API de inferência passa a carregar o artefato MLflow em `runs:/<mlflow_run_id>/model`.
+Após o treino, o script registra cada modelo em `churn.models`:
+
+- O modelo com maior F1 do run recebe `status='approved'`
+- Os demais modelos do run recebem `status='trained'`
+- Nenhum modelo é automaticamente colocado em produção
+
+**Para colocar um modelo em produção**, é necessário criar um registro em `churn.project_model_config` apontando para o `model_id` desejado com `is_active=true`. A API de inferência carrega o artefato MLflow em `runs:/<mlflow_run_id>/model` a partir dessa configuração.
+
+```sql
+INSERT INTO churn.project_model_config
+    (tenant_id, project_id, model_id, threshold, is_active, environment, configured_by, activation_reason)
+VALUES (
+    (SELECT tenant_id FROM churn.projects WHERE id = '<project_id>'),
+    '<project_id>',
+    '<model_id>',   -- deve ter status='approved' em churn.models
+    0.500,
+    TRUE,
+    'production',
+    'seu-identificador',
+    'motivo da ativação'
+);
+```
 
 Resultados do baseline e critérios para os próximos experimentos: [MODEL_COMPARISON.md](MODEL_COMPARISON.md).
 
