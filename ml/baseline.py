@@ -1,6 +1,6 @@
 """
 Treina e avalia DummyClassifier e Logistic Regression como baselines.
-Loga métricas no MLflow e registra todos os modelos em churn.models com status.
+Loga métricas no MLflow e registra todos os modelos em churn.models com status técnico.
 
 Uso:
     # escopo global (todos os tenants)
@@ -151,7 +151,7 @@ def _register_in_db(
     status: str,
     dry_run: bool,
 ) -> None:
-    """Insere o modelo em churn.models. Se status='active', arquiva o active anterior."""
+    """Insere o modelo em churn.models com status técnico."""
     engine = _build_engine()
     with engine.begin() as conn:
         tenant_id  = _resolve_tenant_id(conn, tenant_slug)                     if tenant_slug  else None
@@ -177,19 +177,6 @@ def _register_in_db(
     with engine.begin() as conn:
         tenant_id  = _resolve_tenant_id(conn, tenant_slug)                     if tenant_slug  else None
         project_id = _resolve_project_id(conn, tenant_id, project_slug)        if project_slug else None
-
-        if status == "active":
-            conn.execute(
-                text("""
-                    UPDATE churn.models SET status = 'archived'
-                    WHERE scope = :scope
-                      AND (tenant_id  IS NOT DISTINCT FROM :tenant_id)
-                      AND (project_id IS NOT DISTINCT FROM :project_id)
-                      AND name = :name
-                      AND status = 'active'
-                """),
-                {"scope": scope, "tenant_id": tenant_id, "project_id": project_id, "name": name},
-            )
 
         conn.execute(
             text("""
@@ -256,7 +243,7 @@ def main() -> None:
     print(f"{'='*50}")
 
     for name, run_id, metrics in results:
-        status = "active" if name == best_name else "shadow"
+        status = "approved" if name == best_name else "trained"
         _register_in_db(
             name=name,
             run_id=run_id,
