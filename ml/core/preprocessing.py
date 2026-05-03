@@ -3,7 +3,6 @@ Carregamento de dados do PostgreSQL e pipeline de pré-processamento reutilizáv
 """
 
 import os
-import sys
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -13,8 +12,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sqlalchemy import create_engine, text
 
-sys.path.insert(0, os.path.dirname(__file__))
-from config import (
+from ml.core.config import (
     BOOL_FEATURES,
     CATEGORICAL_FEATURES,
     DROP_COLS,
