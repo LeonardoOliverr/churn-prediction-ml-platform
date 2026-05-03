@@ -12,7 +12,7 @@ requires-python = ">=3.10"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = "--cov=ml --cov-report=term-missing --cov-report=html:htmlcov"
+addopts = "--cov=ml --cov=src --cov-report=term-missing --cov-report=html:htmlcov"
 markers = [
     "smoke: testes de fumaça — fluxo mínimo end-to-end sem dependências externas",
     "schema: testes de estrutura — valida colunas, tipos e configuração de features",
@@ -20,7 +20,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["ml", "pipeline"]
+source = ["ml", "pipeline", "src"]
 omit = [".venv/*", "tests/*", "notebooks/*"]
 
 [tool.coverage.report]
