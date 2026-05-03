@@ -42,7 +42,7 @@ services:
       - tools
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: docker/api.Dockerfile
     depends_on:
       postgres:
         condition: service_healthy
@@ -60,6 +60,29 @@ services:
       - mlflow_artifacts:/mlflow/artifacts
     command: ["python", "ml/baseline.py", "--help"]
 
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      APP_SECRET_KEY: ${APP_SECRET_KEY}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-30}
+      API_KEY_CACHE_TTL_SECONDS: ${API_KEY_CACHE_TTL_SECONDS:-60}
+      MODEL_CACHE_TTL_SECONDS: ${MODEL_CACHE_TTL_SECONDS:-300}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+      MAX_BATCH_SIZE: ${MAX_BATCH_SIZE:-100}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - mlflow_artifacts:/mlflow/artifacts
 
 volumes:
   postgres_data:
