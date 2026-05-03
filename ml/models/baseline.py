@@ -4,16 +4,16 @@ Loga métricas no MLflow e registra todos os modelos em churn.models com status 
 
 Uso:
     # escopo global (todos os tenants)
-    python ml/baseline.py
-    python ml/baseline.py --dry-run
+    python ml/models/baseline.py
+    python ml/models/baseline.py --dry-run
 
     # escopo tenant
-    python ml/baseline.py --tenant <tenant-slug>
-    python ml/baseline.py --tenant <tenant-slug> --dry-run
+    python ml/models/baseline.py --tenant <tenant-slug>
+    python ml/models/baseline.py --tenant <tenant-slug> --dry-run
 
     # escopo project
-    python ml/baseline.py --tenant <tenant-slug> --project <project-slug>
-    python ml/baseline.py --tenant <tenant-slug> --project <project-slug> --dry-run
+    python ml/models/baseline.py --tenant <tenant-slug> --project <project-slug>
+    python ml/models/baseline.py --tenant <tenant-slug> --project <project-slug> --dry-run
 """
 
 import argparse
@@ -29,9 +29,11 @@ from sklearn.model_selection import StratifiedKFold, cross_validate
 from sklearn.pipeline import Pipeline
 from sqlalchemy import text
 
-sys.path.insert(0, os.path.dirname(__file__))
-from config import MLFLOW_TRACKING_URI
-from preprocessing import (
+# Raiz do projeto no path para imports absolutos
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+
+from ml.core.config import MLFLOW_TRACKING_URI
+from ml.core.preprocessing import (
     _build_engine,
     _resolve_project_id,
     _resolve_tenant_id,

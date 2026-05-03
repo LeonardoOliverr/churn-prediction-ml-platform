@@ -12,8 +12,8 @@ import pandas as pd
 import pytest
 from sklearn.compose import ColumnTransformer
 
-from ml.config import BOOL_FEATURES, CATEGORICAL_FEATURES, NUMERIC_FEATURES, TARGET
-from ml.preprocessing import build_preprocessor
+from ml.core.config import BOOL_FEATURES, CATEGORICAL_FEATURES, NUMERIC_FEATURES, TARGET
+from ml.core.preprocessing import build_preprocessor
 
 
 # ---------------------------------------------------------------------------

@@ -7,7 +7,7 @@ probabilidades inválidas.
 
 import pytest
 
-from ml.risk import classify_risk
+from ml.core.risk import classify_risk
 
 
 # ---------------------------------------------------------------------------

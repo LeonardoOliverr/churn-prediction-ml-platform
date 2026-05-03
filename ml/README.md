@@ -1,119 +1,159 @@
-# ml/ - Pipeline de Treinamento
+# ml/ — Pipeline de Machine Learning
 
-Módulo de treinamento multi-tenant. Suporta três escopos de modelo, dry-run e registro automático no catálogo técnico `churn.models`.
-
----
-
-## Arquivos
-
-| Arquivo | Responsabilidade |
-|---|---|
-| `config.py` | Constantes globais: MLflow URI, feature lists, colunas descartadas |
-| `preprocessing.py` | Carregamento de dados com filtro por escopo + preprocessor sklearn |
-| `baseline.py` | CLI de treinamento: DummyClassifier + Logistic Regression |
-| `BASELINE.md` | Resultados numéricos do experimento baseline |
+Módulo de treinamento multi-tenant para previsão de churn.
+Suporta múltiplos modelos, três escopos de dados, dry-run e registro automático no MLflow e em `churn.models`.
 
 ---
 
-## Escopos de modelo
+## Estrutura
 
-O pipeline respeita a hierarquia multi-tenant da plataforma:
+```
+ml/
+  core/              — biblioteca compartilhada (importada por models, tools e API)
+    config.py        — constantes globais: MLflow URI, feature groups, colunas descartadas
+    preprocessing.py — load_data() + build_preprocessor()
+    risk.py          — classify_risk() — compartilhado com a API de inferência
+    __init__.py
+
+  models/            — um arquivo por modelo, todos com a mesma interface CLI
+    baseline.py      — DummyClassifier + Logistic Regression
+    random_forest.py — (pendente)
+    boosting.py      — (pendente)
+    baseline_fe.py   — (pendente)
+    mlp.py           — (pendente — será implementado após árvores)
+    __init__.py
+    MODELS.md        — guia completo de cada modelo: o que é, quando usar, limitações
+    BASELINE.md      — resultados numéricos do experimento baseline
+
+  tools/             — scripts utilitários, não são modelos
+    export_dataset.py — exporta o dataset tratado para CSV (inspeção e auditoria)
+    __init__.py
+```
+
+---
+
+## Escopos de treinamento
+
+Todos os modelos respeitam a hierarquia multi-tenant via flags CLI:
 
 | Escopo | `--tenant` | `--project` | Dados usados | Experimento MLflow |
 |---|---|---|---|---|
-| `global` | - | - | Todos os tenants | `global/baseline` |
-| `tenant` | sim | - | Só esse tenant | `{tenant}/baseline` |
-| `project` | sim | sim | Só esse projeto | `{tenant}/{project}/baseline` |
+| `global` | — | — | Todos os tenants | `global/<modelo>` |
+| `tenant` | ✓ | — | Só esse tenant | `{tenant}/<modelo>` |
+| `project` | ✓ | ✓ | Só esse projeto | `{tenant}/{project}/<modelo>` |
 
-> Escopo define onde o modelo foi treinado/catalogado. Produção não é definida por `scope`; produção é definida por `churn.project_model_config`.
+> Produção não é definida por `scope` — é definida por `churn.project_model_config`.
 
 ---
 
-## Uso
+## Comandos
 
-O treinamento deve rodar pelo serviço Docker `trainer`, para usar a rede interna do Compose e o volume de artefatos do MLflow.
+### Baseline (DummyClassifier + Logistic Regression)
 
 ```bash
-# Escopo global
-docker compose --profile tools run --rm trainer python ml/baseline.py
-docker compose --profile tools run --rm trainer python ml/baseline.py --dry-run
-
-# Escopo tenant
-docker compose --profile tools run --rm trainer python ml/baseline.py --tenant <tenant-slug>
-docker compose --profile tools run --rm trainer python ml/baseline.py --tenant <tenant-slug> --dry-run
-
-# Escopo project
-docker compose --profile tools run --rm trainer python ml/baseline.py --tenant <tenant-slug> --project <project-slug>
-docker compose --profile tools run --rm trainer python ml/baseline.py --tenant <tenant-slug> --project <project-slug> --dry-run
+python ml/models/baseline.py
+python ml/models/baseline.py --dry-run
+python ml/models/baseline.py --tenant ibm-telco --project telco-churn-2018
+python ml/models/baseline.py --tenant ibm-telco --project telco-churn-2018 --dry-run
 ```
 
-### Dry-run
+### Random Forest
 
-O flag `--dry-run` executa treino e avaliação completos, mas não grava nada:
+```bash
+python ml/models/random_forest.py
+python ml/models/random_forest.py --dry-run
+python ml/models/random_forest.py --tenant ibm-telco --project telco-churn-2018
+```
 
-- Sem criação de runs no MLflow
-- Sem insert em `churn.models`
+### Exportar dataset tratado para CSV
+
+```bash
+python ml/tools/export_dataset.py
+python ml/tools/export_dataset.py --tenant ibm-telco --project telco-churn-2018
+python ml/tools/export_dataset.py --output-dir data/exports/
+# Gera: data/features_raw.csv, data/features_transformed.csv, data/feature_names.txt
+```
+
+### Via Docker (ambiente isolado com MLflow interno)
+
+```bash
+docker compose --profile tools run --rm trainer python ml/models/baseline.py --tenant ibm-telco --project telco-churn-2018
+docker compose --profile tools run --rm trainer python ml/models/random_forest.py --tenant ibm-telco --project telco-churn-2018
+```
+
+### Flag `--dry-run`
+
+Disponível em todos os modelos. Executa treino e CV completos, mas **não grava nada**:
+- Sem runs no MLflow
+- Sem INSERT em `churn.models`
 - Imprime o payload exato que seria gravado
-
-Use para validar configuração antes de comprometer resultados.
 
 ---
 
 ## Pré-requisitos
 
-1. Serviços Docker rodando: `docker compose up -d`
-2. Migrações aplicadas: `cd db && ./sqitch deploy`
-3. Tenant e projeto existentes no banco (seed aplicado)
-4. Variáveis de ambiente configuradas (`.env`)
+1. `docker compose up -d` — PostgreSQL e MLflow rodando
+2. `cd db && ./sqitch deploy` — migrações aplicadas
+3. Seed aplicado (`db/seed/001_default_tenant.sql`)
+4. `.env` configurado com credenciais do banco
 
 ---
 
-## O que é registrado
+## O que é registrado após o treino
 
 ### MLflow
 
-- Parâmetros: tipo do modelo, folds, estratégia de CV, class_weight
-- Métricas: F1, ROC-AUC, Recall, Precision (média e desvio padrão dos 5 folds)
-- Artefato do modelo em `artifact_path="model"`
+| O que | Detalhe |
+|---|---|
+| Parâmetros | tipo do modelo, folds, estratégia de CV, hiperparâmetros |
+| Métricas | F1, ROC-AUC, Recall, Precision — média ± desvio dos 5 folds |
+| Artefato | pipeline completo serializado em `artifact_path="model"` |
+
+Acesse em: `http://localhost:5000`
 
 ### churn.models
 
-`churn.models` é o catálogo técnico de modelos treinados. Todos os modelos do run são registrados, não apenas o melhor:
+Catálogo técnico de todos os modelos treinados:
 
-| Situação | Status técnico |
+| Situação | Status |
 |---|---|
-| Melhor modelo do run (maior F1) | `approved` |
-| Demais modelos do run | `trained` |
+| Melhor F1 do run | `approved` — elegível para produção |
+| Demais modelos do run | `trained` — registrado, não elegível |
 
-Cada registro inclui:
-
-- `scope` derivado dos argumentos CLI
-- `tenant_id` / `project_id` de acordo com o escopo (NULL para global)
-- `version` auto-incremental: `v1`, `v2`, ... por `(scope, tenant_id, project_id, name)`
-- `mlflow_run_id` para rastreabilidade
-- Métricas do cross-validation (F1, ROC-AUC, Recall, Precision)
-
-`status='approved'` indica que o modelo é tecnicamente elegível para servir. Isso não significa que ele esteja em produção.
+Campos registrados: `name`, `version` (v1, v2…), `scope`, `tenant_id`, `project_id`, `mlflow_run_id`, F1, ROC-AUC, Recall, Precision.
 
 ### churn.project_model_config
 
-`churn.project_model_config` é a fonte de verdade da produção por projeto:
-
-- `model_id` aponta para o modelo aprovado que será servido.
-- `is_active=true` indica a configuração atualmente ativa do projeto.
-- Apenas uma configuração ativa por projeto é permitida (índice único parcial no banco).
-
-A API resolve o modelo com cascade: configuração do projeto → configuração do tenant → modelo global (`churn.models` com `scope='global'`). O `scope` do modelo treinado não determina onde ele pode ser servido — isso é definido pela configuração em `project_model_config`.
+Fonte de verdade da produção por projeto. A API resolve com cascade:
+```
+project_model_config do projeto → project_model_config do tenant → churn.models scope=global
+```
 
 ---
 
-## Resultados do baseline
+## Como adicionar um novo modelo
 
-Ver [BASELINE.md](BASELINE.md) para os números completos.
+1. Criar `ml/models/<nome>.py` seguindo a estrutura de `baseline.py`:
+   - Importar `load_data` e `build_preprocessor` de `ml.core.preprocessing`
+   - Implementar `_derive_scope()`, `_cv_metrics()`, `_register_in_db()`, `main()`
+   - Suportar `--tenant`, `--project`, `--dry-run`
+   - Logar métricas no MLflow e registrar em `churn.models`
+
+2. Adicionar linha na tabela de `MODEL_COMPARISON.md`
+
+3. Adicionar seção em `MODELS.md` com descrição do modelo
+
+---
+
+## Resultados consolidados
+
+Ver [MODEL_COMPARISON.md](../MODEL_COMPARISON.md) e [models/MODELS.md](models/MODELS.md) para comparação e guia completo.
 
 | Modelo | F1 | ROC-AUC | Recall |
 |---|---|---|---|
 | DummyClassifier | 0.2413 | 0.4828 | 24.2% |
 | **Logistic Regression** | **0.6379** | **0.8575** | **80.7%** |
-
-Para comparação entre todos os experimentos: [MODEL_COMPARISON.md](../MODEL_COMPARISON.md).
+| Random Forest | — | — | — |
+| XGBoost / LightGBM | — | — | — |
+| LogReg + Feature Engineering | — | — | — |
+| MLP | — | — | — |
