@@ -16,8 +16,8 @@ import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from sqlalchemy.engine import Connection
 
-from ml.config import BOOL_FEATURES, CATEGORICAL_FEATURES, NUMERIC_FEATURES
-from ml.risk import classify_risk
+from ml.core.config import BOOL_FEATURES, CATEGORICAL_FEATURES, NUMERIC_FEATURES
+from ml.core.risk import classify_risk
 from src.config import Settings, get_settings
 from src.dependencies import _get_engine, get_current_api_key, get_db, require_scope
 from src.middleware.auth import ApiKeyRecord
