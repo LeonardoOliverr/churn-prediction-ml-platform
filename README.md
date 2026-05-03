@@ -61,7 +61,7 @@ Plataforma de machine learning end-to-end para previsão de churn de clientes em
 | EDA | Jupyter + matplotlib + seaborn + scikit-learn | Análise exploratória e relatório de negócio |
 | Modelagem | Scikit-learn | Baseline: DummyClassifier + Logistic Regression |
 | Modelagem (deep learning) | PyTorch | _(a implementar)_ |
-| API de inferência | FastAPI | _(a implementar)_ |
+| API de inferência | FastAPI | Predição individual e em lote, multi-tenant |
 
 ---
 
@@ -181,13 +181,13 @@ Os componentes locais de ML (EDA, ingestão e testes) requerem um ambiente Pytho
 O treinamento de modelos deve rodar pelo serviço Docker `trainer`, para usar a mesma rede do PostgreSQL/MLflow e o mesmo volume de artefatos.
 
 ```bash
-python -m venv .venv
+python3 -m venv venv
 
 # Linux / Mac / WSL
-source .venv/bin/activate
+source venv/bin/activate
 
 # Windows (PowerShell)
-.venv\Scripts\Activate.ps1
+venv\Scripts\Activate.ps1
 ```
 
 Com o ambiente ativo, instale as dependências:
@@ -224,6 +224,30 @@ cp .env.example .env
 | `POSTGRES_DB` | Nome do banco de dados | — |
 | `POSTGRES_HOST` | Host do PostgreSQL | `localhost` |
 | `POSTGRES_PORT` | Porta exposta pelo Docker | `5434` |
+| `APP_SECRET_KEY` | Chave de assinatura dos JWTs de admin | — |
+| `JWT_EXPIRE_MINUTES` | Tempo de expiração do JWT em minutos | `30` |
+| `MLFLOW_TRACKING_URI` | URI do servidor MLflow | `http://localhost:5000` |
+| `DATABASE_URL` | Connection string da API (psycopg2) | — |
+
+#### Gerando o APP_SECRET_KEY
+
+`APP_SECRET_KEY` é a chave usada para assinar e verificar os JWTs de admin. Use um valor aleatório e longo — **nunca use o valor padrão `change-me-in-production` fora do ambiente local.**
+
+```bash
+# WSL / Linux / Mac — gera 32 bytes em hex (64 caracteres)
+python -c "import secrets; print(secrets.token_hex(32))"
+
+# alternativa com openssl
+openssl rand -hex 32
+```
+
+Cole o resultado gerado no `.env`:
+
+```env
+APP_SECRET_KEY=a3f8c2e1d4b7...  # valor gerado pelo comando acima
+```
+
+> O mesmo valor configurado no `.env` deve ser usado para gerar o JWT no passo de autenticação. Se a chave mudar, todos os tokens ativos deixam de ser válidos.
 
 ### 3. Suba os serviços
 
@@ -267,6 +291,7 @@ O script baixa o dataset IBM Telco via `kagglehub` (cache local após a primeira
 | Serviço | URL | Credenciais |
 |---|---|---|
 | MLflow UI | http://localhost:5000 | — |
+| API docs | http://localhost:8000/docs | — |
 | PostgreSQL | localhost:5434 | conforme `.env` |
 
 O Compose também define o serviço `trainer`, usado para jobs de treinamento. Ele fica no profile `tools` e não sobe no `docker compose up -d` padrão.
@@ -320,12 +345,20 @@ churn-prediction-ml-platform/
 ├── .env.example                    # template de variáveis de ambiente
 │
 ├── docker/
+│   ├── api.Dockerfile              # API de inferência FastAPI
 │   └── mlflow.Dockerfile           # MLflow + psycopg2 (driver PostgreSQL)
 │
 ├── requirements.txt                # dependências Python do projeto
 ├── GLOSSARY.md                     # dicionário de todos os termos técnicos e de negócio
 ├── MODEL_COMPARISON.md             # comparativo de experimentos e critérios de decisão
-├── app/                            # API de inferência (FastAPI) — a implementar
+├── src/                            # API de inferência (FastAPI)
+│   ├── main.py                     # factory create_app() com middlewares e routers
+│   ├── config.py                   # Settings via pydantic-settings
+│   ├── dependencies.py             # autenticação (API key + JWT), injeção de DB
+│   ├── middleware/                 # autenticação, rate limiting, logging estruturado
+│   ├── routers/                    # endpoints: health, predict, predictions, admin
+│   ├── schemas/                    # contratos Pydantic de entrada e saída
+│   └── services/                   # model_resolver, prediction_logger
 ├── data/                           # arquivos locais opcionais (não versionados)
 ├── estudos/                        # exercícios de fixação de conceitos de ML
 ├── ml/                             # pipeline de treinamento multi-tenant (ver ml/README.md)
@@ -360,6 +393,7 @@ churn-prediction-ml-platform/
     │   ├── 07_cost_analysis.sql
     │   ├── 08_models_unique_constraint.sql
     │   ├── 09_models_status.sql    # status técnico: trained, validated, approved, archived
+    │   ├── 10_api_keys.sql         # tabela de API keys para autenticação de inferência
     │   └── 11_models_status_and_project_config_semantics.sql  # semântica de produção via project_model_config
     ├── revert/                     # scripts de rollback
     └── verify/                     # scripts de verificação pós-deploy
@@ -377,7 +411,7 @@ churn-prediction-ml-platform/
 | EDA (`notebooks/`) | ✅ Completo |
 | Baseline multi-tenant (`ml/`) — DummyClassifier + Logistic Regression | ✅ Completo |
 | Semântica de status técnico (`churn.models`) e configuração de produção (`churn.project_model_config`) | ✅ Completo |
-| API de inferência (FastAPI) — predição individual e em lote | 🔲 Em progresso |
+| API de inferência (FastAPI) — predição individual e em lote | ✅ Completo |
 | Próximos experimentos (`ml/`) — Random Forest, XGBoost | 🔲 Pendente |
 | Análise de custo (`churn.cost_analysis`) | 🔲 Pendente |
 
@@ -472,10 +506,430 @@ Resultados do baseline e critérios para os próximos experimentos: [MODEL_COMPA
 
 ---
 
+## API de Inferência
+
+A API FastAPI roda na porta **8000** e expõe os seguintes grupos de endpoints:
+
+| Grupo | Endpoints | Autenticação |
+|---|---|---|
+| Health | `GET /health`, `GET /health/ready` | Pública |
+| Inferência | `POST /predict`, `POST /predict/batch` | API Key (`x-api-key`) com escopo `predict` |
+| Histórico | `GET /predictions` | API Key (`x-api-key`) com escopo `predictions:read` |
+| Admin | `POST /admin/tenants`, `POST /admin/projects`, `POST /admin/keys`, `DELETE /admin/keys/{id}` | JWT Bearer |
+
+Documentação interativa disponível em `http://localhost:8000/docs` com a API no ar.
+
+---
+
+### 1. Iniciar a API
+
+```bash
+# sobe o serviço api (PostgreSQL e MLflow já devem estar rodando)
+docker compose up -d api
+
+# verifica saúde
+curl http://localhost:8000/health
+# → {"status":"ok"}
+
+curl http://localhost:8000/health/ready
+# → {"status":"ready"}
+```
+
+---
+
+### 2. Gerar JWT de admin
+
+O JWT é exigido pelos endpoints `/admin/*`. Ele é assinado com `APP_SECRET_KEY` (definido no `.env`).
+
+> **Pré-requisito:** dependências Python instaladas no venv local.
+> ```bash
+> pip install -r requirements.txt
+> ```
+
+#### WSL (terminal)
+
+```bash
+# na raiz do projeto, com o venv ativo
+# lê APP_SECRET_KEY diretamente do .env e gera o token
+TOKEN=$(python - <<'EOF'
+import time, os
+from jose import jwt
+from dotenv import load_dotenv
+load_dotenv(".env")
+secret = os.environ["APP_SECRET_KEY"]
+payload = {"sub": "admin", "exp": int(time.time()) + 1800}
+print(jwt.encode(payload, secret, algorithm="HS256"))
+EOF
+)
+
+echo $TOKEN
+```
+
+#### Python
+
+```python
+import time, os
+from jose import jwt
+from dotenv import load_dotenv
+
+load_dotenv(".env")
+secret = os.environ["APP_SECRET_KEY"]  # lido do .env
+payload = {"sub": "admin", "exp": int(time.time()) + 1800}
+token = jwt.encode(payload, secret, algorithm="HS256")
+print(token)
+```
+
+---
+
+### 3. Criar API key — `POST /admin/keys`
+
+A API key é o segredo de autenticação para chamadas de inferência. O campo `secret` é retornado **apenas nesta resposta** — guarde-o.
+
+> **Pré-requisito:** ter o `tenant_id` e `project_id` do tenant desejado.
+> Para obter os IDs, consulte o banco:
+> ```bash
+> psql -U churn_user -d churn_dev -h localhost -p 5434 \
+>   -c "SELECT id, slug FROM churn.tenants;"
+> psql -U churn_user -d churn_dev -h localhost -p 5434 \
+>   -c "SELECT id, slug FROM churn.projects;"
+> ```
+
+#### WSL (terminal)
+
+```bash
+TENANT_ID="<uuid-do-tenant>"
+PROJECT_ID="<uuid-do-projeto>"   # opcional — omita para escopo de tenant
+
+curl -s -X POST http://localhost:8000/admin/keys \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tenant_id": "'"$TENANT_ID"'",
+    "project_id": "'"$PROJECT_ID"'",
+    "scopes": ["predict"],
+    "description": "key de teste"
+  }' | python -m json.tool
+
+# guarde o campo "secret" retornado
+API_KEY="churn_live_sk_..."
+```
+
+#### Python
+
+```python
+import requests
+
+token = "..."           # JWT gerado no passo anterior
+tenant_id = "..."       # UUID do tenant
+project_id = "..."      # UUID do projeto (opcional)
+
+resp = requests.post(
+    "http://localhost:8000/admin/keys",
+    headers={"Authorization": f"Bearer {token}"},
+    json={
+        "tenant_id": tenant_id,
+        "project_id": project_id,
+        "scopes": ["predict"],
+        "description": "key de teste",
+    },
+)
+data = resp.json()
+print(data)
+api_key = data["secret"]   # guarde — retornado apenas uma vez
+```
+
+---
+
+### 4. Predição individual — `POST /predict`
+
+Envia as features de **um cliente** e recebe a probabilidade de churn, nível de risco e metadados do modelo.
+
+#### WSL (terminal)
+
+```bash
+curl -s -X POST http://localhost:8000/predict \
+  -H "x-api-key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customer_id": "CUST-001",
+    "tenure_months": 2,
+    "monthly_charges": 94.5,
+    "total_charges": 189.0,
+    "senior_citizen": 0,
+    "partner": 0,
+    "dependents": 0,
+    "phone_service": 1,
+    "paperless_billing": 1,
+    "gender": "Male",
+    "multiple_lines": "No",
+    "internet_service": "Fiber optic",
+    "online_security": "No",
+    "online_backup": "No",
+    "device_protection": "No",
+    "tech_support": "No",
+    "streaming_tv": "No",
+    "streaming_movies": "No",
+    "contract": "Month-to-month",
+    "payment_method": "Electronic check"
+  }' | python -m json.tool
+```
+
+Resposta esperada:
+
+```json
+{
+  "prediction_id": "...",
+  "customer_id": "CUST-001",
+  "churn_probability": 0.8341,
+  "risk_level": "high",
+  "churn_pred": true,
+  "threshold_used": 0.5,
+  "model_version": "1",
+  "model_name": "LogisticRegression",
+  "model_id": "..."
+}
+```
+
+#### Python
+
+```python
+import requests
+
+api_key = "churn_live_sk_..."
+
+customer = {
+    "customer_id": "CUST-001",
+    "tenure_months": 2,
+    "monthly_charges": 94.5,
+    "total_charges": 189.0,
+    "senior_citizen": 0,
+    "partner": 0,
+    "dependents": 0,
+    "phone_service": 1,
+    "paperless_billing": 1,
+    "gender": "Male",
+    "multiple_lines": "No",
+    "internet_service": "Fiber optic",
+    "online_security": "No",
+    "online_backup": "No",
+    "device_protection": "No",
+    "tech_support": "No",
+    "streaming_tv": "No",
+    "streaming_movies": "No",
+    "contract": "Month-to-month",
+    "payment_method": "Electronic check",
+}
+
+resp = requests.post(
+    "http://localhost:8000/predict",
+    headers={"x-api-key": api_key},
+    json=customer,
+)
+print(resp.json())
+```
+
+---
+
+### 5. Predição em lote — `POST /predict/batch`
+
+Envia **múltiplos clientes** (máximo 100) em uma única requisição. O mesmo modelo ativo é aplicado a todos.
+
+#### WSL (terminal)
+
+```bash
+curl -s -X POST http://localhost:8000/predict/batch \
+  -H "x-api-key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customers": [
+      {
+        "customer_id": "CUST-001",
+        "tenure_months": 2,
+        "monthly_charges": 94.5,
+        "total_charges": 189.0,
+        "senior_citizen": 0,
+        "partner": 0,
+        "dependents": 0,
+        "phone_service": 1,
+        "paperless_billing": 1,
+        "gender": "Male",
+        "multiple_lines": "No",
+        "internet_service": "Fiber optic",
+        "online_security": "No",
+        "online_backup": "No",
+        "device_protection": "No",
+        "tech_support": "No",
+        "streaming_tv": "No",
+        "streaming_movies": "No",
+        "contract": "Month-to-month",
+        "payment_method": "Electronic check"
+      },
+      {
+        "customer_id": "CUST-002",
+        "tenure_months": 58,
+        "monthly_charges": 45.0,
+        "total_charges": 2610.0,
+        "senior_citizen": 0,
+        "partner": 1,
+        "dependents": 1,
+        "phone_service": 1,
+        "paperless_billing": 0,
+        "gender": "Female",
+        "multiple_lines": "Yes",
+        "internet_service": "DSL",
+        "online_security": "Yes",
+        "online_backup": "Yes",
+        "device_protection": "Yes",
+        "tech_support": "Yes",
+        "streaming_tv": "No",
+        "streaming_movies": "No",
+        "contract": "Two year",
+        "payment_method": "Bank transfer (automatic)"
+      }
+    ]
+  }' | python -m json.tool
+```
+
+#### Python
+
+```python
+import requests
+
+api_key = "churn_live_sk_..."
+
+batch = {
+    "customers": [
+        {
+            "customer_id": "CUST-001",
+            "tenure_months": 2, "monthly_charges": 94.5, "total_charges": 189.0,
+            "senior_citizen": 0, "partner": 0, "dependents": 0,
+            "phone_service": 1, "paperless_billing": 1,
+            "gender": "Male", "multiple_lines": "No",
+            "internet_service": "Fiber optic",
+            "online_security": "No", "online_backup": "No",
+            "device_protection": "No", "tech_support": "No",
+            "streaming_tv": "No", "streaming_movies": "No",
+            "contract": "Month-to-month",
+            "payment_method": "Electronic check",
+        },
+        {
+            "customer_id": "CUST-002",
+            "tenure_months": 58, "monthly_charges": 45.0, "total_charges": 2610.0,
+            "senior_citizen": 0, "partner": 1, "dependents": 1,
+            "phone_service": 1, "paperless_billing": 0,
+            "gender": "Female", "multiple_lines": "Yes",
+            "internet_service": "DSL",
+            "online_security": "Yes", "online_backup": "Yes",
+            "device_protection": "Yes", "tech_support": "Yes",
+            "streaming_tv": "No", "streaming_movies": "No",
+            "contract": "Two year",
+            "payment_method": "Bank transfer (automatic)",
+        },
+    ]
+}
+
+resp = requests.post(
+    "http://localhost:8000/predict/batch",
+    headers={"x-api-key": api_key},
+    json=batch,
+)
+data = resp.json()
+print(f"Total processado: {data['total']}")
+for item in data["results"]:
+    print(f"{item['customer_id']}: {item['churn_probability']:.2%} ({item['risk_level']})")
+```
+
+---
+
+### 6. Histórico de predições — `GET /predictions`
+
+Retorna o histórico paginado de predições do tenant/projeto da API key. O isolamento multi-tenant é garantido — não é possível acessar predições de outro tenant.
+
+#### WSL (terminal)
+
+```bash
+# página 1, 20 itens por página (padrão)
+curl -s "http://localhost:8000/predictions" \
+  -H "x-api-key: $API_KEY" | python -m json.tool
+
+# página 2, 10 itens por página
+curl -s "http://localhost:8000/predictions?page=2&page_size=10" \
+  -H "x-api-key: $API_KEY" | python -m json.tool
+```
+
+Resposta esperada:
+
+```json
+{
+  "items": [
+    {
+      "id": "...",
+      "customer_id": "CUST-001",
+      "churn_probability": 0.8341,
+      "churn_pred": true,
+      "threshold_used": 0.5,
+      "latency_ms": 42,
+      "requested_at": "2026-05-02 14:23:11.000000+00:00",
+      "model_id": "..."
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "page_size": 20
+}
+```
+
+#### Python
+
+```python
+import requests
+
+api_key = "churn_live_sk_..."
+
+resp = requests.get(
+    "http://localhost:8000/predictions",
+    headers={"x-api-key": api_key},
+    params={"page": 1, "page_size": 20},
+)
+data = resp.json()
+print(f"Total: {data['total']} predições")
+for item in data["items"]:
+    print(f"  {item['customer_id']} | {float(item['churn_probability']):.2%} | {item['requested_at']}")
+```
+
+---
+
+### Referência rápida de campos — CustomerFeatures
+
+| Campo | Tipo | Valores aceitos |
+|---|---|---|
+| `customer_id` | `string` | Identificador livre |
+| `tenure_months` | `float` | Meses de contrato do cliente |
+| `monthly_charges` | `float` | Valor mensal da fatura |
+| `total_charges` | `float` | Total histórico cobrado |
+| `senior_citizen` | `0` ou `1` | 1 = cliente sênior |
+| `partner` | `0` ou `1` | 1 = possui cônjuge |
+| `dependents` | `0` ou `1` | 1 = possui dependentes |
+| `phone_service` | `0` ou `1` | 1 = tem serviço de telefone |
+| `paperless_billing` | `0` ou `1` | 1 = fatura digital |
+| `gender` | `string` | `"Male"` \| `"Female"` |
+| `multiple_lines` | `string` | `"No"` \| `"Yes"` \| `"No phone service"` |
+| `internet_service` | `string` | `"DSL"` \| `"Fiber optic"` \| `"No"` |
+| `online_security` | `string` | `"No"` \| `"Yes"` \| `"No internet service"` |
+| `online_backup` | `string` | `"No"` \| `"Yes"` \| `"No internet service"` |
+| `device_protection` | `string` | `"No"` \| `"Yes"` \| `"No internet service"` |
+| `tech_support` | `string` | `"No"` \| `"Yes"` \| `"No internet service"` |
+| `streaming_tv` | `string` | `"No"` \| `"Yes"` \| `"No internet service"` |
+| `streaming_movies` | `string` | `"No"` \| `"Yes"` \| `"No internet service"` |
+| `contract` | `string` | `"Month-to-month"` \| `"One year"` \| `"Two year"` |
+| `payment_method` | `string` | `"Electronic check"` \| `"Mailed check"` \| `"Bank transfer (automatic)"` \| `"Credit card (automatic)"` |
+
+---
+
 ## Convenções
 
 - Todas as tabelas de negócio ficam no schema `churn`
-- Toda tabela possui `tenant_id` e `project_id` para isolamento multi-tenant
+- O isolamento multi-tenant segue três escopos: `global` (sem tenant/project), `tenant` (apenas `tenant_id`) e `tenant + project` (`tenant_id` + `project_id`) — nem toda tabela possui ambas as colunas
 - Migrações são prefixadas com número sequencial (`00_`, `01_`, ...)
 - Scripts de revert devem sempre ser o inverso exato do deploy
 - Credenciais nunca são hardcoded — sempre via variáveis de ambiente
