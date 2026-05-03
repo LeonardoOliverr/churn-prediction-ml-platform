@@ -21,9 +21,11 @@
 | 3 | Random Forest | — | — | — | — | 🔲 Pendente |
 | 4 | XGBoost / LightGBM | — | — | — | — | 🔲 Pendente |
 | 5 | Logistic Regression + Feature Engineering | — | — | — | — | 🔲 Pendente |
+| 6 | MLP — Rede Neural (PyTorch) | — | — | — | — | ⏸ Após árvores |
 
 **Modelo recomendado atualmente:** `Logistic Regression` (`active`, scope=project)  
-**Experimento MLflow:** `ibm-telco/telco-churn-2018/baseline`
+**Experimento MLflow:** `ibm-telco/telco-churn-2018/baseline`  
+**Guia de modelos:** [`ml/MODELS.md`](ml/MODELS.md)
 
 ---
 
@@ -82,8 +84,29 @@ Logistic Regression adotada como **piso de referência**. Próximo passo: Random
 
 ### Experimento 2 — Random Forest
 **Data:** —  
-**MLflow:** —  
-**Branch:** —
+**MLflow:** `ibm-telco/telco-churn-2018/random-forest`  
+**Branch:** `feature/random-forest-model`  
+**Script:** `python ml/models/random_forest.py --tenant ibm-telco --project telco-churn-2018`
+
+#### Configuração
+
+```
+Estimators : 500 árvores
+Max depth  : None (cresce até folhas puras)
+Max features: sqrt (padrão para classificação)
+Class weight: balanced
+```
+
+#### Resultados
+
+| Modelo | F1 ± std | ROC-AUC ± std | Recall | Precision |
+|---|---|---|---|---|
+| Random Forest | — | — | — | — |
+
+#### Expectativa
+```
+F1 esperado: 0.68–0.73  |  ROC-AUC esperado: 0.87–0.91
+```
 
 > *A preencher após execução.*
 
@@ -92,7 +115,32 @@ Logistic Regression adotada como **piso de referência**. Próximo passo: Random
 ### Experimento 3 — XGBoost / LightGBM
 **Data:** —  
 **MLflow:** —  
-**Branch:** —
+**Branch:** —  
+**Script:** `python ml/models/boosting.py --tenant ibm-telco --project telco-churn-2018`
+
+#### Configuração
+
+```
+n_estimators  : 300
+learning_rate : 0.05
+max_depth     : 6
+subsample     : 0.8
+colsample     : 0.8
+scale_pos_weight: ratio classes (desbalanceamento)
+```
+
+#### Resultados
+
+| Modelo | F1 ± std | ROC-AUC ± std | Recall | Precision |
+|---|---|---|---|---|
+| XGBoost | — | — | — | — |
+| LightGBM | — | — | — | — |
+
+#### Expectativa
+```
+F1 esperado: 0.70–0.76  |  ROC-AUC esperado: 0.89–0.93
+Provavelmente o melhor resultado entre todos os modelos.
+```
 
 > *A preencher após execução.*
 
@@ -101,9 +149,38 @@ Logistic Regression adotada como **piso de referência**. Próximo passo: Random
 ### Experimento 4 — Logistic Regression + Feature Engineering
 **Data:** —  
 **MLflow:** —  
-**Branch:** —
+**Branch:** —  
+**Script:** `python ml/models/baseline_fe.py --tenant ibm-telco --project telco-churn-2018`
 
-> *A preencher após execução. Features candidatas: `monthly_charges / tenure_months`, reintrodução de `cltv`, agrupamento de localização por região.*
+#### Features candidatas
+
+```python
+# Custo por mês de relacionamento
+charge_per_tenure       = monthly_charges / (tenure_months + 1)
+
+# Segmentação de risco por tempo de contrato
+is_new_customer         = tenure_months < 12
+
+# Alto valor sem compromisso de longo prazo
+high_value_no_contract  = (monthly_charges > 70) AND (contract == "Month-to-month")
+
+# Nível de engajamento com serviços adicionais
+num_addon_services      = soma de: online_security, online_backup,
+                          device_protection, tech_support,
+                          streaming_tv, streaming_movies
+```
+
+#### Resultados
+
+| Modelo | F1 ± std | ROC-AUC ± std | Recall | Precision |
+|---|---|---|---|---|
+| LogReg + FE | — | — | — | — |
+
+#### Hipótese a validar
+Se LogReg+FE superar o MLP → o problema era a representação das features, não o algoritmo.
+Nesse caso, as features derivadas devem ser aplicadas a todos os modelos subsequentes.
+
+> *A preencher após execução.*
 
 ---
 
