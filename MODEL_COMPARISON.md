@@ -8,7 +8,7 @@
 
 > Este documento é atualizado a cada novo experimento concluído.  
 > A métrica de decisão primária é o **F1-Score** (classes desbalanceadas).  
-> O modelo recomendado é o que apresenta o melhor F1 com complexidade justificada.
+> O modelo recomendado é o que apresenta melhor equilíbrio entre F1, Recall, ROC-AUC e complexidade operacional.
 
 ---
 
@@ -17,13 +17,14 @@
 | # | Modelo | F1 | ROC-AUC | Recall | Precision | Status |
 |---|---|---|---|---|---|---|
 | 1 | DummyClassifier (estratificado) | 0.2413 | 0.4828 | 0.2424 | 0.2403 | ✅ Concluído |
-| 2 | Logistic Regression | **0.6379** | **0.8575** | **0.8074** | 0.5273 | ✅ Concluído |
-| 3 | Random Forest | — | — | — | — | 🔲 Pendente |
+| 2 | Logistic Regression | 0.6379 | 0.8575 | **0.8074** | 0.5273 | ✅ Champion |
+| 3 | Random Forest | **0.6470** | **0.8579** | 0.7812 | **0.5526** | ✅ Challenger |
 | 4 | XGBoost / LightGBM | — | — | — | — | 🔲 Pendente |
 | 5 | Logistic Regression + Feature Engineering | — | — | — | — | 🔲 Pendente |
 | 6 | MLP — Rede Neural (PyTorch) | — | — | — | — | ⏸ Após árvores |
 
 **Modelo recomendado atualmente:** `Logistic Regression` (`active`, scope=project)  
+**Challenger atual:** `Random Forest` (`approved`, scope=project)  
 **Experimento MLflow:** `ibm-telco/telco-churn-2018/baseline`  
 **Guia de modelos:** [`ml/MODELS.md`](ml/MODELS.md)
 
@@ -83,16 +84,16 @@ Logistic Regression adotada como **piso de referência**. Próximo passo: Random
 ---
 
 ### Experimento 2 — Random Forest
-**Data:** —  
-**MLflow:** `ibm-telco/telco-churn-2018/random-forest`  
+**Data:** 03/05/2026  
+**MLflow:** `ibm-telco/telco-churn-2018/random-forest` (experiments/6, run `1389f4884b7b47fd959b882409bff005`)  
 **Branch:** `feature/random-forest-model`  
-**Script:** `python ml/models/random_forest.py --tenant ibm-telco --project telco-churn-2018`
+**Script:** `python ml/models/random_forest/random_forest.py --tenant ibm-telco --project telco-churn-2018 --max-depth 8 --n-estimators 100`
 
 #### Configuração
 
 ```
-Estimators : 500 árvores
-Max depth  : None (cresce até folhas puras)
+Estimators : 100 árvores
+Max depth  : 8
 Max features: sqrt (padrão para classificação)
 Class weight: balanced
 ```
@@ -101,14 +102,34 @@ Class weight: balanced
 
 | Modelo | F1 ± std | ROC-AUC ± std | Recall | Precision |
 |---|---|---|---|---|
-| Random Forest | — | — | — | — |
+| Random Forest | **0.6470 ± 0.0103** | **0.8579 ± 0.0080** | 0.7812 | 0.5526 |
 
-#### Expectativa
+#### Diagnóstico treino × teste
+
+| Métrica | Treino | Teste | Gap | Leitura |
+|---|---:|---:|---:|---|
+| F1 | 0.7096 | 0.6470 | +0.0626 | Sem overfitting crítico |
+| ROC-AUC | 0.9070 | 0.8579 | +0.0491 | Generalização aceitável |
+
+#### Top 5 features
+
 ```
-F1 esperado: 0.68–0.73  |  ROC-AUC esperado: 0.87–0.91
+contract_Month-to-month   0.1625
+tenure_months             0.1126
+total_charges             0.0834
+contract_Two year         0.0791
+tech_support_No           0.0680
 ```
 
-> *A preencher após execução.*
+#### Análise
+- Random Forest superou Logistic Regression em F1 (+0.0091), ROC-AUC (+0.0004) e Precision (+0.0253).
+- O ganho de F1 foi real, mas pequeno para justificar troca imediata de modelo em produção.
+- Recall caiu de 0.8074 para 0.7812, piorando a capacidade de capturar churners.
+- O modelo não atingiu os thresholds definidos para promoção: F1 > 0.68, ROC-AUC > 0.88 e Recall > 0.82.
+- O gap treino/teste ficou controlado, indicando que `max_depth=8` reduziu overfitting em relação a uma floresta sem limite de profundidade.
+
+#### Decisão
+Random Forest registrado como **challenger aprovado**, mas não promovido a champion. Logistic Regression permanece como modelo recomendado por entregar Recall maior, desempenho praticamente equivalente em ROC-AUC e menor complexidade operacional.
 
 ---
 
