@@ -43,7 +43,7 @@ services:
       - tools
     build:
       context: .
-      dockerfile: docker/api.Dockerfile
+      dockerfile: docker/trainer.Dockerfile
     depends_on:
       postgres:
         condition: service_healthy
