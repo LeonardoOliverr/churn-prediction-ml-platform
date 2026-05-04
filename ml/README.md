@@ -128,10 +128,23 @@ Campos registrados: `name`, `version` (v1, v2…), `scope`, `tenant_id`, `projec
 
 ### churn.project_model_config
 
-Fonte de verdade da produção por projeto. A API resolve com cascade:
+Fonte de verdade da produção por projeto. `churn.models` diz se o artefato está tecnicamente elegível; `project_model_config` diz se ele está servindo tráfego.
+
+Campos operacionais principais:
+
+| Campo | Uso |
+|---|---|
+| `role` | `champion` ou `challenger` |
+| `traffic_split` | Fração do tráfego enviada ao challenger |
+| `threshold` | Threshold aplicado na predição |
+| `is_active` | Define se a configuração participa da inferência |
+
+A API resolve com cascade:
 ```
-project_model_config do projeto → project_model_config do tenant → churn.models scope=global
+champion/challenger do projeto → champion do tenant → churn.models scope=global
 ```
+
+O challenger é roteado de forma determinística por `customer_id`, então o mesmo cliente tende a permanecer no mesmo grupo durante o teste.
 
 ---
 
