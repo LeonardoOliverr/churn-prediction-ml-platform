@@ -4,24 +4,26 @@ Loga métricas no MLflow e registra todos os modelos em churn.models com status 
 
 Uso:
     # escopo global (todos os tenants)
-    python ml/models/baseline.py
-    python ml/models/baseline.py --dry-run
+    python ml/models/baseline/baseline.py
+    python ml/models/baseline/baseline.py --dry-run
 
     # escopo tenant
-    python ml/models/baseline.py --tenant <tenant-slug>
-    python ml/models/baseline.py --tenant <tenant-slug> --dry-run
+    python ml/models/baseline/baseline.py --tenant <tenant-slug>
+    python ml/models/baseline/baseline.py --tenant <tenant-slug> --dry-run
 
     # escopo project
-    python ml/models/baseline.py --tenant <tenant-slug> --project <project-slug>
-    python ml/models/baseline.py --tenant <tenant-slug> --project <project-slug> --dry-run
+    python ml/models/baseline/baseline.py --tenant <tenant-slug> --project <project-slug>
+    python ml/models/baseline/baseline.py --tenant <tenant-slug> --project <project-slug> --dry-run
 """
 
 import argparse
 import os
 import sys
 
+import joblib
+import tempfile
+
 import mlflow
-import mlflow.sklearn
 import numpy as np
 from sklearn.dummy import DummyClassifier
 from sklearn.linear_model import LogisticRegression
@@ -30,7 +32,7 @@ from sklearn.pipeline import Pipeline
 from sqlalchemy import text
 
 # Raiz do projeto no path para imports absolutos
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 from ml.core.config import MLFLOW_TRACKING_URI
 from ml.core.preprocessing import (
@@ -78,13 +80,19 @@ def _derive_scope(tenant_slug: str | None, project_slug: str | None) -> tuple[st
 
 
 def _cv_metrics(pipeline: Pipeline, X, y) -> dict[str, float]:
-    """Executa cross-validation e retorna métricas agregadas (mean + std)."""
-    results = cross_validate(pipeline, X, y, cv=CV, scoring=SCORING)
+    """Executa cross-validation e retorna métricas de teste e treino por fold.
+
+    Retorna mean/std das métricas de teste (validação) e mean das métricas de treino.
+    A diferença train_mean − test_mean indica overfitting: gap > 0.10 é sinal de alerta.
+    """
+    results = cross_validate(pipeline, X, y, cv=CV, scoring=SCORING, return_train_score=True)
     metrics = {}
     for metric in SCORING:
-        scores = results[f"test_{metric}"]
-        metrics[f"{metric}_mean"] = float(np.mean(scores))
-        metrics[f"{metric}_std"]  = float(np.std(scores))
+        test_scores  = results[f"test_{metric}"]
+        train_scores = results[f"train_{metric}"]
+        metrics[f"{metric}_mean"]       = float(np.mean(test_scores))
+        metrics[f"{metric}_std"]        = float(np.std(test_scores))
+        metrics[f"train_{metric}_mean"] = float(np.mean(train_scores))
     return metrics
 
 
@@ -98,8 +106,12 @@ def _run_model(name: str, model, X, y, dry_run: bool) -> tuple[str, dict]:
     print(f"\n[{name}] Executando cross-validation ({CV.n_splits} folds)...")
     metrics = _cv_metrics(pipeline, X, y)
 
-    print(f"  F1        : {metrics['f1_mean']:.4f} ± {metrics['f1_std']:.4f}")
-    print(f"  ROC-AUC   : {metrics['roc_auc_mean']:.4f} ± {metrics['roc_auc_std']:.4f}")
+    f1_gap      = metrics["train_f1_mean"] - metrics["f1_mean"]
+    roc_gap     = metrics["train_roc_auc_mean"] - metrics["roc_auc_mean"]
+    gap_warning = "  ⚠ overfitting" if f1_gap > 0.10 else ""
+
+    print(f"  F1        : treino={metrics['train_f1_mean']:.4f}  teste={metrics['f1_mean']:.4f} ± {metrics['f1_std']:.4f}  gap={f1_gap:+.4f}{gap_warning}")
+    print(f"  ROC-AUC   : treino={metrics['train_roc_auc_mean']:.4f}  teste={metrics['roc_auc_mean']:.4f} ± {metrics['roc_auc_std']:.4f}  gap={roc_gap:+.4f}")
     print(f"  Recall    : {metrics['recall_mean']:.4f}")
     print(f"  Precision : {metrics['precision_mean']:.4f}")
 
@@ -118,10 +130,10 @@ def _run_model(name: str, model, X, y, dry_run: bool) -> tuple[str, dict]:
 
         # Treina o pipeline final em todos os dados para uso em inferência.
         pipeline.fit(X, y)
-        mlflow.sklearn.log_model(
-            sk_model=pipeline,
-            artifact_path="model",
-        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            model_path = os.path.join(tmpdir, "model.pkl")
+            joblib.dump(pipeline, model_path)
+            mlflow.log_artifact(model_path, artifact_path="model")
 
         run_id = run.info.run_id
 
@@ -244,10 +256,18 @@ def main() -> None:
     print(f"ROC-AUC médio : {best_metrics['roc_auc_mean']:.4f}")
     print(f"{'='*50}")
 
+    if args.tenant is None:
+        scope_prefix = "global"
+    elif args.project is None:
+        scope_prefix = args.tenant
+    else:
+        scope_prefix = f"{args.tenant}-{args.project}"
+
     for name, run_id, metrics in results:
+        db_name = f"{scope_prefix}-{name.replace('_', '-')}"
         status = "approved" if name == best_name else "trained"
         _register_in_db(
-            name=name,
+            name=db_name,
             run_id=run_id,
             metrics=metrics,
             scope=scope,

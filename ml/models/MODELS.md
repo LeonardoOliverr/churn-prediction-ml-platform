@@ -9,12 +9,12 @@ Para cada modelo: o que é, como aprende, quando usar e suas limitações.
 
 | # | Modelo | Arquivo | F1 | ROC-AUC | Recall | Status |
 |---|---|---|---|---|---|---|
-| 1 | [DummyClassifier](#1-dummyclassifier) | `baseline.py` | 0.2413 | 0.4828 | 0.2424 | ✅ Implementado |
-| 2 | [Logistic Regression](#2-logistic-regression) | `baseline.py` | 0.6379 | 0.8575 | 0.8074 | ✅ Implementado |
-| 3 | [Random Forest](#3-random-forest) | `random_forest.py` | — | — | — | 🔲 Pendente |
-| 4 | [XGBoost / LightGBM](#4-xgboost--lightgbm) | `boosting.py` | — | — | — | 🔲 Pendente |
-| 5 | [LogReg + Feature Engineering](#5-logistic-regression--feature-engineering) | `baseline_fe.py` | — | — | — | 🔲 Pendente |
-| 6 | [MLP — Rede Neural](#6-mlp--rede-neural) | `mlp.py` | — | — | — | ⏸ Após árvores |
+| 1 | [DummyClassifier](#1-dummyclassifier) | `baseline/baseline.py` | 0.2413 | 0.4828 | 0.2424 | ✅ Implementado |
+| 2 | [Logistic Regression](#2-logistic-regression) | `baseline/baseline.py` | 0.6379 | 0.8575 | 0.8074 | ✅ Implementado |
+| 3 | [Random Forest](#3-random-forest) | `random_forest/random_forest.py` | — | — | — | ✅ Implementado |
+| 4 | [XGBoost / LightGBM](#4-xgboost--lightgbm) | `boosting/boosting.py` | — | — | — | 🔲 Pendente |
+| 5 | [LogReg + Feature Engineering](#5-logistic-regression--feature-engineering) | `baseline_fe/baseline_fe.py` | — | — | — | 🔲 Pendente |
+| 6 | [MLP — Rede Neural](#6-mlp--rede-neural) | `mlp/mlp.py` | — | — | — | ⏸ Após árvores |
 
 **Métrica de decisão primária:** F1-Score — dataset desbalanceado (26.5% churn).
 Um novo modelo só substitui o atual se superar simultaneamente: F1 > 0.68, ROC-AUC > 0.88, Recall > 0.82.
@@ -118,61 +118,9 @@ F1: 0.6379  |  ROC-AUC: 0.8575  |  Recall: 80.7%  |  Precision: 52.7%
 
 ---
 
-## 3. MLP — Rede Neural
+## 3. Random Forest
 
-**Arquivo:** `mlp.py` | **Tipo:** Deep Learning (PyTorch)
-
-### O que é
-
-Empilha múltiplas camadas de transformações não-lineares. Cada camada aprende uma
-representação mais abstrata — as primeiras camadas capturam padrões simples, as
-seguintes combinam esses padrões em padrões mais complexos.
-
-### Como aprende
-
-```
-Input: ~32 features
-    ↓  Linear(32→128) + BatchNorm + ReLU + Dropout(0.3)
-    Camada 1: aprende "quem tem fibra", "quem tem contrato curto"...
-    ↓  Linear(128→64) + BatchNorm + ReLU + Dropout(0.3)
-    Camada 2: combina → "fibra + contrato curto + pagamento eletrônico"
-    ↓  Linear(64→32) + ReLU
-    Camada 3: comprime a representação
-    ↓  Linear(32→1) + Sigmoid
-Output: P(churn) ∈ [0, 1]
-```
-
-- **ReLU:** ativa só quando positivo — introduz não-linearidade entre camadas
-- **BatchNorm:** normaliza ativações — treino mais estável e rápido
-- **Dropout(0.3):** desliga 30% dos neurônios por batch — evita que o modelo decore o treino
-
-### Quando usar
-
-- Quando suspeitar de padrões complexos não-lineares que LogReg não captura
-- Datasets grandes (> 50k registros idealmente — com 7k o benefício é limitado)
-- Imagens, texto, áudio, séries temporais — onde redes neurais dominam
-
-### Limitações
-
-- **Caixa-preta:** não dá para explicar a decisão por cliente
-- Mais lento para treinar do que Random Forest e XGBoost
-- Para dados tabulares estruturados, tipicamente perde para XGBoost
-- Requer mais tuning (learning rate, arquitetura, dropout, epochs)
-
-### Como treinar
-
-```bash
-python ml/models/mlp.py
-python ml/models/mlp.py --dry-run
-python ml/models/mlp.py --tenant ibm-telco --project telco-churn-2018
-python ml/models/mlp.py --epochs 100 --lr 5e-4 --batch-size 128
-```
-
----
-
-## 4. Random Forest
-
-**Arquivo:** `random_forest.py` *(a implementar)* | **Tipo:** Ensemble de árvores (bagging)
+**Arquivo:** `random_forest/random_forest.py` | **Tipo:** Ensemble de árvores (bagging)
 
 ### O que é
 
@@ -196,7 +144,7 @@ P(churn) = 0.74
 A aleatoriedade faz cada árvore cometer erros **diferentes** — na média, os erros
 se cancelam e o resultado é mais robusto do que qualquer árvore individual.
 
-### Vantagem principal sobre MLP
+### Vantagem sobre modelos lineares
 
 Gera `feature_importances_` — você vê quais features mais influenciaram o modelo:
 
@@ -220,6 +168,14 @@ contract_Month...   0.15
 - Mais lento que XGBoost em datasets grandes
 - Não extrapola bem fora do range de valores do treino
 
+### Como treinar
+
+```bash
+python ml/models/random_forest/random_forest.py --tenant ibm-telco --project telco-churn-2018
+python ml/models/random_forest/random_forest.py --dry-run
+python ml/models/random_forest/random_forest.py --n-estimators 300 --max-depth 10
+```
+
 ### Expectativa para IBM Telco
 
 ```
@@ -228,9 +184,9 @@ F1 esperado: 0.68–0.73  |  ROC-AUC esperado: 0.87–0.91
 
 ---
 
-## 5. XGBoost / LightGBM
+## 4. XGBoost / LightGBM
 
-**Arquivo:** `boosting.py` *(a implementar)* | **Tipo:** Gradient Boosting (ensemble sequencial)
+**Arquivo:** `boosting/boosting.py` *(a implementar)* | **Tipo:** Gradient Boosting (ensemble sequencial)
 
 ### O que é
 
@@ -276,9 +232,9 @@ Provavelmente o melhor resultado entre todos os modelos.
 
 ---
 
-## 6. Logistic Regression + Feature Engineering
+## 5. Logistic Regression + Feature Engineering
 
-**Arquivo:** `baseline_fe.py` *(a implementar)* | **Tipo:** Modelo linear com features derivadas
+**Arquivo:** `baseline_fe/baseline_fe.py` *(a implementar)* | **Tipo:** Modelo linear com features derivadas
 
 ### O que é
 
@@ -323,6 +279,49 @@ Isso é valioso: mantém o modelo simples e interpretável, só melhora a entrad
 
 - Processo manual e iterativo — requer conhecimento do domínio
 - Risco de overfitting ao criar muitas features derivadas
+
+---
+
+## 6. MLP — Rede Neural
+
+**Arquivo:** `mlp/mlp.py` *(a implementar — após árvores)* | **Tipo:** Deep Learning (PyTorch)
+
+### O que é
+
+Empilha múltiplas camadas de transformações não-lineares. Cada camada aprende uma
+representação mais abstrata — as primeiras camadas capturam padrões simples, as
+seguintes combinam esses padrões em padrões mais complexos.
+
+### Como aprende
+
+```
+Input: ~32 features
+    ↓  Linear(32→128) + BatchNorm + ReLU + Dropout(0.3)
+    Camada 1: aprende "quem tem fibra", "quem tem contrato curto"...
+    ↓  Linear(128→64) + BatchNorm + ReLU + Dropout(0.3)
+    Camada 2: combina → "fibra + contrato curto + pagamento eletrônico"
+    ↓  Linear(64→32) + ReLU
+    Camada 3: comprime a representação
+    ↓  Linear(32→1) + Sigmoid
+Output: P(churn) ∈ [0, 1]
+```
+
+- **ReLU:** ativa só quando positivo — introduz não-linearidade entre camadas
+- **BatchNorm:** normaliza ativações — treino mais estável e rápido
+- **Dropout(0.3):** desliga 30% dos neurônios por batch — evita que o modelo decore o treino
+
+### Quando usar
+
+- Quando suspeitar de padrões complexos não-lineares que LogReg não captura
+- Datasets grandes (> 50k registros idealmente — com 7k o benefício é limitado)
+- Imagens, texto, áudio, séries temporais — onde redes neurais dominam
+
+### Limitações
+
+- **Caixa-preta:** não dá para explicar a decisão por cliente
+- Mais lento para treinar do que Random Forest e XGBoost
+- Para dados tabulares estruturados, tipicamente perde para XGBoost
+- Requer mais tuning (learning rate, arquitetura, dropout, epochs)
 
 ---
 

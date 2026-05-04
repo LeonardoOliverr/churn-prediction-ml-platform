@@ -1,5 +1,5 @@
 """
-Testes unitários para ml/models/baseline.py.
+Testes unitários para ml/models/baseline/baseline.py.
 
 Inclui:
 - [SMOKE TEST] Pipeline mínimo: preprocess → fit → predict sem DB ou MLflow
@@ -27,6 +27,10 @@ _FAKE_METRICS = {
     "roc_auc_mean": 0.85, "roc_auc_std": 0.02,
     "recall_mean": 0.80, "recall_std": 0.04,
     "precision_mean": 0.70, "precision_std": 0.03,
+    "train_f1_mean": 0.82,
+    "train_roc_auc_mean": 0.94,
+    "train_recall_mean": 0.89,
+    "train_precision_mean": 0.78,
 }
 _DUMMY_METRICS = {k: 0.25 for k in _FAKE_METRICS}
 
@@ -91,7 +95,7 @@ def test_smoke_pipeline_logistic_regression(fake_customers_df):
 
 def test_models_have_fit_method():
     """Todos os modelos em MODELS possuem método fit."""
-    from ml.models.baseline import MODELS
+    from ml.models.baseline.baseline import MODELS
 
     for name, model in MODELS.items():
         assert hasattr(model, "fit"), f"Modelo '{name}' não tem método fit."
@@ -99,7 +103,7 @@ def test_models_have_fit_method():
 
 def test_models_have_predict_method():
     """Todos os modelos em MODELS possuem método predict."""
-    from ml.models.baseline import MODELS
+    from ml.models.baseline.baseline import MODELS
 
     for name, model in MODELS.items():
         assert hasattr(model, "predict"), f"Modelo '{name}' não tem método predict."
@@ -107,7 +111,7 @@ def test_models_have_predict_method():
 
 def test_models_have_predict_proba_method():
     """Todos os modelos em MODELS possuem método predict_proba."""
-    from ml.models.baseline import MODELS
+    from ml.models.baseline.baseline import MODELS
 
     for name, model in MODELS.items():
         assert hasattr(model, "predict_proba"), (
@@ -117,7 +121,7 @@ def test_models_have_predict_proba_method():
 
 def test_models_dict_contains_expected_keys():
     """MODELS contém DummyClassifier e LogisticRegression."""
-    from ml.models.baseline import MODELS
+    from ml.models.baseline.baseline import MODELS
 
     assert "dummy_stratified" in MODELS
     assert "logistic_regression" in MODELS
@@ -130,7 +134,7 @@ def test_models_dict_contains_expected_keys():
 
 def test_derive_scope_global():
     """(None, None) → escopo global."""
-    from ml.models.baseline import _derive_scope
+    from ml.models.baseline.baseline import _derive_scope
 
     scope, experiment, model_name = _derive_scope(None, None)
     assert scope == "global"
@@ -140,7 +144,7 @@ def test_derive_scope_global():
 
 def test_derive_scope_tenant():
     """(slug, None) → escopo tenant."""
-    from ml.models.baseline import _derive_scope
+    from ml.models.baseline.baseline import _derive_scope
 
     scope, experiment, model_name = _derive_scope("ibm-telco", None)
     assert scope == "tenant"
@@ -149,7 +153,7 @@ def test_derive_scope_tenant():
 
 def test_derive_scope_project():
     """(slug, slug) → escopo project."""
-    from ml.models.baseline import _derive_scope
+    from ml.models.baseline.baseline import _derive_scope
 
     scope, experiment, model_name = _derive_scope("ibm-telco", "telco-churn-2018")
     assert scope == "project"
@@ -159,7 +163,7 @@ def test_derive_scope_project():
 
 def test_derive_scope_project_requires_tenant():
     """Escopos retornados são sempre um dos três valores válidos."""
-    from ml.models.baseline import _derive_scope
+    from ml.models.baseline.baseline import _derive_scope
 
     for args, expected_scope in [
         ((None, None), "global"),
@@ -177,7 +181,7 @@ def test_derive_scope_project_requires_tenant():
 
 def test_cv_metrics_returns_expected_keys(fake_customers_df):
     """_cv_metrics() retorna todas as chaves de métricas esperadas."""
-    from ml.models.baseline import _cv_metrics, SCORING
+    from ml.models.baseline.baseline import _cv_metrics, SCORING
 
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
@@ -190,21 +194,24 @@ def test_cv_metrics_returns_expected_keys(fake_customers_df):
     )
 
     fake_cv_results = {
-        f"test_{metric}": np.array([0.5, 0.6, 0.55, 0.58, 0.52])
-        for metric in SCORING
+        **{f"test_{metric}":  np.array([0.5, 0.6, 0.55, 0.58, 0.52]) for metric in SCORING},
+        **{f"train_{metric}": np.array([0.8, 0.82, 0.81, 0.80, 0.79]) for metric in SCORING},
     }
 
-    with patch("ml.models.baseline.cross_validate", return_value=fake_cv_results):
+    with patch("ml.models.baseline.baseline.cross_validate", return_value=fake_cv_results):
         metrics = _cv_metrics(pipeline, X, y)
 
-    expected_keys = [f"{m}_{stat}" for m in SCORING for stat in ("mean", "std")]
+    expected_keys = (
+        [f"{m}_{stat}" for m in SCORING for stat in ("mean", "std")]
+        + [f"train_{m}_mean" for m in SCORING]
+    )
     for key in expected_keys:
         assert key in metrics, f"Chave ausente em metrics: '{key}'"
 
 
 def test_cv_metrics_values_are_floats(fake_customers_df):
     """Todos os valores retornados por _cv_metrics() são float."""
-    from ml.models.baseline import _cv_metrics, SCORING
+    from ml.models.baseline.baseline import _cv_metrics, SCORING
 
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
@@ -217,11 +224,11 @@ def test_cv_metrics_values_are_floats(fake_customers_df):
     )
 
     fake_cv_results = {
-        f"test_{metric}": np.array([0.5, 0.6, 0.55, 0.58, 0.52])
-        for metric in SCORING
+        **{f"test_{metric}":  np.array([0.5, 0.6, 0.55, 0.58, 0.52]) for metric in SCORING},
+        **{f"train_{metric}": np.array([0.8, 0.82, 0.81, 0.80, 0.79]) for metric in SCORING},
     }
 
-    with patch("ml.models.baseline.cross_validate", return_value=fake_cv_results):
+    with patch("ml.models.baseline.baseline.cross_validate", return_value=fake_cv_results):
         metrics = _cv_metrics(pipeline, X, y)
 
     for key, value in metrics.items():
@@ -235,7 +242,7 @@ def test_cv_metrics_values_are_floats(fake_customers_df):
 
 def test_parse_args_defaults():
     """Sem argumentos → tenant=None, project=None, dry_run=False."""
-    from ml.models.baseline import _parse_args
+    from ml.models.baseline.baseline import _parse_args
 
     with patch.object(sys, "argv", ["baseline.py"]):
         args = _parse_args()
@@ -247,7 +254,7 @@ def test_parse_args_defaults():
 
 def test_parse_args_tenant_only():
     """--tenant define tenant sem afetar project ou dry_run."""
-    from ml.models.baseline import _parse_args
+    from ml.models.baseline.baseline import _parse_args
 
     with patch.object(sys, "argv", ["baseline.py", "--tenant", "ibm-telco"]):
         args = _parse_args()
@@ -259,7 +266,7 @@ def test_parse_args_tenant_only():
 
 def test_parse_args_tenant_and_project():
     """--tenant + --project definem ambos os escopos."""
-    from ml.models.baseline import _parse_args
+    from ml.models.baseline.baseline import _parse_args
 
     with patch.object(sys, "argv", ["baseline.py", "--tenant", "ibm-telco", "--project", "telco-churn-2018"]):
         args = _parse_args()
@@ -270,7 +277,7 @@ def test_parse_args_tenant_and_project():
 
 def test_parse_args_dry_run_flag():
     """--dry-run ativa o modo de simulação."""
-    from ml.models.baseline import _parse_args
+    from ml.models.baseline.baseline import _parse_args
 
     with patch.object(sys, "argv", ["baseline.py", "--dry-run"]):
         args = _parse_args()
@@ -280,7 +287,7 @@ def test_parse_args_dry_run_flag():
 
 def test_parse_args_project_without_tenant_exits():
     """--project sem --tenant deve encerrar com SystemExit."""
-    from ml.models.baseline import _parse_args
+    from ml.models.baseline.baseline import _parse_args
 
     with patch.object(sys, "argv", ["baseline.py", "--project", "telco-churn-2018"]):
         with pytest.raises(SystemExit):
@@ -294,13 +301,13 @@ def test_parse_args_project_without_tenant_exits():
 
 def test_run_model_dry_run_returns_sentinel_id(fake_customers_df):
     """dry_run=True retorna 'dry-run-run-id' sem abrir run no MLflow."""
-    from ml.models.baseline import _run_model
+    from ml.models.baseline.baseline import _run_model
 
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
     model = DummyClassifier(strategy="stratified", random_state=42)
 
-    with patch("ml.models.baseline._cv_metrics", return_value=_FAKE_METRICS):
+    with patch("ml.models.baseline.baseline._cv_metrics", return_value=_FAKE_METRICS):
         run_id, metrics = _run_model("dummy_stratified", model, X, y, dry_run=True)
 
     assert run_id == "dry-run-run-id"
@@ -309,14 +316,14 @@ def test_run_model_dry_run_returns_sentinel_id(fake_customers_df):
 
 def test_run_model_dry_run_does_not_call_mlflow(fake_customers_df):
     """dry_run=True não deve chamar mlflow.start_run."""
-    from ml.models.baseline import _run_model
+    from ml.models.baseline.baseline import _run_model
 
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
     model = DummyClassifier(strategy="stratified", random_state=42)
 
-    with patch("ml.models.baseline._cv_metrics", return_value=_FAKE_METRICS), \
-         patch("ml.models.baseline.mlflow.start_run") as mock_start_run:
+    with patch("ml.models.baseline.baseline._cv_metrics", return_value=_FAKE_METRICS), \
+         patch("ml.models.baseline.baseline.mlflow.start_run") as mock_start_run:
         _run_model("dummy_stratified", model, X, y, dry_run=True)
 
     mock_start_run.assert_not_called()
@@ -324,7 +331,7 @@ def test_run_model_dry_run_does_not_call_mlflow(fake_customers_df):
 
 def test_run_model_not_dry_run_returns_mlflow_run_id(fake_customers_df):
     """dry_run=False retorna o run_id do MLflow e registra métricas, params e artefato."""
-    from ml.models.baseline import _run_model
+    from ml.models.baseline.baseline import _run_model
 
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
@@ -336,19 +343,20 @@ def test_run_model_not_dry_run_returns_mlflow_run_id(fake_customers_df):
     mock_ctx.__enter__ = MagicMock(return_value=mock_run)
     mock_ctx.__exit__ = MagicMock(return_value=False)
 
-    with patch("ml.models.baseline._cv_metrics", return_value=_FAKE_METRICS), \
-         patch("ml.models.baseline.mlflow.start_run", return_value=mock_ctx), \
-         patch("ml.models.baseline.mlflow.log_params") as mock_log_params, \
-         patch("ml.models.baseline.mlflow.log_metrics") as mock_log_metrics, \
-         patch("ml.models.baseline.mlflow.sklearn.log_model") as mock_log_model:
+    with patch("ml.models.baseline.baseline._cv_metrics", return_value=_FAKE_METRICS), \
+         patch("ml.models.baseline.baseline.mlflow.start_run", return_value=mock_ctx), \
+         patch("ml.models.baseline.baseline.mlflow.log_params") as mock_log_params, \
+         patch("ml.models.baseline.baseline.mlflow.log_metrics") as mock_log_metrics, \
+         patch("ml.models.baseline.baseline.mlflow.log_artifact") as mock_log_artifact, \
+         patch("ml.models.baseline.baseline.joblib.dump"):
         run_id, metrics = _run_model("dummy_stratified", model, X, y, dry_run=False)
 
     assert run_id == "mlflow-abc-123"
     assert metrics == _FAKE_METRICS
     mock_log_params.assert_called_once()
     mock_log_metrics.assert_called_once_with(_FAKE_METRICS)
-    mock_log_model.assert_called_once()
-    assert mock_log_model.call_args.kwargs["artifact_path"] == "model"
+    mock_log_artifact.assert_called_once()
+    assert mock_log_artifact.call_args.kwargs["artifact_path"] == "model"
 
 
 # ---------------------------------------------------------------------------
@@ -365,7 +373,7 @@ def _make_mock_conn(count: int) -> MagicMock:
 
 def test_next_version_first_model_is_v1():
     """Quando não existe nenhum modelo registrado, retorna 'v1'."""
-    from ml.models.baseline import _next_version
+    from ml.models.baseline.baseline import _next_version
 
     conn = _make_mock_conn(count=0)
     version = _next_version(conn, "global", None, None, "global-baseline")
@@ -374,7 +382,7 @@ def test_next_version_first_model_is_v1():
 
 def test_next_version_increments_correctly():
     """Quando já existem 3 versões, retorna 'v4'."""
-    from ml.models.baseline import _next_version
+    from ml.models.baseline.baseline import _next_version
 
     conn = _make_mock_conn(count=3)
     version = _next_version(conn, "global", None, None, "global-baseline")
@@ -383,7 +391,7 @@ def test_next_version_increments_correctly():
 
 def test_next_version_passes_correct_params_to_query():
     """Os parâmetros de escopo são passados corretamente à query."""
-    from ml.models.baseline import _next_version
+    from ml.models.baseline.baseline import _next_version
 
     conn = _make_mock_conn(count=0)
     _next_version(conn, "tenant", "tenant-uuid", None, "my-model")
@@ -412,12 +420,12 @@ def _make_mock_engine() -> tuple[MagicMock, MagicMock]:
 
 def test_register_in_db_dry_run_no_db_writes(capsys):
     """dry_run=True imprime o registro e não executa nenhuma query de escrita."""
-    from ml.models.baseline import _register_in_db
+    from ml.models.baseline.baseline import _register_in_db
 
     mock_engine, mock_conn = _make_mock_engine()
 
-    with patch("ml.models.baseline._build_engine", return_value=mock_engine), \
-         patch("ml.models.baseline._next_version", return_value="v1"):
+    with patch("ml.models.baseline.baseline._build_engine", return_value=mock_engine), \
+         patch("ml.models.baseline.baseline._next_version", return_value="v1"):
         _register_in_db(
             name="global-baseline",
             run_id="test-run-id",
@@ -437,12 +445,12 @@ def test_register_in_db_dry_run_no_db_writes(capsys):
 
 def test_register_in_db_approved_status_executes_only_insert():
     """status='approved' executa apenas INSERT do novo modelo."""
-    from ml.models.baseline import _register_in_db
+    from ml.models.baseline.baseline import _register_in_db
 
     mock_engine, mock_conn = _make_mock_engine()
 
-    with patch("ml.models.baseline._build_engine", return_value=mock_engine), \
-         patch("ml.models.baseline._next_version", return_value="v2"):
+    with patch("ml.models.baseline.baseline._build_engine", return_value=mock_engine), \
+         patch("ml.models.baseline.baseline._next_version", return_value="v2"):
         _register_in_db(
             name="global-baseline",
             run_id="run-id",
@@ -460,12 +468,12 @@ def test_register_in_db_approved_status_executes_only_insert():
 
 def test_register_in_db_trained_status_executes_only_insert():
     """status='trained' executa apenas INSERT, sem UPDATE de arquivamento."""
-    from ml.models.baseline import _register_in_db
+    from ml.models.baseline.baseline import _register_in_db
 
     mock_engine, mock_conn = _make_mock_engine()
 
-    with patch("ml.models.baseline._build_engine", return_value=mock_engine), \
-         patch("ml.models.baseline._next_version", return_value="v1"):
+    with patch("ml.models.baseline.baseline._build_engine", return_value=mock_engine), \
+         patch("ml.models.baseline.baseline._next_version", return_value="v1"):
         _register_in_db(
             name="global-baseline",
             run_id="run-id",
@@ -483,12 +491,12 @@ def test_register_in_db_trained_status_executes_only_insert():
 
 def test_register_in_db_dry_run_includes_version_in_output(capsys):
     """O output do dry-run inclui a versão calculada."""
-    from ml.models.baseline import _register_in_db
+    from ml.models.baseline.baseline import _register_in_db
 
     mock_engine, _ = _make_mock_engine()
 
-    with patch("ml.models.baseline._build_engine", return_value=mock_engine), \
-         patch("ml.models.baseline._next_version", return_value="v3"):
+    with patch("ml.models.baseline.baseline._build_engine", return_value=mock_engine), \
+         patch("ml.models.baseline.baseline._next_version", return_value="v3"):
         _register_in_db(
             name="global-baseline",
             run_id="run-id",
@@ -510,14 +518,14 @@ def test_register_in_db_dry_run_includes_version_in_output(capsys):
 
 def test_register_in_db_tenant_scope_calls_resolve_tenant_id():
     """Escopo tenant chama _resolve_tenant_id e não chama _resolve_project_id."""
-    from ml.models.baseline import _register_in_db
+    from ml.models.baseline.baseline import _register_in_db
 
     mock_engine, _ = _make_mock_engine()
 
-    with patch("ml.models.baseline._build_engine", return_value=mock_engine), \
-         patch("ml.models.baseline._next_version", return_value="v1"), \
-         patch("ml.models.baseline._resolve_tenant_id", return_value="tenant-uuid") as mock_tid, \
-         patch("ml.models.baseline._resolve_project_id") as mock_pid:
+    with patch("ml.models.baseline.baseline._build_engine", return_value=mock_engine), \
+         patch("ml.models.baseline.baseline._next_version", return_value="v1"), \
+         patch("ml.models.baseline.baseline._resolve_tenant_id", return_value="tenant-uuid") as mock_tid, \
+         patch("ml.models.baseline.baseline._resolve_project_id") as mock_pid:
         _register_in_db(
             name="ibm-telco-baseline",
             run_id="run-id",
@@ -535,14 +543,14 @@ def test_register_in_db_tenant_scope_calls_resolve_tenant_id():
 
 def test_register_in_db_project_scope_calls_both_resolvers():
     """Escopo project chama _resolve_tenant_id e _resolve_project_id."""
-    from ml.models.baseline import _register_in_db
+    from ml.models.baseline.baseline import _register_in_db
 
     mock_engine, _ = _make_mock_engine()
 
-    with patch("ml.models.baseline._build_engine", return_value=mock_engine), \
-         patch("ml.models.baseline._next_version", return_value="v1"), \
-         patch("ml.models.baseline._resolve_tenant_id", return_value="tenant-uuid") as mock_tid, \
-         patch("ml.models.baseline._resolve_project_id", return_value="project-uuid") as mock_pid:
+    with patch("ml.models.baseline.baseline._build_engine", return_value=mock_engine), \
+         patch("ml.models.baseline.baseline._next_version", return_value="v1"), \
+         patch("ml.models.baseline.baseline._resolve_tenant_id", return_value="tenant-uuid") as mock_tid, \
+         patch("ml.models.baseline.baseline._resolve_project_id", return_value="project-uuid") as mock_pid:
         _register_in_db(
             name="ibm-telco-telco-churn-2018-baseline",
             run_id="run-id",
@@ -560,14 +568,14 @@ def test_register_in_db_project_scope_calls_both_resolvers():
 
 def test_register_in_db_tenant_scope_not_dry_run_executes_writes():
     """Escopo tenant, dry_run=False executa UPDATE + INSERT sem erros."""
-    from ml.models.baseline import _register_in_db
+    from ml.models.baseline.baseline import _register_in_db
 
     mock_engine, mock_conn = _make_mock_engine()
 
-    with patch("ml.models.baseline._build_engine", return_value=mock_engine), \
-         patch("ml.models.baseline._next_version", return_value="v1"), \
-         patch("ml.models.baseline._resolve_tenant_id", return_value="tenant-uuid"), \
-         patch("ml.models.baseline._resolve_project_id", return_value=None):
+    with patch("ml.models.baseline.baseline._build_engine", return_value=mock_engine), \
+         patch("ml.models.baseline.baseline._next_version", return_value="v1"), \
+         patch("ml.models.baseline.baseline._resolve_tenant_id", return_value="tenant-uuid"), \
+         patch("ml.models.baseline.baseline._resolve_project_id", return_value=None):
         _register_in_db(
             name="ibm-telco-baseline",
             run_id="run-id",
@@ -584,14 +592,14 @@ def test_register_in_db_tenant_scope_not_dry_run_executes_writes():
 
 def test_register_in_db_project_scope_not_dry_run_trained_executes_only_insert():
     """Escopo project, dry_run=False, status='trained' executa apenas INSERT."""
-    from ml.models.baseline import _register_in_db
+    from ml.models.baseline.baseline import _register_in_db
 
     mock_engine, mock_conn = _make_mock_engine()
 
-    with patch("ml.models.baseline._build_engine", return_value=mock_engine), \
-         patch("ml.models.baseline._next_version", return_value="v1"), \
-         patch("ml.models.baseline._resolve_tenant_id", return_value="tenant-uuid"), \
-         patch("ml.models.baseline._resolve_project_id", return_value="project-uuid"):
+    with patch("ml.models.baseline.baseline._build_engine", return_value=mock_engine), \
+         patch("ml.models.baseline.baseline._next_version", return_value="v1"), \
+         patch("ml.models.baseline.baseline._resolve_tenant_id", return_value="tenant-uuid"), \
+         patch("ml.models.baseline.baseline._resolve_project_id", return_value="project-uuid"):
         _register_in_db(
             name="ibm-telco-telco-churn-2018-baseline",
             run_id="run-id",
@@ -620,16 +628,16 @@ def _fake_run_model_side_effect(name, model, X, y, dry_run):
 
 def test_main_dry_run_calls_run_model_for_each_model(fake_customers_df):
     """main() com dry_run=True chama _run_model e _register_in_db para cada modelo em MODELS."""
-    from ml.models.baseline import main, MODELS
+    from ml.models.baseline.baseline import main, MODELS
 
     fake_args = argparse.Namespace(tenant=None, project=None, dry_run=True)
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
 
-    with patch("ml.models.baseline._parse_args", return_value=fake_args), \
-         patch("ml.models.baseline.load_data", return_value=(X, y)), \
-         patch("ml.models.baseline._run_model", side_effect=_fake_run_model_side_effect) as mock_run, \
-         patch("ml.models.baseline._register_in_db") as mock_register:
+    with patch("ml.models.baseline.baseline._parse_args", return_value=fake_args), \
+         patch("ml.models.baseline.baseline.load_data", return_value=(X, y)), \
+         patch("ml.models.baseline.baseline._run_model", side_effect=_fake_run_model_side_effect) as mock_run, \
+         patch("ml.models.baseline.baseline._register_in_db") as mock_register:
         main()
 
     assert mock_run.call_count == len(MODELS)
@@ -638,18 +646,18 @@ def test_main_dry_run_calls_run_model_for_each_model(fake_customers_df):
 
 def test_main_dry_run_does_not_configure_mlflow(fake_customers_df):
     """main() com dry_run=True não chama mlflow.set_tracking_uri nem set_experiment."""
-    from ml.models.baseline import main
+    from ml.models.baseline.baseline import main
 
     fake_args = argparse.Namespace(tenant=None, project=None, dry_run=True)
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
 
-    with patch("ml.models.baseline._parse_args", return_value=fake_args), \
-         patch("ml.models.baseline.load_data", return_value=(X, y)), \
-         patch("ml.models.baseline._run_model", side_effect=_fake_run_model_side_effect), \
-         patch("ml.models.baseline._register_in_db"), \
-         patch("ml.models.baseline.mlflow.set_tracking_uri") as mock_uri, \
-         patch("ml.models.baseline.mlflow.set_experiment") as mock_exp:
+    with patch("ml.models.baseline.baseline._parse_args", return_value=fake_args), \
+         patch("ml.models.baseline.baseline.load_data", return_value=(X, y)), \
+         patch("ml.models.baseline.baseline._run_model", side_effect=_fake_run_model_side_effect), \
+         patch("ml.models.baseline.baseline._register_in_db"), \
+         patch("ml.models.baseline.baseline.mlflow.set_tracking_uri") as mock_uri, \
+         patch("ml.models.baseline.baseline.mlflow.set_experiment") as mock_exp:
         main()
 
     mock_uri.assert_not_called()
@@ -658,39 +666,39 @@ def test_main_dry_run_does_not_configure_mlflow(fake_customers_df):
 
 def test_main_not_dry_run_marks_best_model_as_approved(fake_customers_df):
     """main() sem dry_run marca logistic_regression como 'approved' e dummy como 'trained'."""
-    from ml.models.baseline import main
+    from ml.models.baseline.baseline import main
 
     fake_args = argparse.Namespace(tenant=None, project=None, dry_run=False)
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
 
-    with patch("ml.models.baseline._parse_args", return_value=fake_args), \
-         patch("ml.models.baseline.load_data", return_value=(X, y)), \
-         patch("ml.models.baseline._run_model", side_effect=_fake_run_model_side_effect), \
-         patch("ml.models.baseline._register_in_db") as mock_register, \
-         patch("ml.models.baseline.mlflow.set_tracking_uri"), \
-         patch("ml.models.baseline.mlflow.set_experiment"):
+    with patch("ml.models.baseline.baseline._parse_args", return_value=fake_args), \
+         patch("ml.models.baseline.baseline.load_data", return_value=(X, y)), \
+         patch("ml.models.baseline.baseline._run_model", side_effect=_fake_run_model_side_effect), \
+         patch("ml.models.baseline.baseline._register_in_db") as mock_register, \
+         patch("ml.models.baseline.baseline.mlflow.set_tracking_uri"), \
+         patch("ml.models.baseline.baseline.mlflow.set_experiment"):
         main()
 
     statuses = {c.kwargs["name"]: c.kwargs["status"] for c in mock_register.call_args_list}
-    assert statuses["logistic_regression"] == "approved"
-    assert statuses["dummy_stratified"] == "trained"
+    assert statuses["global-logistic-regression"] == "approved"
+    assert statuses["global-dummy-stratified"] == "trained"
 
 
 def test_main_not_dry_run_configures_mlflow(fake_customers_df):
     """main() sem dry_run chama mlflow.set_tracking_uri e set_experiment."""
-    from ml.models.baseline import main
+    from ml.models.baseline.baseline import main
 
     fake_args = argparse.Namespace(tenant="ibm-telco", project=None, dry_run=False)
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
 
-    with patch("ml.models.baseline._parse_args", return_value=fake_args), \
-         patch("ml.models.baseline.load_data", return_value=(X, y)), \
-         patch("ml.models.baseline._run_model", side_effect=_fake_run_model_side_effect), \
-         patch("ml.models.baseline._register_in_db"), \
-         patch("ml.models.baseline.mlflow.set_tracking_uri") as mock_uri, \
-         patch("ml.models.baseline.mlflow.set_experiment") as mock_exp:
+    with patch("ml.models.baseline.baseline._parse_args", return_value=fake_args), \
+         patch("ml.models.baseline.baseline.load_data", return_value=(X, y)), \
+         patch("ml.models.baseline.baseline._run_model", side_effect=_fake_run_model_side_effect), \
+         patch("ml.models.baseline.baseline._register_in_db"), \
+         patch("ml.models.baseline.baseline.mlflow.set_tracking_uri") as mock_uri, \
+         patch("ml.models.baseline.baseline.mlflow.set_experiment") as mock_exp:
         main()
 
     mock_uri.assert_called_once()

@@ -15,15 +15,18 @@ ml/
     risk.py          — classify_risk() — compartilhado com a API de inferência
     __init__.py
 
-  models/            — um arquivo por modelo, todos com a mesma interface CLI
-    baseline.py      — DummyClassifier + Logistic Regression
-    random_forest.py — (pendente)
-    boosting.py      — (pendente)
-    baseline_fe.py   — (pendente)
-    mlp.py           — (pendente — será implementado após árvores)
+  models/            — uma subpasta por modelo, todos com a mesma interface CLI
+    baseline/
+      baseline.py    — DummyClassifier + Logistic Regression
+      BASELINE.md    — resultados numéricos do experimento baseline
+    random_forest/
+      random_forest.py — Random Forest (500 árvores, sqrt, balanced)
+      RANDOM_FOREST.md — resultados e configuração do experimento
+    boosting/        — (pendente)
+    baseline_fe/     — (pendente)
+    mlp/             — (pendente — após árvores)
     __init__.py
     MODELS.md        — guia completo de cada modelo: o que é, quando usar, limitações
-    BASELINE.md      — resultados numéricos do experimento baseline
 
   tools/             — scripts utilitários, não são modelos
     export_dataset.py — exporta o dataset tratado para CSV (inspeção e auditoria)
@@ -51,18 +54,19 @@ Todos os modelos respeitam a hierarquia multi-tenant via flags CLI:
 ### Baseline (DummyClassifier + Logistic Regression)
 
 ```bash
-python ml/models/baseline.py
-python ml/models/baseline.py --dry-run
-python ml/models/baseline.py --tenant ibm-telco --project telco-churn-2018
-python ml/models/baseline.py --tenant ibm-telco --project telco-churn-2018 --dry-run
+python ml/models/baseline/baseline.py
+python ml/models/baseline/baseline.py --dry-run
+python ml/models/baseline/baseline.py --tenant ibm-telco --project telco-churn-2018
+python ml/models/baseline/baseline.py --tenant ibm-telco --project telco-churn-2018 --dry-run
 ```
 
 ### Random Forest
 
 ```bash
-python ml/models/random_forest.py
-python ml/models/random_forest.py --dry-run
-python ml/models/random_forest.py --tenant ibm-telco --project telco-churn-2018
+python ml/models/random_forest/random_forest.py
+python ml/models/random_forest/random_forest.py --dry-run
+python ml/models/random_forest/random_forest.py --tenant ibm-telco --project telco-churn-2018
+python ml/models/random_forest/random_forest.py --n-estimators 300 --max-depth 10
 ```
 
 ### Exportar dataset tratado para CSV
@@ -77,8 +81,8 @@ python ml/tools/export_dataset.py --output-dir data/exports/
 ### Via Docker (ambiente isolado com MLflow interno)
 
 ```bash
-docker compose --profile tools run --rm trainer python ml/models/baseline.py --tenant ibm-telco --project telco-churn-2018
-docker compose --profile tools run --rm trainer python ml/models/random_forest.py --tenant ibm-telco --project telco-churn-2018
+docker compose --profile tools run --rm trainer python ml/models/baseline/baseline.py --tenant ibm-telco --project telco-churn-2018
+docker compose --profile tools run --rm trainer python ml/models/random_forest/random_forest.py --tenant ibm-telco --project telco-churn-2018
 ```
 
 ### Flag `--dry-run`
@@ -133,7 +137,7 @@ project_model_config do projeto → project_model_config do tenant → churn.mod
 
 ## Como adicionar um novo modelo
 
-1. Criar `ml/models/<nome>.py` seguindo a estrutura de `baseline.py`:
+1. Criar `ml/models/<nome>/<nome>.py` seguindo a estrutura de `baseline/baseline.py`:
    - Importar `load_data` e `build_preprocessor` de `ml.core.preprocessing`
    - Implementar `_derive_scope()`, `_cv_metrics()`, `_register_in_db()`, `main()`
    - Suportar `--tenant`, `--project`, `--dry-run`
