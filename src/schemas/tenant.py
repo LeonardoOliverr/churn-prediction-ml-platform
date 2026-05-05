@@ -14,6 +14,11 @@ class Scope(str, Enum):
     predictions_read = "predictions:read"
 
 
+class ModelRole(str, Enum):
+    champion = "champion"
+    challenger = "challenger"
+
+
 class TenantCreate(BaseModel):
     """Payload para criação de tenant."""
 
@@ -137,3 +142,92 @@ class ApiKeyRecord(BaseModel):
     created_at: str
     expires_at: Optional[str] = Field(None, description="Data/hora de expiração. `null` = sem expiração.")
     last_used_at: Optional[str] = Field(None, description="Última vez que a key foi utilizada. `null` se nunca usada.")
+
+
+class ChampionModelConfigure(BaseModel):
+    """Payload para ativar ou trocar o champion de um tenant ou projeto."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "model_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "threshold": 0.5,
+                "activation_reason": "baseline aprovado para producao",
+                "description": "Logistic Regression v1",
+            }
+        }
+    )
+
+    model_id: str = Field(..., description="UUID do modelo em churn.models.")
+    threshold: float = Field(0.5, ge=0, le=1, description="Threshold operacional do modelo.")
+    activation_reason: Optional[str] = Field(None, description="Motivo para ativar esta configuracao.")
+    description: Optional[str] = Field(None, description="Descricao livre da configuracao operacional.")
+
+
+class ChallengerModelConfigure(ChampionModelConfigure):
+    """Payload para ativar ou trocar o challenger de um tenant ou projeto."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "model_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "threshold": 0.5,
+                "traffic_split": 0.2,
+                "activation_reason": "teste controlado com Random Forest",
+                "description": "Random Forest v2",
+            }
+        }
+    )
+
+    traffic_split: float = Field(..., gt=0, le=0.5, description="Fracao do trafego enviada ao challenger.")
+
+
+class ModelPromotionRequest(BaseModel):
+    """Payload para promover um challenger a champion."""
+
+    activation_reason: Optional[str] = Field(None, description="Motivo da promocao do challenger.")
+
+
+class ModelDeactivationRequest(BaseModel):
+    """Payload para desligar uma configuracao de producao."""
+
+    reason: str = Field(..., description="Motivo operacional do desligamento.")
+    replacement_model_id: Optional[str] = Field(None, description="Modelo substituto quando o desligamento for do champion.")
+
+
+class ProjectModelConfigRecord(BaseModel):
+    """Registro operacional de modelo configurado para um tenant ou projeto."""
+
+    id: str
+    tenant_id: str
+    project_id: Optional[str]
+    model_id: str
+    model_name: str
+    model_version: str
+    model_status: str
+    role: ModelRole
+    threshold: float
+    traffic_split: float
+    is_active: bool
+    environment: str
+    configured_by: Optional[str] = None
+    description: Optional[str] = None
+    activation_reason: Optional[str] = None
+    configured_at: str
+    deactivated_at: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
+class ProjectModelConfigResponse(BaseModel):
+    """Resposta apos operacao administrativa em project_model_config."""
+
+    config: ProjectModelConfigRecord
+
+
+class ProjectModelConfigListResponse(BaseModel):
+    """Listagem de configuracoes champion/challenger de um tenant ou projeto."""
+
+    champion: Optional[ProjectModelConfigRecord]
+    challenger: Optional[ProjectModelConfigRecord]
+    history: list[ProjectModelConfigRecord]

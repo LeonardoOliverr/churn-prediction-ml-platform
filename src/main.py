@@ -48,16 +48,17 @@ O token é gerado externamente com a chave `APP_SECRET_KEY` (HS256, expiração 
 
 ---
 
-## Resolução de Modelo (Cascade)
+## Resolução de Modelo (Champion-Challenger)
 
-A API seleciona automaticamente o modelo ativo seguindo três níveis de especificidade:
+A API seleciona automaticamente o modelo operacional seguindo três níveis de especificidade:
 
 | Nível | Fonte | Condição |
 |---|---|---|
-| 1 | `project_model_config` | API key com `project_id` |
-| 2 | `project_model_config` | Config ativa do tenant (API key sem `project_id`) |
+| 1 | `project_model_config` | Champion/challenger do projeto da API key |
+| 2 | `project_model_config` | Champion ativo do tenant (API key sem `project_id`) |
 | 3 | `churn.models` | Modelo global aprovado (`scope = 'global'`) |
 
+Quando existe challenger ativo, o tráfego é dividido por hash determinístico de `customer_id`, respeitando `traffic_split`.
 Se nenhum nível retornar resultado, a API responde `404 model_not_found`.
 
 ---
@@ -106,8 +107,9 @@ _TAGS_METADATA = [
     },
     {
         "name": "admin",
-        "description": "**Administração da plataforma.** Gerencia tenants, projetos e API keys. "
-        "Requer JWT Bearer de admin. O `secret` de uma API key é retornado **apenas no momento da criação**.",
+        "description": "**Administração da plataforma.** Gerencia tenants, projetos, API keys e configuração "
+        "champion/challenger de modelos. Requer JWT Bearer de admin. O `secret` de uma API key é retornado "
+        "**apenas no momento da criação**.",
     },
 ]
 
