@@ -19,27 +19,27 @@ Plataforma de machine learning end-to-end para previsão de churn de clientes em
                 │
                 ▼
 [3] TREINAMENTO
-    ml/baseline.py  (roda via Docker trainer)
+    ml/models/baseline/baseline.py  (roda via Docker trainer)
     ├── MLflow      → artefatos + métricas por run
     └── churn.models → catálogo técnico
                         ├── melhor modelo  → status: approved
                         └── demais modelos → status: trained
                 │
-                │  promoção manual
-                │  INSERT em churn.project_model_config
+                │
+                │
                 ▼
 [4] CONFIGURAÇÃO DE PRODUÇÃO
     churn.project_model_config
-    └── define modelo ativo + threshold por projeto
-        (única config ativa por projeto — garantido pelo banco)
+    └── define champion/challenger + threshold + split por projeto
+        (um champion e no máximo um challenger ativos por projeto)
                 │
                 ▼
 [5] INFERÊNCIA
     FastAPI  POST /predict  |  POST /predict/batch
     ├── autentica via churn.api_keys (x-api-key)
-    ├── resolve modelo com cascade:
-    │     1º project_model_config do projeto  (API key com project_id)
-    │     2º project_model_config do tenant   (API key sem project_id)
+    ├── resolve modelo com cascade e split determinístico por customer_id:
+    │     1º champion/challenger do projeto   (API key com project_id)
+    │     2º champion do tenant               (API key sem project_id)
     │     3º churn.models scope=global        (modelo global aprovado)
     ├── carrega artefato do MLflow
     ├── churn.predictions   → log de cada predição
@@ -95,7 +95,7 @@ O schema `public` é reservado para as tabelas internas do MLflow.
 | `approved` | Elegível para servir em produção |
 | `archived` | Descontinuado — não deve ser selecionado |
 
-O pipeline de treinamento (`ml/baseline.py`) atribui `approved` ao modelo de melhor F1 do run e `trained` aos demais. A promoção entre status (`trained → validated → approved`) é uma decisão operacional, feita manualmente ou via automação.
+O pipeline de treinamento (`ml/models/baseline/baseline.py`) atribui `approved` ao modelo de melhor F1 do run e `trained` aos demais. A promoção entre status (`trained → validated → approved`) é uma decisão operacional, feita manualmente ou via automação.
 
 > `status='approved'` indica elegibilidade técnica. **Não significa que o modelo está em produção.** Produção é definida exclusivamente por `churn.project_model_config`.
 
@@ -105,7 +105,8 @@ O pipeline de treinamento (`ml/baseline.py`) atribui `approved` ao modelo de mel
 
 Regras garantidas pelo banco:
 
-- Apenas **uma configuração `is_active=true`** por projeto (índice único parcial)
+- Apenas **um champion ativo** por projeto e ambiente
+- No máximo **um challenger ativo** por projeto e ambiente
 - O `model_id` referenciado deve existir em `churn.models`
 - O `model_id` referenciado deve ter `status='approved'` para ser carregado pela API
 
@@ -115,6 +116,8 @@ Campos relevantes:
 |---|---|
 | `model_id` | Modelo aprovado que será servido pelo projeto |
 | `threshold` | Threshold de decisão aplicado (padrão: 0.500) |
+| `role` | Papel operacional: `champion` ou `challenger` |
+| `traffic_split` | Fração do tráfego enviada ao challenger. Ex.: `0.200` = 20% |
 | `is_active` | `true` = configuração atualmente em produção |
 | `environment` | `production`, `staging` ou `dev` |
 | `configured_by` | Identificador de quem ativou a configuração |
@@ -128,11 +131,11 @@ A API resolve qual modelo carregar seguindo três níveis em ordem de especifici
 API Key com project_id
         │
         ▼
-1º  project_model_config WHERE project_id = :project_id AND is_active = TRUE
+1º  project_model_config champion/challenger WHERE project_id = :project_id AND is_active = TRUE
         │ não encontrou
         ▼
-2º  project_model_config WHERE tenant_id = :tenant_id AND is_active = TRUE
-    (config ativa mais recente do tenant — API key sem project_id)
+2º  project_model_config champion WHERE tenant_id = :tenant_id AND is_active = TRUE
+    (fallback legado para API key sem project_id)
         │ não encontrou
         ▼
 3º  churn.models WHERE scope = 'global' AND status = 'approved'
@@ -142,15 +145,15 @@ API Key com project_id
     404 model_not_found
 ```
 
-O nível 3 consulta `churn.models` diretamente — é o único caso em que a API não passa por `project_model_config`. O threshold aplicado nesse caso é o padrão (`0.5`).
+Quando há challenger ativo, a API usa `customer_id` para aplicar split determinístico. O mesmo cliente tende a permanecer no mesmo grupo durante o teste. O nível 3 consulta `churn.models` diretamente — é o único caso em que a API não passa por `project_model_config`. O threshold aplicado nesse caso é o padrão (`0.5`).
 
 ### Fluxo de promoção de modelo
 
 ```
 treino → churn.models (status=approved)
                 │
-                │  INSERT em project_model_config
-                │  com is_active=true
+                │  POST /admin/projects/{project_id}/models/champion
+                │  ou /models/challenger
                 ▼
    churn.project_model_config
                 │
@@ -159,7 +162,7 @@ treino → churn.models (status=approved)
          inferência em produção
 ```
 
-Ao ativar uma nova configuração, a anterior deve ter `is_active` definido como `false` e `deactivated_at` preenchido. O banco garante que apenas uma configuração ativa existe por projeto via índice único parcial.
+Ao ativar um novo champion, o champion anterior é desativado. Ao ativar um novo challenger, o challenger anterior é desativado e o champion permanece intacto. O banco permite um champion e um challenger ativos por projeto.
 
 ---
 
@@ -195,6 +198,16 @@ Com o ambiente ativo, instale as dependências:
 ```bash
 pip install -r requirements.txt
 ```
+
+O arquivo `requirements.txt` instala o ambiente local completo. As imagens Docker usam arquivos menores:
+
+| Arquivo | Uso |
+|---|---|
+| `requirements-api.txt` | Runtime da API FastAPI |
+| `requirements-ml.txt` | Serviço `trainer` e scripts de modelos |
+| `requirements-pipeline.txt` | Ingestão do dataset |
+| `requirements-notebooks.txt` | EDA/Jupyter |
+| `requirements-dev.txt` | Testes |
 
 ---
 
@@ -394,7 +407,8 @@ churn-prediction-ml-platform/
     │   ├── 08_models_unique_constraint.sql
     │   ├── 09_models_status.sql    # status técnico: trained, validated, approved, archived
     │   ├── 10_api_keys.sql         # tabela de API keys para autenticação de inferência
-    │   └── 11_models_status_and_project_config_semantics.sql  # semântica de produção via project_model_config
+    │   ├── 11_models_status_and_project_config_semantics.sql  # semântica de produção via project_model_config
+    │   └── 12_champion_challenger.sql # champion/challenger e traffic split
     ├── revert/                     # scripts de rollback
     └── verify/                     # scripts de verificação pós-deploy
 ```
@@ -410,9 +424,10 @@ churn-prediction-ml-platform/
 | Pipeline de ingestão (IBM Telco → `churn.customers`) | ✅ Completo |
 | EDA (`notebooks/`) | ✅ Completo |
 | Baseline multi-tenant (`ml/`) — DummyClassifier + Logistic Regression | ✅ Completo |
+| Random Forest (`ml/models/random_forest/`) | ✅ Completo |
 | Semântica de status técnico (`churn.models`) e configuração de produção (`churn.project_model_config`) | ✅ Completo |
 | API de inferência (FastAPI) — predição individual e em lote | ✅ Completo |
-| Próximos experimentos (`ml/`) — Random Forest, XGBoost | 🔲 Pendente |
+| Próximos experimentos (`ml/`) — XGBoost, MLP | 🔲 Pendente |
 | Análise de custo (`churn.cost_analysis`) | 🔲 Pendente |
 
 ---
@@ -463,20 +478,20 @@ api      → carrega modelos registrados para inferência
 postgres → armazena dados, catálogo de modelos e logs de predição
 ```
 
-O serviço `trainer` monta o volume `mlflow_artifacts` em `/mlflow/artifacts`, acessa o PostgreSQL por `postgres:5432` e usa `MLFLOW_TRACKING_URI=http://mlflow:5000`. Por isso, evite rodar `ml/baseline.py` diretamente na máquina local para treinos que geram artefatos.
+O serviço `trainer` monta o volume `mlflow_artifacts` em `/mlflow/artifacts`, acessa o PostgreSQL por `postgres:5432` e usa `MLFLOW_TRACKING_URI=http://mlflow:5000`. Por isso, evite rodar scripts de treino diretamente na máquina local quando eles geram artefatos.
 
 ```bash
 # escopo global — treina com dados de todos os tenants
-docker compose --profile tools run --rm trainer python ml/baseline.py
+docker compose --profile tools run --rm trainer python ml/models/baseline/baseline.py
 
 # escopo tenant
-docker compose --profile tools run --rm trainer python ml/baseline.py --tenant ibm-telco
+docker compose --profile tools run --rm trainer python ml/models/baseline/baseline.py --tenant ibm-telco
 
 # escopo project (mais específico)
-docker compose --profile tools run --rm trainer python ml/baseline.py --tenant ibm-telco --project telco-churn-2018
+docker compose --profile tools run --rm trainer python ml/models/baseline/baseline.py --tenant ibm-telco --project telco-churn-2018
 
 # simulação sem gravar nada
-docker compose --profile tools run --rm trainer python ml/baseline.py --tenant ibm-telco --project telco-churn-2018 --dry-run
+docker compose --profile tools run --rm trainer python ml/models/baseline/baseline.py --tenant ibm-telco --project telco-churn-2018 --dry-run
 ```
 
 Após o treino, o script registra cada modelo em `churn.models`:
@@ -485,21 +500,31 @@ Após o treino, o script registra cada modelo em `churn.models`:
 - Os demais modelos do run recebem `status='trained'`
 - Nenhum modelo é automaticamente colocado em produção
 
-**Para colocar um modelo em produção**, é necessário criar um registro em `churn.project_model_config` apontando para o `model_id` desejado com `is_active=true`. A API de inferência carrega o artefato MLflow em `runs:/<mlflow_run_id>/model` a partir dessa configuração.
+**Para colocar um modelo em produção**, use os endpoints administrativos. A API de inferência carrega o artefato MLflow em `runs:/<mlflow_run_id>/model` a partir da configuração operacional.
 
-```sql
-INSERT INTO churn.project_model_config
-    (tenant_id, project_id, model_id, threshold, is_active, environment, configured_by, activation_reason)
-VALUES (
-    (SELECT tenant_id FROM churn.projects WHERE id = '<project_id>'),
-    '<project_id>',
-    '<model_id>',   -- deve ter status='approved' em churn.models
-    0.500,
-    TRUE,
-    'production',
-    'seu-identificador',
-    'motivo da ativação'
-);
+```bash
+# configurar champion
+curl -s -X POST http://localhost:8000/admin/projects/$PROJECT_ID/models/champion \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model_id": "'"$MODEL_ID"'",
+    "threshold": 0.5,
+    "activation_reason": "modelo aprovado para produção",
+    "description": "Logistic Regression champion"
+  }'
+
+# configurar challenger com 20% do tráfego
+curl -s -X POST http://localhost:8000/admin/projects/$PROJECT_ID/models/challenger \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model_id": "'"$CHALLENGER_MODEL_ID"'",
+    "threshold": 0.5,
+    "traffic_split": 0.2,
+    "activation_reason": "teste controlado",
+    "description": "Random Forest challenger"
+  }'
 ```
 
 Resultados do baseline e critérios para os próximos experimentos: [MODEL_COMPARISON.md](MODEL_COMPARISON.md).
@@ -515,7 +540,7 @@ A API FastAPI roda na porta **8000** e expõe os seguintes grupos de endpoints:
 | Health | `GET /health`, `GET /health/ready` | Pública |
 | Inferência | `POST /predict`, `POST /predict/batch` | API Key (`x-api-key`) com escopo `predict` |
 | Histórico | `GET /predictions` | API Key (`x-api-key`) com escopo `predictions:read` |
-| Admin | `POST /admin/tenants`, `POST /admin/projects`, `POST /admin/keys`, `DELETE /admin/keys/{id}` | JWT Bearer |
+| Admin | `POST /admin/tenants`, `POST /admin/projects`, `POST /admin/keys`, `DELETE /admin/keys/{id}`, `/admin/projects/{id}/models/*` | JWT Bearer |
 
 Documentação interativa disponível em `http://localhost:8000/docs` com a API no ar.
 
@@ -732,7 +757,7 @@ print(resp.json())
 
 ### 5. Predição em lote — `POST /predict/batch`
 
-Envia **múltiplos clientes** (máximo 100) em uma única requisição. O mesmo modelo ativo é aplicado a todos.
+Envia **múltiplos clientes** (máximo 100) em uma única requisição. Com champion/challenger ativo, o modelo é resolvido por cliente usando `customer_id`; a ordem da resposta permanece igual à ordem enviada.
 
 #### WSL (terminal)
 
