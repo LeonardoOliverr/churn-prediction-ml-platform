@@ -19,11 +19,10 @@ Uso:
 import argparse
 import os
 import sys
-
-import joblib
 import tempfile
 
 import mlflow
+import mlflow.sklearn
 import numpy as np
 from sklearn.dummy import DummyClassifier
 from sklearn.linear_model import LogisticRegression
@@ -130,10 +129,13 @@ def _run_model(name: str, model, X, y, dry_run: bool) -> tuple[str, dict]:
 
         # Treina o pipeline final em todos os dados para uso em inferência.
         pipeline.fit(X, y)
-        with tempfile.TemporaryDirectory() as tmpdir:
-            model_path = os.path.join(tmpdir, "model.pkl")
-            joblib.dump(pipeline, model_path)
-            mlflow.log_artifact(model_path, artifact_path="model")
+        # Usa save_model+log_artifacts em vez de log_model para evitar a API
+        # LoggedModel do MLflow 3.x, que tenta gravar em /mlflow/artifacts
+        # (caminho físico do container) em vez de usar o proxy mlflow-artifacts://.
+        with tempfile.TemporaryDirectory() as tmp:
+            model_path = os.path.join(tmp, "model")
+            mlflow.sklearn.save_model(pipeline, model_path)
+            mlflow.log_artifacts(model_path, artifact_path="model")
 
         run_id = run.info.run_id
 

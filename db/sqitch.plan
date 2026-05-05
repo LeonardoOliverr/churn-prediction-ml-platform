@@ -14,3 +14,4 @@
 09_models_status [04_models] 2026-04-30T03:40:47Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona status (active/shadow/archived) em churn.models
 10_api_keys [01_tenants 02_projects] 2026-05-01T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Tabela de API keys para autenticação de inferência
 11_models_status_and_project_config_semantics [05_project_model_config 09_models_status] 2026-05-02T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Separa status tecnico de modelos da configuracao de producao por projeto
+12_champion_challenger [11_models_status_and_project_config_semantics] 2026-05-04T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona configuracao champion-challenger por projeto

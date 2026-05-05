@@ -347,16 +347,15 @@ def test_run_model_not_dry_run_returns_mlflow_run_id(fake_customers_df):
          patch("ml.models.baseline.baseline.mlflow.start_run", return_value=mock_ctx), \
          patch("ml.models.baseline.baseline.mlflow.log_params") as mock_log_params, \
          patch("ml.models.baseline.baseline.mlflow.log_metrics") as mock_log_metrics, \
-         patch("ml.models.baseline.baseline.mlflow.log_artifact") as mock_log_artifact, \
-         patch("ml.models.baseline.baseline.joblib.dump"):
+         patch("ml.models.baseline.baseline.mlflow.log_artifacts") as mock_log_artifacts:
         run_id, metrics = _run_model("dummy_stratified", model, X, y, dry_run=False)
 
     assert run_id == "mlflow-abc-123"
     assert metrics == _FAKE_METRICS
     mock_log_params.assert_called_once()
     mock_log_metrics.assert_called_once_with(_FAKE_METRICS)
-    mock_log_artifact.assert_called_once()
-    assert mock_log_artifact.call_args.kwargs["artifact_path"] == "model"
+    mock_log_artifacts.assert_called_once()
+    assert mock_log_artifacts.call_args.kwargs["artifact_path"] == "model"
 
 
 # ---------------------------------------------------------------------------

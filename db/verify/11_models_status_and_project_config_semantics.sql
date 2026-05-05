@@ -18,9 +18,12 @@ BEGIN
         FROM pg_indexes
         WHERE schemaname = 'churn'
           AND tablename = 'project_model_config'
-          AND indexname = 'uq_project_model_config_active'
+          AND indexname IN (
+              'uq_project_model_config_active',
+              'uq_project_model_config_active_champion'
+          )
     ) THEN
-        RAISE EXCEPTION 'uq_project_model_config_active index not found';
+        RAISE EXCEPTION 'active project_model_config unique index not found';
     END IF;
 END
 $$;

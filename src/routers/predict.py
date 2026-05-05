@@ -28,7 +28,7 @@ from src.schemas.predict import (
     CustomerFeatures,
     PredictResponse,
 )
-from src.services.model_resolver import resolve_model
+from src.services.model_resolver import choose_for_customer, resolve_batch_models, resolve_model
 from src.services.prediction_logger import log_prediction_bg
 
 logger = structlog.get_logger()
@@ -105,9 +105,12 @@ _COMMON_RESPONSES = {
 Realiza a predição de churn para **um único cliente**.
 
 O modelo ativo é selecionado automaticamente seguindo a **cascade de resolução**:
-1. `project_model_config` do projeto da API key
+1. `project_model_config` do projeto da API key, com suporte a champion/challenger
 2. `project_model_config` do tenant (API key sem `project_id`)
 3. Modelo global aprovado em `churn.models`
+
+Quando há challenger ativo no projeto, a seleção usa hash determinístico de `customer_id`
+e respeita o `traffic_split` configurado.
 
 O registro da predição em `churn.predictions` ocorre de forma **assíncrona** — não impacta a latência da resposta.
 """,
@@ -133,6 +136,7 @@ def predict(
         project_id=api_key.project_id,
         db=db,
         settings=settings,
+        customer_id=customer.customer_id,
     )
 
     X = _build_dataframe([customer])
@@ -169,7 +173,7 @@ def predict(
 Realiza predições de churn para **múltiplos clientes** em uma única requisição.
 
 - **Limite máximo:** 100 clientes por requisição (configurável via `MAX_BATCH_SIZE`)
-- O mesmo modelo ativo é aplicado a todos os clientes do lote
+- O modelo é resolvido por cliente para suportar roteamento champion/challenger
 - As predições são registradas individualmente em `churn.predictions` de forma assíncrona
 - Os resultados retornam na **mesma ordem** dos clientes enviados
 """,
@@ -225,35 +229,60 @@ def predict_batch(
         )
 
     start_ms = time.perf_counter()
-    pipeline, threshold, model_record = resolve_model(
+    champion_loaded, challenger_loaded = resolve_batch_models(
         tenant_id=api_key.tenant_id,
         project_id=api_key.project_id,
         db=db,
         settings=settings,
     )
 
-    X = _build_dataframe(batch.customers)
-    probs = pipeline.predict_proba(X)[:, 1]
-    latency_ms = round((time.perf_counter() - start_ms) * 1000)
-
-    results = []
-    for customer, prob in zip(batch.customers, probs):
-        prob = float(prob)
-        prediction_id = str(uuid.uuid4())
-        results.append(_make_response(customer, prob, threshold, model_record, prediction_id))
-        background_tasks.add_task(
-            log_prediction_bg,
-            engine=_get_engine(settings),
-            prediction_id=prediction_id,
+    grouped: dict[str, dict] = {}
+    for index, customer in enumerate(batch.customers):
+        pipeline, threshold, model_record = choose_for_customer(
             tenant_id=api_key.tenant_id,
-            project_id=api_key.project_id or str(model_record.get("project_id", "")),
+            project_id=api_key.project_id,
             customer_id=customer.customer_id,
-            model_id=str(model_record["id"]),
-            churn_prob=prob,
-            churn_pred=prob >= threshold,
-            threshold_used=threshold,
-            latency_ms=latency_ms,
+            champion_loaded=champion_loaded,
+            challenger_loaded=challenger_loaded,
         )
+        model_id = str(model_record["id"])
+        if model_id not in grouped:
+            grouped[model_id] = {
+                "pipeline": pipeline,
+                "threshold": threshold,
+                "model_record": model_record,
+                "items": [],
+            }
+        grouped[model_id]["items"].append((index, customer))
 
+    results: list[PredictResponse | None] = [None] * len(batch.customers)
+    engine = _get_engine(settings)
+    for group in grouped.values():
+        customers = [customer for _, customer in group["items"]]
+        X = _build_dataframe(customers)
+        probs = group["pipeline"].predict_proba(X)[:, 1]
+        threshold = group["threshold"]
+        model_record = group["model_record"]
+
+        for (index, customer), prob in zip(group["items"], probs):
+            prob = float(prob)
+            latency_ms = round((time.perf_counter() - start_ms) * 1000)
+            prediction_id = str(uuid.uuid4())
+            results[index] = _make_response(customer, prob, threshold, model_record, prediction_id)
+            background_tasks.add_task(
+                log_prediction_bg,
+                engine=engine,
+                prediction_id=prediction_id,
+                tenant_id=api_key.tenant_id,
+                project_id=api_key.project_id or str(model_record.get("project_id", "")),
+                customer_id=customer.customer_id,
+                model_id=str(model_record["id"]),
+                churn_prob=prob,
+                churn_pred=prob >= threshold,
+                threshold_used=threshold,
+                latency_ms=latency_ms,
+            )
+
+    latency_ms = round((time.perf_counter() - start_ms) * 1000)
     logger.info("batch_predict", count=len(results), latency_ms=latency_ms, tenant_id=api_key.tenant_id)
-    return BatchPredictResponse(results=results, total=len(results))
+    return BatchPredictResponse(results=[result for result in results if result is not None], total=len(results))
