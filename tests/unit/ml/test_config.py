@@ -7,7 +7,7 @@ sem data leakage e com as features essenciais do IBM Telco presentes.
 
 import pytest
 
-from ml.core.config import (
+from ml.config.settings import (
     BOOL_FEATURES,
     CATEGORICAL_FEATURES,
     DROP_COLS,

@@ -1,4 +1,4 @@
-"""Compatibility wrapper for settings now stored in ml.config.settings."""
+"""Configuration package for the ML pipeline."""
 
 from ml.config.settings import (
     BOOL_FEATURES,

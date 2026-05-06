@@ -26,7 +26,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 import mlflow
 
-from ml.core.config import MLFLOW_TRACKING_URI
+from ml.config.settings import MLFLOW_TRACKING_URI
 
 
 METRICS = ["f1_mean", "roc_auc_mean", "recall_mean", "precision_mean"]

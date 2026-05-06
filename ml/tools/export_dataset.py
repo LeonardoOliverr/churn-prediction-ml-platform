@@ -22,8 +22,8 @@ import pandas as pd
 # Raiz do projeto no path para imports absolutos
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from ml.core.config import TARGET
-from ml.core.preprocessing import build_preprocessor, load_data
+from ml.config.settings import TARGET
+from ml.data.preprocessing import build_preprocessor, load_data
 
 
 def _parse_args() -> argparse.Namespace:
@@ -45,17 +45,36 @@ def _parse_args() -> argparse.Namespace:
 
 def _get_feature_names(preprocessor) -> list[str]:
     """Extrai os nomes das colunas após fit do ColumnTransformer."""
+    if hasattr(preprocessor, "get_feature_names_out"):
+        try:
+            raw = preprocessor.get_feature_names_out()
+            return [
+                name.split("__", 1)[-1] if "__" in name else name
+                for name in raw.tolist()
+            ]
+        except Exception:
+            pass
+
     names: list[str] = []
 
     for name, transformer, cols in preprocessor.transformers_:
+        if transformer == "drop":
+            continue
         if transformer == "passthrough":
             names.extend(cols)
-        else:
+        elif hasattr(transformer, "steps"):
             last_step = transformer.steps[-1][1]
             if hasattr(last_step, "get_feature_names_out"):
                 names.extend(last_step.get_feature_names_out(cols).tolist())
             else:
                 names.extend(cols)
+        elif hasattr(transformer, "get_feature_names_out"):
+            try:
+                names.extend(transformer.get_feature_names_out(cols).tolist())
+            except TypeError:
+                names.extend(transformer.get_feature_names_out().tolist())
+        else:
+            names.extend(cols)
 
     return names
 
