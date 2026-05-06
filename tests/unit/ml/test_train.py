@@ -229,6 +229,84 @@ def test_db_name_project_rf():
 
 
 # ---------------------------------------------------------------------------
+# Training metadata
+# ---------------------------------------------------------------------------
+
+
+def test_build_hyperparameters_random_forest_defaults_and_cli_override():
+    """Random Forest combina default_params, overrides da CLI e fixed_params."""
+    from ml.train import _build_hyperparameters, _resolve_specs
+
+    spec = _resolve_specs("random_forest")[0]
+    hyperparameters = _build_hyperparameters(spec, {"n_estimators": 300})
+
+    assert hyperparameters == {
+        "n_estimators": 300,
+        "max_depth": None,
+        "max_features": "sqrt",
+        "class_weight": "balanced",
+        "random_state": 42,
+        "n_jobs": -1,
+    }
+
+
+def test_build_hyperparameters_logistic_regression_fixed_params():
+    """Logistic Regression expõe os hiperparâmetros finais próprios."""
+    from ml.train import _build_hyperparameters, _resolve_specs
+
+    spec = next(s for s in _resolve_specs("baseline") if s.name == "logistic_regression")
+    hyperparameters = _build_hyperparameters(spec, {})
+
+    assert hyperparameters == {
+        "max_iter": 1000,
+        "random_state": 42,
+        "class_weight": "balanced",
+    }
+
+
+def test_build_hyperparameters_dummy_stratified_fixed_params():
+    """DummyClassifier também mantém metadata auditável."""
+    from ml.train import _build_hyperparameters, _resolve_specs
+
+    spec = next(s for s in _resolve_specs("baseline") if s.name == "dummy_stratified")
+    hyperparameters = _build_hyperparameters(spec, {})
+
+    assert hyperparameters == {"strategy": "stratified", "random_state": 42}
+
+
+def test_build_training_params_contains_expected_strategy_fields():
+    """training_params guarda a estratégia de treino e métrica primária."""
+    from ml.train import _build_training_params
+
+    training_params = _build_training_params(holdout_size=0.3)
+
+    assert training_params == {
+        "cv_folds": 5,
+        "cv_strategy": "StratifiedKFold",
+        "holdout_size": 0.3,
+        "primary_metric": "f1",
+    }
+
+
+def test_build_mlflow_params_uses_flat_prefixed_keys():
+    """MLflow recebe parâmetros flat prefixados."""
+    from ml.train import _build_mlflow_params, _resolve_specs
+
+    spec = _resolve_specs("random_forest")[0]
+    params = _build_mlflow_params(
+        spec,
+        hyperparameters={"n_estimators": 500, "max_depth": None},
+        training_params={"cv_folds": 5, "primary_metric": "f1"},
+    )
+
+    assert params["model_type"] == "random_forest"
+    assert params["hyperparameters.n_estimators"] == "500"
+    assert params["hyperparameters.max_depth"] == "None"
+    assert params["training_params.cv_folds"] == "5"
+    assert params["training_params.primary_metric"] == "f1"
+
+
+# ---------------------------------------------------------------------------
 # main()
 # ---------------------------------------------------------------------------
 
@@ -275,6 +353,11 @@ def test_main_not_dry_run_calls_log_to_mlflow(fake_customers_df):
         main()
 
     mock_log.assert_called_once()
+    params = mock_log.call_args.kwargs["params"]
+    assert params["hyperparameters.n_estimators"] == "500"
+    assert params["hyperparameters.max_features"] == "sqrt"
+    assert params["training_params.holdout_size"] == "0.2"
+    assert params["training_params.primary_metric"] == "f1"
 
 
 def test_main_calls_comparison_report_and_registration(fake_customers_df):

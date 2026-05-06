@@ -231,3 +231,29 @@ def test_train_with_cv_applies_hp_overrides(fake_customers_df):
 
     classifier = result["pipeline"].named_steps["classifier"]
     assert classifier.n_estimators == 7
+    assert classifier.max_features == "sqrt"
+    assert classifier.class_weight == "balanced"
+    assert classifier.random_state == 42
+    assert classifier.n_jobs == -1
+
+
+def test_train_with_cv_uses_logistic_regression_fixed_params(fake_customers_df):
+    """Logistic Regression treina com os fixed_params declarados no ModelSpec."""
+    from ml.core.training import train_with_cv
+    from ml.train import _resolve_specs
+
+    spec = next(s for s in _resolve_specs("baseline") if s.name == "logistic_regression")
+    X = fake_customers_df.drop(columns=[TARGET])
+    y = fake_customers_df[TARGET]
+
+    fake_cv = {f"{m}_mean": 0.7 for m in SCORING}
+    fake_cv.update({f"{m}_std": 0.01 for m in SCORING})
+    fake_cv.update({f"train_{m}_mean": 0.9 for m in SCORING})
+
+    with patch("ml.core.training.train._cv_metrics", return_value=fake_cv):
+        result = train_with_cv(spec, X, y, holdout_size=0.0)
+
+    classifier = result["pipeline"].named_steps["classifier"]
+    assert classifier.max_iter == 1000
+    assert classifier.random_state == 42
+    assert classifier.class_weight == "balanced"

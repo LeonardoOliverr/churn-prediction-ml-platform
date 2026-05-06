@@ -125,6 +125,35 @@ def test_register_in_db_dry_run_includes_version_in_output(capsys):
     assert "v3" in capsys.readouterr().out
 
 
+def test_register_in_db_dry_run_prints_metadata(capsys):
+    """O dry-run imprime hyperparameters e training_params sem escrever no banco."""
+    from ml.core.registry import register_in_db
+
+    mock_engine, mock_conn = _make_mock_engine()
+
+    with patch("ml.core.registry.db._build_engine", return_value=mock_engine), \
+         patch("ml.core.registry.db._next_version", return_value="v1"):
+        register_in_db(
+            name="global-random-forest",
+            run_id="run-id",
+            metrics=_FAKE_METRICS,
+            scope="global",
+            tenant_slug=None,
+            project_slug=None,
+            status="approved",
+            dry_run=True,
+            hyperparameters={"n_estimators": 500, "max_depth": None},
+            training_params={"cv_folds": 5, "primary_metric": "f1"},
+        )
+
+    output = capsys.readouterr().out
+    assert "hyperparameters" in output
+    assert '"n_estimators": 500' in output
+    assert "training_params" in output
+    assert '"primary_metric": "f1"' in output
+    mock_conn.execute.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # register_in_db() — escrita real
 # ---------------------------------------------------------------------------
@@ -162,6 +191,34 @@ def test_register_in_db_trained_status_executes_only_insert():
         )
 
     assert mock_conn.execute.call_count == 1
+
+
+def test_register_in_db_persists_training_metadata_jsons():
+    """O INSERT em churn.models recebe hyperparameters e training_params."""
+    from ml.core.registry import register_in_db
+
+    mock_engine, mock_conn = _make_mock_engine()
+    hyperparameters = {"n_estimators": 500, "max_depth": None}
+    training_params = {"cv_folds": 5, "cv_strategy": "StratifiedKFold"}
+
+    with patch("ml.core.registry.db._build_engine", return_value=mock_engine), \
+         patch("ml.core.registry.db._next_version", return_value="v1"):
+        register_in_db(
+            name="global-random-forest",
+            run_id="run-id",
+            metrics=_FAKE_METRICS,
+            scope="global",
+            tenant_slug=None,
+            project_slug=None,
+            status="approved",
+            dry_run=False,
+            hyperparameters=hyperparameters,
+            training_params=training_params,
+        )
+
+    insert_params = mock_conn.execute.call_args[0][1]
+    assert insert_params["hyperparameters"] == hyperparameters
+    assert insert_params["training_params"] == training_params
 
 
 # ---------------------------------------------------------------------------
