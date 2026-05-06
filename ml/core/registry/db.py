@@ -1,6 +1,9 @@
 """Database registration for trained models."""
 
-from sqlalchemy import text
+import json
+
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from ml.data.preprocessing import _build_engine, _resolve_project_id, _resolve_tenant_id
 
@@ -31,8 +34,12 @@ def register_in_db(
     project_slug: str | None,
     status: str,
     dry_run: bool,
+    hyperparameters: dict | None = None,
+    training_params: dict | None = None,
 ) -> None:
     """Insert the trained model metadata into churn.models."""
+    hyperparameters = hyperparameters or {}
+    training_params = training_params or {}
     engine = _build_engine()
     with engine.begin() as conn:
         tenant_id = _resolve_tenant_id(conn, tenant_slug) if tenant_slug else None
@@ -52,6 +59,8 @@ def register_in_db(
         print(f"  roc_auc       : {round(metrics['roc_auc_mean'], 4)}")
         print(f"  precision     : {round(metrics['precision_mean'], 4)}")
         print(f"  recall        : {round(metrics['recall_mean'], 4)}")
+        print(f"  hyperparameters: {json.dumps(hyperparameters, sort_keys=True)}")
+        print(f"  training_params: {json.dumps(training_params, sort_keys=True)}")
         print("[dry-run] Nenhuma escrita realizada.")
         return
 
@@ -64,11 +73,16 @@ def register_in_db(
                 """
                 INSERT INTO churn.models
                     (name, version, scope, tenant_id, project_id,
-                     mlflow_run_id, f1_score, roc_auc, precision_score, recall_score, status)
+                     mlflow_run_id, f1_score, roc_auc, precision_score, recall_score,
+                     status, hyperparameters, training_params)
                 VALUES
                     (:name, :version, :scope, :tenant_id, :project_id,
-                     :run_id, :f1, :roc_auc, :precision, :recall, :status)
+                     :run_id, :f1, :roc_auc, :precision, :recall,
+                     :status, :hyperparameters, :training_params)
             """
+            ).bindparams(
+                bindparam("hyperparameters", type_=JSONB),
+                bindparam("training_params", type_=JSONB),
             ),
             {
                 "name": name,
@@ -82,6 +96,8 @@ def register_in_db(
                 "precision": round(metrics["precision_mean"], 4),
                 "recall": round(metrics["recall_mean"], 4),
                 "status": status,
+                "hyperparameters": hyperparameters,
+                "training_params": training_params,
             },
         )
 
