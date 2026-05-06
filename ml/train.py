@@ -9,9 +9,10 @@ Uso:
 from __future__ import annotations
 
 import argparse
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ml.config.settings import MLFLOW_TRACKING_URI
+from ml.core.training.metrics import CV
 from ml.evaluation import CandidateResult, build_run_report, compare_results
 
 if TYPE_CHECKING:
@@ -147,25 +148,46 @@ def _db_name(
     return f"{tenant_slug}-{project_slug}-{display}"
 
 
-def _build_mlflow_params(spec: ModelSpec, hp_overrides: dict) -> dict:
-    """Constroi o dict de parametros a logar no MLflow."""
-    merged = {**spec.default_params, **hp_overrides}
-    base: dict = {
-        "model_type": spec.name,
-        "cv_folds": 5,
-        "cv_strategy": "StratifiedKFold",
+def _build_hyperparameters(spec: ModelSpec, hp_overrides: dict[str, Any]) -> dict[str, Any]:
+    """Retorna os hiperparametros finais usados para instanciar o estimador."""
+    return {**spec.default_params, **hp_overrides, **spec.fixed_params}
+
+
+def _build_training_params(holdout_size: float) -> dict[str, Any]:
+    """Retorna os parametros do processo de treino."""
+    return {
+        "cv_folds": CV.n_splits,
+        "cv_strategy": type(CV).__name__,
+        "holdout_size": holdout_size,
+        "primary_metric": "f1",
     }
 
-    if not spec.cli_overrides:
-        base["class_weight"] = "balanced" if spec.name == "logistic_regression" else "none"
-    else:
-        for key in spec.cli_overrides:
-            base[key] = str(merged.get(key))
-        if spec.name == "random_forest":
-            base["max_features"] = "sqrt"
-            base["class_weight"] = "balanced"
 
-    return base
+def _mlflow_param_value(value: Any) -> str:
+    """Normaliza valores para o contrato string de parametros do MLflow."""
+    return "None" if value is None else str(value)
+
+
+def _build_mlflow_params(
+    spec: ModelSpec,
+    hyperparameters: dict[str, Any],
+    training_params: dict[str, Any],
+) -> dict[str, str]:
+    """Constroi o dict flat de parametros a logar no MLflow."""
+    params = {"model_type": spec.name}
+    params.update(
+        {
+            f"hyperparameters.{key}": _mlflow_param_value(value)
+            for key, value in hyperparameters.items()
+        }
+    )
+    params.update(
+        {
+            f"training_params.{key}": _mlflow_param_value(value)
+            for key, value in training_params.items()
+        }
+    )
+    return params
 
 
 def _hp_overrides_from_args(args: argparse.Namespace) -> dict:
@@ -206,6 +228,8 @@ def _train_candidates(
     candidates: list[CandidateResult] = []
     for spec in specs:
         applicable = {k: v for k, v in hp_overrides.items() if k in spec.cli_overrides}
+        hyperparameters = _build_hyperparameters(spec, applicable)
+        training_params = _build_training_params(args.holdout_size)
         result = train_with_cv(
             spec,
             X,
@@ -220,7 +244,7 @@ def _train_candidates(
             print("  [dry-run] MLflow run NAO criado.")
             run_id = "dry-run-run-id"
         else:
-            params = _build_mlflow_params(spec, applicable)
+            params = _build_mlflow_params(spec, hyperparameters, training_params)
             run_id = log_to_mlflow(
                 run_name=spec.name,
                 params=params,
@@ -229,7 +253,15 @@ def _train_candidates(
                 log_feature_importances=spec.log_feature_importances,
             )
 
-        candidates.append(CandidateResult(spec=spec, run_id=run_id, metrics=metrics))
+        candidates.append(
+            CandidateResult(
+                spec=spec,
+                run_id=run_id,
+                metrics=metrics,
+                hyperparameters=hyperparameters,
+                training_params=training_params,
+            )
+        )
 
     return candidates
 
@@ -253,6 +285,8 @@ def _register_comparison(
             project_slug=project_slug,
             status=comparison.status_by_model[candidate.spec.name],
             dry_run=dry_run,
+            hyperparameters=candidate.hyperparameters,
+            training_params=candidate.training_params,
         )
 
 

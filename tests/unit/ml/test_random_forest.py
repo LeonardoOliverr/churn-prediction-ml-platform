@@ -261,6 +261,11 @@ def test_main_dry_run_calls_train_with_cv_and_register(fake_customers_df):
 
     mock_train.assert_called_once()
     mock_register.assert_called_once()
+    register_kwargs = mock_register.call_args.kwargs
+    assert register_kwargs["hyperparameters"]["n_estimators"] == 10
+    assert register_kwargs["hyperparameters"]["max_features"] == "sqrt"
+    assert register_kwargs["training_params"]["holdout_size"] == 0.2
+    assert register_kwargs["training_params"]["primary_metric"] == "f1"
 
 
 def test_main_always_marks_model_as_approved(fake_customers_df):

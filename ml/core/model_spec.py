@@ -16,6 +16,7 @@ class ModelSpec:
     name: str
     estimator_factory: Callable[..., BaseEstimator]
     default_params: dict[str, Any] = field(default_factory=dict)
+    fixed_params: dict[str, Any] = field(default_factory=dict)
     cli_overrides: dict[str, type] = field(default_factory=dict)
     experiment_suffix: str = ""
     log_feature_importances: bool = False

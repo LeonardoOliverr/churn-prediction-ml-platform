@@ -21,7 +21,7 @@ def train_with_cv(
     if hp_overrides is None:
         hp_overrides = {}
 
-    merged = {**spec.default_params, **hp_overrides}
+    merged = {**spec.default_params, **hp_overrides, **spec.fixed_params}
     estimator = spec.estimator_factory(**merged)
     pipeline = Pipeline(
         [
