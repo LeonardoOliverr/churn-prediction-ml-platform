@@ -157,24 +157,24 @@ def test_derive_scope_returns_two_tuple():
 
 
 def test_db_name_global():
-    """Escopo global → 'global-random-forest'."""
+    """Qualquer escopo → apenas nome do modelo em kebab-case."""
     from ml.train import _db_name
 
-    assert _db_name("global", None, None, "random_forest") == "global-random-forest"
+    assert _db_name("random_forest") == "random-forest"
 
 
 def test_db_name_tenant():
-    """Escopo tenant → '{tenant}-random-forest'."""
+    """Qualquer escopo → apenas nome do modelo em kebab-case."""
     from ml.train import _db_name
 
-    assert _db_name("tenant", "ibm-telco", None, "random_forest") == "ibm-telco-random-forest"
+    assert _db_name("random_forest") == "random-forest"
 
 
 def test_db_name_project():
-    """Escopo project → '{tenant}-{project}-random-forest'."""
+    """Qualquer escopo → apenas nome do modelo em kebab-case."""
     from ml.train import _db_name
 
-    assert _db_name("project", "ibm-telco", "telco-churn-2018", "random_forest") == "ibm-telco-telco-churn-2018-random-forest"
+    assert _db_name("random_forest") == "random-forest"
 
 
 # ---------------------------------------------------------------------------

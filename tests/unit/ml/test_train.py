@@ -215,17 +215,17 @@ def test_derive_scope_project():
 
 def test_db_name_global_baseline():
     from ml.train import _db_name
-    assert _db_name("global", None, None, "logistic_regression") == "global-logistic-regression"
+    assert _db_name("logistic_regression") == "logistic-regression"
 
 
 def test_db_name_global_rf():
     from ml.train import _db_name
-    assert _db_name("global", None, None, "random_forest") == "global-random-forest"
+    assert _db_name("random_forest") == "random-forest"
 
 
 def test_db_name_project_rf():
     from ml.train import _db_name
-    assert _db_name("project", "ibm-telco", "telco-churn-2018", "random_forest") == "ibm-telco-telco-churn-2018-random-forest"
+    assert _db_name("random_forest") == "random-forest"
 
 
 # ---------------------------------------------------------------------------
