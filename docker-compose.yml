@@ -56,10 +56,11 @@ services:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       MLFLOW_TRACKING_URI: http://mlflow:5000
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      GIT_PYTHON_REFRESH: quiet
     volumes:
       - ./ml:/app/ml:ro
       - mlflow_artifacts:/mlflow/artifacts
-    command: ["python", "ml/models/baseline/baseline.py", "--help"]
 
   api:
     build:

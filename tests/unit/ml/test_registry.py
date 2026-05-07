@@ -103,8 +103,8 @@ def test_register_in_db_dry_run_no_db_writes(capsys):
         )
 
     captured = capsys.readouterr()
-    assert "dry-run" in captured.out
-    assert "Nenhuma escrita realizada" in captured.out
+    assert "dry_run" in captured.out
+    assert "db_registration_skipped" in captured.out
     mock_conn.execute.assert_not_called()
 
 

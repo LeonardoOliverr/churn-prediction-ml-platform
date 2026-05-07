@@ -27,6 +27,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 import mlflow
 
 from ml.config.settings import MLFLOW_TRACKING_URI
+from ml.core.logger import get_logger
+
+logger = get_logger()
 
 
 METRICS = ["f1_mean", "roc_auc_mean", "recall_mean", "precision_mean"]
@@ -78,7 +81,7 @@ def _load_best_runs(tenant: str, project: str | None) -> pd.DataFrame:
     experiments = [e for e in client.search_experiments() if e.name.startswith(prefix)]
 
     if not experiments:
-        print(f"Nenhum experimento encontrado para {prefix}*")
+        logger.warning("no_experiments_found", prefix=f"{prefix}*")
         sys.exit(1)
 
     rows = []
@@ -142,7 +145,7 @@ def _save_or_show(fig, output: str | None) -> None:
     if output:
         os.makedirs(os.path.dirname(output) or ".", exist_ok=True)
         fig.savefig(output, dpi=150, bbox_inches="tight")
-        print(f"Gráfico salvo em: {output}")
+        logger.info("chart_saved", path=output)
         plt.close(fig)
         return
 
@@ -359,11 +362,11 @@ def _plot_decision_map(df: pd.DataFrame, output: str | None) -> None:
 def main() -> None:
     args = _parse_args()
     scope = f"{args.tenant}/{args.project}" if args.project else args.tenant
-    print(f"Carregando experimentos de {scope}/...")
+    logger.info("loading_experiments", scope=f"{scope}/")
     df = _load_best_runs(args.tenant, args.project)
     xy_output, decision_output = _derived_outputs(args.output, args.xy_output, args.decision_output)
 
-    print(f"\n{len(df)} modelo(s) encontrado(s):\n")
+    logger.info("models_found", count=len(df))
     print(df[["model", "f1_mean", "roc_auc_mean", "recall_mean", "precision_mean", "train_f1_mean"]].to_string(index=False))
 
     _plot(df, args.output)

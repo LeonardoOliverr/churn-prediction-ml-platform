@@ -23,7 +23,10 @@ import pandas as pd
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from ml.config.settings import TARGET
+from ml.core.logger import get_logger
 from ml.data.preprocessing import build_preprocessor, load_data
+
+logger = get_logger()
 
 
 def _parse_args() -> argparse.Namespace:
@@ -87,23 +90,22 @@ def export(
     """Carrega dados, aplica transformações e exporta CSVs para `output_dir`."""
     os.makedirs(output_dir, exist_ok=True)
 
-    print(f"Carregando dados do PostgreSQL...")
+    logger.info("data_loading_started")
     X, y = load_data(tenant_slug=tenant_slug, project_slug=project_slug)
-    print(f"  {len(X)} registros | churn rate: {y.mean():.1%}")
+    logger.info("data_loaded", records=len(X), churn_rate=round(float(y.mean()), 4))
 
     # ---- 1. CSV bruto ----
     raw_df = X.copy()
     raw_df[TARGET] = y
     raw_path = os.path.join(output_dir, "features_raw.csv")
     raw_df.to_csv(raw_path, index=False)
-    print(f"\n[1/3] features_raw.csv exportado → {raw_path}")
-    print(f"      Shape: {raw_df.shape} | Colunas: {list(raw_df.columns)}")
+    logger.info("raw_csv_exported", path=raw_path, shape=list(raw_df.shape), columns=list(raw_df.columns))
 
     # ---- 2. Fit do preprocessor ----
-    print(f"\nAplicando ColumnTransformer (imputation + scaling + OHE)...")
+    logger.info("preprocessor_fitting_started")
     preprocessor = build_preprocessor()
     X_transformed = preprocessor.fit_transform(X)
-    print(f"  Shape após transformação: {X_transformed.shape}")
+    logger.info("preprocessor_fitted", shape=list(X_transformed.shape))
 
     # ---- 3. Nomes das colunas transformadas ----
     feature_names = _get_feature_names(preprocessor)
@@ -112,14 +114,18 @@ def export(
     with open(names_path, "w", encoding="utf-8") as f:
         for i, name in enumerate(feature_names):
             f.write(f"{i:3d}  {name}\n")
-    print(f"\n[2/3] feature_names.txt exportado → {names_path}")
-    print(f"      {len(feature_names)} features no total")
 
     numeric_count = 3
     bool_count    = 5
     ohe_count     = len(feature_names) - numeric_count - bool_count
-    print(f"      Distribuição: {numeric_count} numéricas (scaled) | "
-          f"{bool_count} booleans | {ohe_count} OHE (categorical)")
+    logger.info(
+        "feature_names_exported",
+        path=names_path,
+        total_features=len(feature_names),
+        numeric=numeric_count,
+        boolean=bool_count,
+        ohe=ohe_count,
+    )
 
     # ---- 4. CSV transformado ----
     cols = feature_names if len(feature_names) == X_transformed.shape[1] \
@@ -130,18 +136,15 @@ def export(
 
     transformed_path = os.path.join(output_dir, "features_transformed.csv")
     transformed_df.to_csv(transformed_path, index=False)
-    print(f"\n[3/3] features_transformed.csv exportado → {transformed_path}")
-    print(f"      Shape: {transformed_df.shape}")
+    logger.info("transformed_csv_exported", path=transformed_path, shape=list(transformed_df.shape))
 
-    print(f"\n{'='*60}")
-    print("Resumo das features numéricas (após StandardScaler):")
-    print(transformed_df.iloc[:, :numeric_count].describe().round(3).to_string())
-    print(f"\nChurn rate: {y.mean():.1%} ({y.sum()} positivos de {len(y)})")
-    print(f"{'='*60}")
-    print(f"\nArquivos gerados em '{output_dir}/':")
-    print(f"  • features_raw.csv          — dataset original (legível por humanos)")
-    print(f"  • features_transformed.csv  — dataset pronto para o modelo")
-    print(f"  • feature_names.txt         — índice das colunas do array transformado")
+    logger.info(
+        "export_complete",
+        output_dir=output_dir,
+        churn_rate=round(float(y.mean()), 4),
+        positives=int(y.sum()),
+        total=len(y),
+    )
 
 
 def main() -> None:

@@ -312,8 +312,8 @@ def test_main_not_dry_run_marks_best_model_as_approved(fake_customers_df):
         main()
 
     statuses = {c.kwargs["name"]: c.kwargs["status"] for c in mock_register.call_args_list}
-    assert statuses["global-logistic-regression"] == "approved"
-    assert statuses["global-dummy-stratified"] == "trained"
+    assert statuses["logistic-regression"] == "approved"
+    assert statuses["dummy-stratified"] == "trained"
 
 
 def test_main_not_dry_run_configures_mlflow(fake_customers_df):

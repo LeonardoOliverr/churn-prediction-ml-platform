@@ -12,8 +12,11 @@ import argparse
 from typing import TYPE_CHECKING, Any
 
 from ml.config.settings import MLFLOW_TRACKING_URI
+from ml.core.logger import get_logger
 from ml.core.training.metrics import CV
 from ml.evaluation import CandidateResult, build_run_report, compare_results
+
+logger = get_logger()
 
 if TYPE_CHECKING:
     from ml.core.model_spec import ModelSpec
@@ -133,19 +136,9 @@ def _derive_scope(
     return "project", f"{tenant_slug}/{project_slug}/{experiment_suffix}"
 
 
-def _db_name(
-    scope: str,
-    tenant_slug: str | None,
-    project_slug: str | None,
-    spec_name: str,
-) -> str:
+def _db_name(spec_name: str) -> str:
     """Gera o nome do modelo para registro em churn.models."""
-    display = spec_name.replace("_", "-")
-    if scope == "global":
-        return f"global-{display}"
-    if scope == "tenant":
-        return f"{tenant_slug}-{display}"
-    return f"{tenant_slug}-{project_slug}-{display}"
+    return spec_name.replace("_", "-")
 
 
 def _build_hyperparameters(spec: ModelSpec, hp_overrides: dict[str, Any]) -> dict[str, Any]:
@@ -200,21 +193,21 @@ def _hp_overrides_from_args(args: argparse.Namespace) -> dict:
     return hp_overrides
 
 
-def _print_run_context(
+def _log_run_context(
     scope: str,
     tenant_slug: str | None,
     project_slug: str | None,
     experiment_name: str,
     holdout_size: float,
 ) -> None:
-    print(f"\nEscopo      : {scope}")
-    print(f"Tenant      : {tenant_slug or '-'}")
-    print(f"Projeto     : {project_slug or '-'}")
-    print(f"Experimento : {experiment_name}")
-    if holdout_size > 0:
-        print(f"Holdout     : {holdout_size:.0%} reservado para avaliacao final")
-    else:
-        print("Holdout     : desativado (CV puro)")
+    logger.info(
+        "run_context",
+        scope=scope,
+        tenant=tenant_slug or "-",
+        project=project_slug or "-",
+        experiment=experiment_name,
+        holdout=f"{holdout_size:.0%}" if holdout_size > 0 else "disabled",
+    )
 
 
 def _train_candidates(
@@ -241,7 +234,7 @@ def _train_candidates(
         metrics = result["metrics"]
 
         if args.dry_run:
-            print("  [dry-run] MLflow run NAO criado.")
+            logger.warning("mlflow_run_skipped", reason="dry_run")
             run_id = "dry-run-run-id"
         else:
             params = _build_mlflow_params(spec, hyperparameters, training_params)
@@ -275,7 +268,7 @@ def _register_comparison(
 ) -> None:
     """Registra todos os candidatos com o status decidido pela comparacao."""
     for candidate in comparison.candidates:
-        db_name = _db_name(scope, tenant_slug, project_slug, candidate.spec.name)
+        db_name = _db_name(candidate.spec.name)
         register_in_db(
             name=db_name,
             run_id=candidate.run_id,
@@ -297,11 +290,9 @@ def main() -> None:
     scope, experiment_name = _derive_scope(args.tenant, args.project, experiment_suffix)
 
     if args.dry_run:
-        print("=" * 50)
-        print("MODO DRY-RUN - nenhuma escrita sera realizada")
-        print("=" * 50)
+        logger.warning("dry_run_mode", message="nenhuma escrita sera realizada")
 
-    _print_run_context(
+    _log_run_context(
         scope=scope,
         tenant_slug=args.tenant,
         project_slug=args.project,
@@ -313,21 +304,22 @@ def main() -> None:
         mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
         mlflow.set_experiment(experiment_name)
 
-    print("\nCarregando dados do PostgreSQL...")
+    logger.info("data_loading_started")
     X, y = load_data(tenant_slug=args.tenant, project_slug=args.project)
-    print(f"  {len(X)} registros | churn rate: {y.mean():.1%}")
+    logger.info("data_loaded", records=len(X), churn_rate=round(float(y.mean()), 4))
 
     hp_overrides = _hp_overrides_from_args(args)
     candidates = _train_candidates(specs, X, y, args, hp_overrides)
     comparison = compare_results(candidates)
-    print(
-        build_run_report(
+    logger.info(
+        "training_run_report",
+        report=build_run_report(
             comparison=comparison,
             experiment_name=experiment_name,
             tenant_slug=args.tenant,
             project_slug=args.project,
             holdout_size=args.holdout_size,
-        )
+        ),
     )
     _register_comparison(
         comparison=comparison,
@@ -338,7 +330,7 @@ def main() -> None:
     )
 
     if not args.dry_run:
-        print(f"\nResultados no MLflow: {MLFLOW_TRACKING_URI}")
+        logger.info("mlflow_results", uri=MLFLOW_TRACKING_URI)
 
 
 if __name__ == "__main__":
