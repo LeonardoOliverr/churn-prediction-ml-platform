@@ -5,9 +5,12 @@ from __future__ import annotations
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 
+from ml.core.logger import get_logger
 from ml.core.model_spec import ModelSpec
 from ml.core.training.metrics import CV, SCORING, _compute_score, _cv_metrics
 from ml.data.preprocessing import build_preprocessor
+
+logger = get_logger()
 
 
 def train_with_cv(
@@ -42,17 +45,27 @@ def train_with_cv(
         X_train, y_train = X, y
         X_holdout, y_holdout = None, None
 
-    print(f"\n[{spec.name}] Executando cross-validation ({CV.n_splits} folds)...")
+    logger.info("cv_started", model=spec.name, n_splits=CV.n_splits)
     cv_metrics = _cv_metrics(pipeline, X_train, y_train)
 
     cv_f1_gap = cv_metrics["train_f1_mean"] - cv_metrics["f1_mean"]
     cv_roc_gap = cv_metrics["train_roc_auc_mean"] - cv_metrics["roc_auc_mean"]
-    gap_warning = "  overfitting" if cv_f1_gap > 0.10 else ""
 
-    print(f"  CV F1        : treino={cv_metrics['train_f1_mean']:.4f}  val={cv_metrics['f1_mean']:.4f} +/- {cv_metrics['f1_std']:.4f}  gap={cv_f1_gap:+.4f}{gap_warning}")
-    print(f"  CV ROC-AUC   : treino={cv_metrics['train_roc_auc_mean']:.4f}  val={cv_metrics['roc_auc_mean']:.4f} +/- {cv_metrics['roc_auc_std']:.4f}  gap={cv_roc_gap:+.4f}")
-    print(f"  CV Recall    : {cv_metrics['recall_mean']:.4f}")
-    print(f"  CV Precision : {cv_metrics['precision_mean']:.4f}")
+    logger.info(
+        "cv_metrics",
+        model=spec.name,
+        train_f1=round(cv_metrics["train_f1_mean"], 4),
+        val_f1=round(cv_metrics["f1_mean"], 4),
+        val_f1_std=round(cv_metrics["f1_std"], 4),
+        cv_f1_gap=round(cv_f1_gap, 4),
+        train_roc_auc=round(cv_metrics["train_roc_auc_mean"], 4),
+        val_roc_auc=round(cv_metrics["roc_auc_mean"], 4),
+        val_roc_auc_std=round(cv_metrics["roc_auc_std"], 4),
+        cv_roc_gap=round(cv_roc_gap, 4),
+        recall=round(cv_metrics["recall_mean"], 4),
+        precision=round(cv_metrics["precision_mean"], 4),
+        overfitting=cv_f1_gap > 0.10,
+    )
 
     pipeline.fit(X_train, y_train)
 
@@ -63,10 +76,15 @@ def train_with_cv(
         }
 
         ho_f1_gap = cv_metrics["train_f1_mean"] - holdout_scores["f1"]
-        print(f"\n  Holdout F1        : {holdout_scores['f1']:.4f}  gap vs CV-treino={ho_f1_gap:+.4f}")
-        print(f"  Holdout ROC-AUC   : {holdout_scores['roc_auc']:.4f}")
-        print(f"  Holdout Recall    : {holdout_scores['recall']:.4f}")
-        print(f"  Holdout Precision : {holdout_scores['precision']:.4f}")
+        logger.info(
+            "holdout_metrics",
+            model=spec.name,
+            f1=round(holdout_scores["f1"], 4),
+            ho_f1_gap=round(ho_f1_gap, 4),
+            roc_auc=round(holdout_scores["roc_auc"], 4),
+            recall=round(holdout_scores["recall"], 4),
+            precision=round(holdout_scores["precision"], 4),
+        )
 
         metrics: dict[str, float] = {
             "f1_mean": holdout_scores["f1"],

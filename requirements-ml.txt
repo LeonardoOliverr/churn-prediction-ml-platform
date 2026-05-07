@@ -12,3 +12,4 @@ sqlalchemy==2.0.30
 # Utilitários visuais e ambiente
 matplotlib==3.9.0
 python-dotenv==1.0.1
+structlog>=24.0.0

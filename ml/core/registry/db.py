@@ -1,11 +1,12 @@
 """Database registration for trained models."""
 
-import json
-
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from ml.core.logger import get_logger
 from ml.data.preprocessing import _build_engine, _resolve_project_id, _resolve_tenant_id
+
+logger = get_logger()
 
 
 def _next_version(conn, scope: str, tenant_id, project_id, name: str) -> str:
@@ -47,21 +48,23 @@ def register_in_db(
         version = _next_version(conn, scope, tenant_id, project_id, name)
 
     if dry_run:
-        print(f"\n[dry-run] Registro que seria gravado em churn.models:")
-        print(f"  name          : {name}")
-        print(f"  version       : {version}")
-        print(f"  status        : {status}")
-        print(f"  scope         : {scope}")
-        print(f"  tenant        : {tenant_slug or '-'}")
-        print(f"  project       : {project_slug or '-'}")
-        print(f"  mlflow_run_id : {run_id}")
-        print(f"  f1_score      : {round(metrics['f1_mean'], 4)}")
-        print(f"  roc_auc       : {round(metrics['roc_auc_mean'], 4)}")
-        print(f"  precision     : {round(metrics['precision_mean'], 4)}")
-        print(f"  recall        : {round(metrics['recall_mean'], 4)}")
-        print(f"  hyperparameters: {json.dumps(hyperparameters, sort_keys=True)}")
-        print(f"  training_params: {json.dumps(training_params, sort_keys=True)}")
-        print("[dry-run] Nenhuma escrita realizada.")
+        logger.warning(
+            "db_registration_skipped",
+            reason="dry_run",
+            name=name,
+            version=version,
+            status=status,
+            scope=scope,
+            tenant=tenant_slug or "-",
+            project=project_slug or "-",
+            mlflow_run_id=run_id,
+            f1=round(metrics["f1_mean"], 4),
+            roc_auc=round(metrics["roc_auc_mean"], 4),
+            precision=round(metrics["precision_mean"], 4),
+            recall=round(metrics["recall_mean"], 4),
+            hyperparameters=hyperparameters,
+            training_params=training_params,
+        )
         return
 
     with engine.begin() as conn:
@@ -101,5 +104,11 @@ def register_in_db(
             },
         )
 
-    label = f"tenant={tenant_slug}" if tenant_slug else "global"
-    print(f"  Registrado: {name} {version} | status={status} | scope={scope} | {label}")
+    logger.info(
+        "model_registered",
+        name=name,
+        version=version,
+        status=status,
+        scope=scope,
+        tenant=tenant_slug or "global",
+    )

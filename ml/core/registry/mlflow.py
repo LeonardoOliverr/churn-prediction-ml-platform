@@ -9,6 +9,10 @@ import mlflow
 import mlflow.sklearn
 from sklearn.pipeline import Pipeline
 
+from ml.core.logger import get_logger
+
+logger = get_logger()
+
 
 def _get_feature_names(pipeline: Pipeline) -> list[str]:
     """Extract transformed feature names from the fitted ColumnTransformer."""
@@ -47,11 +51,12 @@ def log_to_mlflow(
             try:
                 mlflow.log_dict(importance_map, "feature_importances.json")
             except Exception as e:
-                print(f"  [aviso] feature_importances.json nao salvo ({e}).")
+                logger.warning("feature_importances_not_saved", error=str(e))
 
             top5 = list(importance_map.items())[:5]
-            print("\n  Top 5 features:")
-            for feat, imp in top5:
-                print(f"    {feat:<40} {imp:.4f}")
+            logger.info(
+                "top_features",
+                features={feat: round(imp, 4) for feat, imp in top5},
+            )
 
         return run.info.run_id
