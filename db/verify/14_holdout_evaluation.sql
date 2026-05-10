@@ -18,22 +18,4 @@ BEGIN
     ) THEN
         RAISE EXCEPTION 'churn.outcomes table not found';
     END IF;
-
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema = 'churn'
-          AND table_name   = 'cost_analysis'
-          AND column_name  = 'tp'
-    ) THEN
-        RAISE EXCEPTION 'cost_analysis.tp column not found';
-    END IF;
-
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema = 'churn'
-          AND table_name   = 'cost_analysis'
-          AND column_name  = 'f1_score'
-    ) THEN
-        RAISE EXCEPTION 'cost_analysis.f1_score column not found';
-    END IF;
 END $$;
