@@ -151,3 +151,63 @@ def test_preprocessor_number_of_output_columns(fake_customers_df):
 
     n_input_features = len(NUMERIC_FEATURES) + len(BOOL_FEATURES) + len(CATEGORICAL_FEATURES)
     assert result.shape[1] > n_input_features
+
+
+# ---------------------------------------------------------------------------
+# load_data() — parâmetro split
+# ---------------------------------------------------------------------------
+
+
+def test_load_data_invalid_split_raises_value_error():
+    """load_data() com split inválido levanta ValueError antes de acessar o banco."""
+    from ml.data.preprocessing import load_data
+
+    with pytest.raises(ValueError, match="split deve ser"):
+        load_data(split="test")
+
+
+def test_load_data_invalid_split_value_all_raises():
+    """Valor 'all' não é aceito — deve ser None para carregar todos."""
+    from ml.data.preprocessing import load_data
+
+    with pytest.raises(ValueError):
+        load_data(split="all")
+
+
+def test_load_data_none_split_does_not_raise():
+    """split=None é aceito (carrega todos os registros) sem levantar erro de validação."""
+    from ml.data.preprocessing import load_data
+    from unittest.mock import patch, MagicMock
+    import pandas as pd
+
+    mock_df = pd.DataFrame(columns=["churn_value"])
+    with patch("ml.data.preprocessing._build_engine") as mock_engine_fn:
+        mock_conn = MagicMock()
+        mock_conn.__enter__ = lambda s: s
+        mock_conn.__exit__ = MagicMock(return_value=False)
+        mock_conn.execute.return_value.scalar_one.return_value = "uuid"
+        mock_engine_fn.return_value.connect.return_value = mock_conn
+        with patch("pandas.read_sql", return_value=mock_df):
+            try:
+                load_data(split=None)
+            except Exception as e:
+                assert "split deve ser" not in str(e)
+
+
+def test_load_data_train_split_is_default():
+    """split='train' é o default — não levanta erro de validação."""
+    from ml.data.preprocessing import load_data
+    from unittest.mock import patch, MagicMock
+    import pandas as pd
+
+    mock_df = pd.DataFrame(columns=["churn_value"])
+    with patch("ml.data.preprocessing._build_engine") as mock_engine_fn:
+        mock_conn = MagicMock()
+        mock_conn.__enter__ = lambda s: s
+        mock_conn.__exit__ = MagicMock(return_value=False)
+        mock_engine_fn.return_value.connect.return_value = mock_conn
+        with patch("pandas.read_sql", return_value=mock_df):
+            try:
+                load_data()
+            except Exception as e:
+                assert "split deve ser" not in str(e)
