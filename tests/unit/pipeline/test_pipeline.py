@@ -226,7 +226,7 @@ def test_load_sets_is_synthetic_false(raw_telco_df):
 def test_load_sends_only_expected_columns(raw_telco_df):
     """load() seleciona exatamente as colunas do COLUMN_MAP + IDs de infra."""
     sent_df = _capture_to_sql(raw_telco_df)
-    expected = set(COLUMN_MAP.values()) | {"tenant_id", "project_id", "is_synthetic"}
+    expected = set(COLUMN_MAP.values()) | {"tenant_id", "project_id", "is_synthetic", "split"}
     assert set(sent_df.columns) == expected
 
 
@@ -246,3 +246,60 @@ def test_load_calls_to_sql_with_correct_table_params(raw_telco_df):
     assert captured_kwargs["name"] == "customers"
     assert captured_kwargs["schema"] == "churn"
     assert captured_kwargs["if_exists"] == "append"
+
+
+# ---------------------------------------------------------------------------
+# assign_split() — partição determinística via MD5
+# ---------------------------------------------------------------------------
+
+
+def test_assign_split_is_deterministic():
+    """assign_split retorna o mesmo resultado para o mesmo customer_id."""
+    from pipeline.load_ibm_telco import assign_split
+
+    assert assign_split("7590-VHVEG") == assign_split("7590-VHVEG")
+    assert assign_split("5575-GNVDE") == assign_split("5575-GNVDE")
+
+
+def test_assign_split_returns_valid_values():
+    """assign_split retorna apenas 'train' ou 'holdout'."""
+    from pipeline.load_ibm_telco import assign_split
+
+    customer_ids = [f"CUST-{i:04d}" for i in range(100)]
+    splits = [assign_split(cid) for cid in customer_ids]
+    assert all(s in {"train", "holdout"} for s in splits)
+
+
+def test_assign_split_distribution_is_roughly_30_pct():
+    """assign_split distribui aproximadamente 30% para holdout em amostra grande."""
+    from pipeline.load_ibm_telco import assign_split
+
+    customer_ids = [f"CUST-{i:06d}" for i in range(1000)]
+    holdout_count = sum(1 for cid in customer_ids if assign_split(cid) == "holdout")
+    ratio = holdout_count / len(customer_ids)
+    assert 0.22 <= ratio <= 0.38, f"Distribuição holdout fora do esperado: {ratio:.2%}"
+
+
+def test_assign_split_custom_ratio():
+    """assign_split respeita holdout_ratio customizado."""
+    from pipeline.load_ibm_telco import assign_split
+
+    customer_ids = [f"CUST-{i:06d}" for i in range(1000)]
+    holdout_50 = sum(1 for cid in customer_ids if assign_split(cid, holdout_ratio=0.5) == "holdout")
+    ratio = holdout_50 / len(customer_ids)
+    assert 0.42 <= ratio <= 0.58
+
+
+def test_load_includes_split_column(raw_telco_df):
+    """load() inclui a coluna split no DataFrame enviado ao banco."""
+    df = transform(raw_telco_df)
+    sent_df = []
+
+    def fake_to_sql(self, name, con, **kwargs):
+        sent_df.append(self.copy())
+
+    with patch.object(pd.DataFrame, "to_sql", fake_to_sql):
+        load(df, object(), tenant_id="t", project_id="p")
+
+    assert "split" in sent_df[0].columns
+    assert set(sent_df[0]["split"].unique()).issubset({"train", "holdout"})
