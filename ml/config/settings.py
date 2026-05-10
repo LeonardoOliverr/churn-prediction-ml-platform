@@ -59,4 +59,5 @@ DROP_COLS = [
     "churn_reason",
     "is_synthetic",
     "created_at",
+    "split",
 ]

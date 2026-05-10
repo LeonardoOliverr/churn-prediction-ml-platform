@@ -30,7 +30,11 @@ def _build_engine():
     return create_engine(f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{db}")
 
 
-def _resolve_tenant_id(conn, tenant_slug: str) -> str:
+def _resolve_tenant_id(conn, tenant_slug: str | None) -> str:
+    if tenant_slug is None:
+        return str(
+            conn.execute(text("SELECT id FROM churn.tenants LIMIT 1")).scalar_one()
+        )
     return str(
         conn.execute(
             text("SELECT id FROM churn.tenants WHERE slug = :s"),
@@ -51,30 +55,45 @@ def _resolve_project_id(conn, tenant_id: str, project_slug: str) -> str:
 def load_data(
     tenant_slug: str | None = None,
     project_slug: str | None = None,
+    split: str | None = "train",
 ) -> tuple[pd.DataFrame, pd.Series]:
-    """Load churn.customers from PostgreSQL and return sklearn-ready (X, y)."""
+    """Load churn.customers from PostgreSQL and return sklearn-ready (X, y).
+
+    Parâmetro split filtra por partição: 'train', 'holdout' ou None (todos).
+    Default 'train' garante compatibilidade com callers existentes.
+    """
+    if split not in ("train", "holdout", None):
+        raise ValueError(f"split deve ser 'train', 'holdout' ou None, recebido: {split!r}")
+
     engine = _build_engine()
 
     with engine.connect() as conn:
         if tenant_slug is None:
-            df = pd.read_sql("SELECT * FROM churn.customers", conn)
+            query = "SELECT * FROM churn.customers"
+            params: dict = {}
+            if split is not None:
+                query += " WHERE split = :split"
+                params["split"] = split
+            df = pd.read_sql(text(query), conn, params=params or None)
 
         elif project_slug is None:
             tenant_id = _resolve_tenant_id(conn, tenant_slug)
-            df = pd.read_sql(
-                text("SELECT * FROM churn.customers WHERE tenant_id = :t"),
-                conn,
-                params={"t": tenant_id},
-            )
+            query = "SELECT * FROM churn.customers WHERE tenant_id = :t"
+            params = {"t": tenant_id}
+            if split is not None:
+                query += " AND split = :split"
+                params["split"] = split
+            df = pd.read_sql(text(query), conn, params=params)
 
         else:
             tenant_id = _resolve_tenant_id(conn, tenant_slug)
             project_id = _resolve_project_id(conn, tenant_id, project_slug)
-            df = pd.read_sql(
-                text("SELECT * FROM churn.customers WHERE tenant_id = :t AND project_id = :p"),
-                conn,
-                params={"t": tenant_id, "p": project_id},
-            )
+            query = "SELECT * FROM churn.customers WHERE tenant_id = :t AND project_id = :p"
+            params = {"t": tenant_id, "p": project_id}
+            if split is not None:
+                query += " AND split = :split"
+                params["split"] = split
+            df = pd.read_sql(text(query), conn, params=params)
 
     df = df.drop(columns=DROP_COLS, errors="ignore")
 

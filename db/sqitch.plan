@@ -16,3 +16,8 @@
 11_models_status_and_project_config_semantics [05_project_model_config 09_models_status] 2026-05-02T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Separa status tecnico de modelos da configuracao de producao por projeto
 12_champion_challenger [11_models_status_and_project_config_semantics] 2026-05-04T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona configuracao champion-challenger por projeto
 13_models_training_metadata [12_champion_challenger] 2026-05-06T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona metadados de hiperparametros e treino em churn.models
+14_holdout_evaluation [13_models_training_metadata] 2026-05-06T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona split em customers, tabela outcomes e metricas de avaliacao holdout em cost_analysis
+15_evaluation_runs [14_holdout_evaluation] 2026-05-07T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Modelo enterprise de avaliacao: evaluation_runs + evaluation_run_results com snapshot operacional
+16_deprecate_cost_analysis [15_evaluation_runs] 2026-05-07T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Depreca cost_analysis e cria view de compatibilidade cost_analysis_v2
+17_comments [16_deprecate_cost_analysis] 2026-05-07T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona COMMENT ON TABLE em todas as tabelas e preenche colunas ausentes em customers
+18_analytics_enhancements [17_comments] 2026-05-09T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona taxas derivadas, segmentacao de risco e recomendacao de promocao; cria view evaluation_comparison
