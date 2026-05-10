@@ -10,38 +10,23 @@ Ele centraliza carregamento de dados, preprocessing, definição de modelos, ava
 
 ```text
 ml/
-|-- core/                # infraestrutura genérica, sem regra de negócio
-|   |-- training/
-|   |   |-- train.py     # treino e holdout
-|   |   |-- metrics.py   # métricas e cross-validation
-|   |-- registry/
-|   |   |-- mlflow.py    # logging de runs e artefatos
-|   |   |-- db.py        # registro em churn.models
-|   |-- model_spec.py    # contrato declarativo de modelos
+|-- core/                      # infraestrutura genérica
+|   |-- logger.py              # logging estruturado com structlog
+|   |-- model_spec.py          # contrato declarativo de ModelSpec
 |
-|-- data/                # dados e preprocessing
-|   |-- preprocessing.py # load_data() e build_preprocessor()
+|-- config/
+|   |-- settings.py            # features, DROP_COLS, MLflow URI
 |
-|-- models/              # definição dos modelos
-|   |-- baseline.py      # DummyClassifier e Logistic Regression
-|   |-- random_forest.py # RandomForestClassifier
+|-- data/
+|   |-- preprocessing.py       # load_data() + build_preprocessor()
 |
-|-- evaluation/          # avaliação, relatórios e comparação
-|   |-- metrics.py
-|   |-- reports.py
-|   |-- comparison.py
+|-- models/                    # definição dos modelos
+|   |-- baseline/
+|   |   |-- baseline.py        # DummyClassifier + Logistic Regression
+|   |-- random_forest/
+|       |-- random_forest.py   # RandomForestClassifier
 |
-|-- domain/              # regras de negócio
-|   |-- risk.py          # classificação de risco de churn
-|
-|-- config/              # configurações isoladas
-|   |-- settings.py      # MLflow URI, target, features e colunas descartadas
-|
-|-- tools/               # scripts utilitários
-|   |-- compare_models.py
-|   |-- export_dataset.py
-|
-|-- train.py             # entrypoint CLI
+|-- evaluate_production.py     # avaliação predictions × outcomes → evaluation_run_results
 |-- README.md
 ```
 
@@ -259,10 +244,26 @@ from ml.models.xgboost import SPECS as XGBOOST_SPECS
 
 ---
 
+## Avaliação em Produção
+
+`ml/evaluate_production.py` avalia predictions contra outcomes reais (ground truth do holdout).
+
+```bash
+python -m ml.evaluate_production \
+  --project telco-churn-2018 \
+  --since 90d \
+  --fp-cost 100 \
+  --fn-cost 2000
+```
+
+Grava em `churn.evaluation_run_results`: F1, ROC-AUC, FPR/FNR, segmentação por risco e recomendação de promoção. Ver `scripts/` para scripts de suporte (seed de outcomes, predições em lote, otimização de threshold).
+
+---
+
 ## Resultados Consolidados
 
-| Modelo | F1 (holdout) | ROC-AUC | Recall |
-|---|---:|---:|---:|
-| DummyClassifier | 0.2413 | 0.4828 | 24.2% |
-| Logistic Regression | 0.6379 | 0.8575 | 80.7% |
-| Random Forest | pendente | pendente | pendente |
+| Modelo | F1 | ROC-AUC | Recall | Precision |
+|---|---:|---:|---:|---:|
+| DummyClassifier | 0.3148 | 0.5347 | 30.9% | 32.0% |
+| Logistic Regression | **0.6586** | **0.8636** | **82.3%** | 54.9% |
+| Random Forest | 0.6476 | 0.8530 | 76.7% | **56.1%** |

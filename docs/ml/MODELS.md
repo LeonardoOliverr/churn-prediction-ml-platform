@@ -11,7 +11,7 @@ Para cada modelo: o que é, como aprende, quando usar e suas limitações.
 |---|---|---|---|---|---|---|
 | 1 | [DummyClassifier](#1-dummyclassifier) | `baseline/baseline.py` | 0.2413 | 0.4828 | 0.2424 | ✅ Implementado |
 | 2 | [Logistic Regression](#2-logistic-regression) | `baseline/baseline.py` | 0.6379 | 0.8575 | 0.8074 | ✅ Implementado |
-| 3 | [Random Forest](#3-random-forest) | `random_forest/random_forest.py` | — | — | — | ✅ Implementado |
+| 3 | [Random Forest](#3-random-forest) | `random_forest/random_forest.py` | 0.6476 | 0.8530 | 0.7666 | ✅ Implementado |
 | 4 | [XGBoost / LightGBM](#4-xgboost--lightgbm) | `boosting/boosting.py` | — | — | — | 🔲 Pendente |
 | 5 | [LogReg + Feature Engineering](#5-logistic-regression--feature-engineering) | `baseline_fe/baseline_fe.py` | — | — | — | 🔲 Pendente |
 | 6 | [MLP — Rede Neural](#6-mlp--rede-neural) | `mlp/mlp.py` | — | — | — | ⏸ Após árvores |
@@ -113,7 +113,7 @@ tenure_months            →  peso negativo        →  mais tempo = menos risco
 ### Resultado no IBM Telco
 
 ```
-F1: 0.6379  |  ROC-AUC: 0.8575  |  Recall: 80.7%  |  Precision: 52.7%
+F1: 0.6586  |  ROC-AUC: 0.8636  |  Recall: 82.3%  |  Precision: 54.9%
 ```
 
 ---
@@ -176,11 +176,13 @@ python ml/models/random_forest/random_forest.py --dry-run
 python ml/models/random_forest/random_forest.py --n-estimators 300 --max-depth 10
 ```
 
-### Expectativa para IBM Telco
+### Resultado no IBM Telco
 
 ```
-F1 esperado: 0.68–0.73  |  ROC-AUC esperado: 0.87–0.91
+F1: 0.6476  |  ROC-AUC: 0.8530  |  Recall: 76.7%  |  Precision: 56.1%
 ```
+
+Registrado como challenger aprovado. Não atingiu os thresholds para promoção a champion (F1 > 0.68, ROC-AUC > 0.88, Recall > 0.82 simultaneamente). Logistic Regression permanece como champion com F1 (0.6586), ROC-AUC (0.8636) e Recall (82.3%) superiores.
 
 ---
 
