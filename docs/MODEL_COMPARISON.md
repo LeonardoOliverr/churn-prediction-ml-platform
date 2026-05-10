@@ -16,12 +16,14 @@
 
 | # | Modelo | F1 | ROC-AUC | Recall | Precision | Status |
 |---|---|---|---|---|---|---|
-| 1 | DummyClassifier (estratificado) | 0.2413 | 0.4828 | 0.2424 | 0.2403 | ✅ Concluído |
-| 2 | Logistic Regression | 0.6379 | 0.8575 | **0.8074** | 0.5273 | ✅ Champion |
-| 3 | Random Forest | **0.6470** | **0.8579** | 0.7812 | **0.5526** | ✅ Challenger |
+| 1 | DummyClassifier (estratificado) | 0.3148 | 0.5347 | 0.3094 | 0.3203 | ✅ Concluído |
+| 2 | Logistic Regression | **0.6586** | **0.8636** | **0.8226** | 0.5491 | ✅ Champion |
+| 3 | Random Forest | 0.6476 | 0.8530 | 0.7666 | **0.5611** | ✅ Challenger |
 | 4 | XGBoost / LightGBM | — | — | — | — | 🔲 Pendente |
 | 5 | Logistic Regression + Feature Engineering | — | — | — | — | 🔲 Pendente |
 | 6 | MLP — Rede Neural (PyTorch) | — | — | — | — | ⏸ Após árvores |
+
+**Fonte das métricas:** `churn.models` — métricas registradas no treinamento (holdout de avaliação)
 
 **Modelo recomendado atualmente:** `Logistic Regression` (`active`, scope=project)  
 **Challenger atual:** `Random Forest` (`approved`, scope=project)  
@@ -36,9 +38,9 @@ Um novo modelo só substitui o atual se superar **os três critérios simultanea
 
 | Critério | Threshold mínimo | Justificativa |
 |---|---|---|
-| F1 > | 0.68 | Melhoria de pelo menos 4 pontos sobre o baseline |
-| ROC-AUC > | 0.88 | Melhoria de pelo menos 3 pontos |
-| Recall > | 0.82 | Detectar mais churners sem sacrificar demais a Precision |
+| F1 > | 0.68 | Melhoria de pelo menos 2 pontos sobre o champion (0.6586) |
+| ROC-AUC > | 0.88 | Melhoria de pelo menos 2 pontos sobre o champion (0.8636) |
+| Recall > | 0.83 | Detectar mais churners que o champion (0.8226) sem regredir |
 
 Se o modelo mais complexo não superar esses três thresholds, o modelo mais simples é mantido — menor custo de manutenção, maior interpretabilidade.
 
@@ -67,19 +69,18 @@ Drop: churn_score (leakage), churn_reason (leakage), localização, cltv
 
 #### Resultados
 
-| Modelo | F1 ± std | ROC-AUC ± std | Recall | Precision |
+| Modelo | F1 | ROC-AUC | Recall | Precision |
 |---|---|---|---|---|
-| DummyClassifier | 0.2413 ± 0.0014 | 0.4828 ± 0.0010 | 0.2424 | 0.2403 |
-| Logistic Regression | **0.6379 ± 0.0160** | **0.8575 ± 0.0119** | **0.8074** | 0.5273 |
+| DummyClassifier | 0.3148 | 0.5347 | 0.3094 | 0.3203 |
+| Logistic Regression | **0.6586** | **0.8636** | **0.8226** | 0.5491 |
 
 #### Análise
-- Logistic Regression entregou ROC-AUC de 0.86 sem nenhum tuning — indica que as features têm sinal preditivo forte.
-- Recall de 80.7% é o ponto alto: o modelo detecta 4 em cada 5 churners.
-- Precision de 52.7% é o tradeoff esperado com `class_weight="balanced"` — prioriza Recall.
-- Desvio padrão do F1 (±0.016) baixo — modelo estável entre os folds.
+- Logistic Regression entregou ROC-AUC de 0.8636 sem nenhum tuning — indica que as features têm sinal preditivo forte.
+- Recall de 82.3% é o ponto alto: o modelo detecta 4 em cada 5 churners.
+- Precision de 54.9% é o tradeoff esperado com `class_weight="balanced"` — prioriza Recall.
 
 #### Decisão
-Logistic Regression adotada como **piso de referência**. Próximo passo: Random Forest para verificar se não-linearidades adicionam sinal.
+Logistic Regression adotada como **champion** — piso de referência para todos os modelos subsequentes.
 
 ---
 
@@ -100,9 +101,9 @@ Class weight: balanced
 
 #### Resultados
 
-| Modelo | F1 ± std | ROC-AUC ± std | Recall | Precision |
+| Modelo | F1 | ROC-AUC | Recall | Precision |
 |---|---|---|---|---|
-| Random Forest | **0.6470 ± 0.0103** | **0.8579 ± 0.0080** | 0.7812 | 0.5526 |
+| Random Forest | 0.6476 | 0.8530 | 0.7666 | 0.5611 |
 
 #### Diagnóstico treino × teste
 
@@ -122,14 +123,14 @@ tech_support_No           0.0680
 ```
 
 #### Análise
-- Random Forest superou Logistic Regression em F1 (+0.0091), ROC-AUC (+0.0004) e Precision (+0.0253).
-- O ganho de F1 foi real, mas pequeno para justificar troca imediata de modelo em produção.
-- Recall caiu de 0.8074 para 0.7812, piorando a capacidade de capturar churners.
-- O modelo não atingiu os thresholds definidos para promoção: F1 > 0.68, ROC-AUC > 0.88 e Recall > 0.82.
+- Random Forest ficou abaixo da Logistic Regression em F1 (0.6476 vs 0.6586), ROC-AUC (0.8530 vs 0.8636) e Recall (0.7666 vs 0.8226).
+- Ganhou apenas em Precision (0.5611 vs 0.5491) — produz menos falsos positivos por predição positiva.
+- Recall caiu de 0.8226 para 0.7666, piorando a capacidade de capturar churners.
+- Não atingiu os thresholds definidos para promoção: F1 > 0.68, ROC-AUC > 0.88 e Recall > 0.82 simultaneamente.
 - O gap treino/teste ficou controlado, indicando que `max_depth=8` reduziu overfitting em relação a uma floresta sem limite de profundidade.
 
 #### Decisão
-Random Forest registrado como **challenger aprovado**, mas não promovido a champion. Logistic Regression permanece como modelo recomendado por entregar Recall maior, desempenho praticamente equivalente em ROC-AUC e menor complexidade operacional.
+Random Forest registrado como **challenger aprovado**, não promovido a champion. Logistic Regression permanece como modelo recomendado — F1, ROC-AUC e Recall superiores com menor complexidade operacional.
 
 ---
 

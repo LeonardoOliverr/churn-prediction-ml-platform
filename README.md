@@ -42,8 +42,20 @@ Plataforma de machine learning end-to-end para previsão de churn de clientes em
     │     2º champion do tenant               (API key sem project_id)
     │     3º churn.models scope=global        (modelo global aprovado)
     ├── carrega artefato do MLflow
-    ├── churn.predictions   → log de cada predição
-    └── churn.cost_analysis → análise de custo FP/FN
+    └── churn.predictions   → log de cada predição
+                │
+                ▼
+[6] AVALIAÇÃO
+    scripts/seed_outcomes_from_customers.py
+    └── churn.outcomes ← ground truth (churn_value real dos clientes holdout)
+                │
+    ml/evaluate_production.py
+    ├── churn.evaluation_runs          → run de avaliação (período, custos)
+    ├── churn.evaluation_run_results   → métricas por modelo (F1, ROC-AUC, FPR, segmentação)
+    └── churn.model_performance        → view consolidada
+                │
+    scripts/optimize_threshold.py
+    └── varre thresholds sobre churn.predictions → custo ótimo por modelo
 ```
 
 ---
@@ -72,11 +84,21 @@ O schema `churn` segue uma hierarquia de isolamento multi-tenant:
 ```
 tenant        →  isolamento por empresa/cliente
   └── project →  isolamento por produto ou caso de uso
-        ├── customers            replica fiel do schema IBM Telco (ver dataset)
-        ├── models               catálogo técnico de modelos treinados
-        ├── project_model_config configuração de produção ativa por project
-        ├── predictions          log de inferências da API
-        └── cost_analysis        análise de custo FP/FN por project
+        ├── customers               replica fiel do schema IBM Telco (split train/holdout)
+        ├── models                  catálogo técnico de modelos treinados
+        ├── project_model_config    configuração de produção ativa por project
+        ├── api_keys                chaves de autenticação de inferência
+        ├── predictions             log de inferências da API
+        ├── outcomes                ground truth de churn real (cross com predictions)
+        ├── evaluation_runs         runs de avaliação (período, custos configurados)
+        └── evaluation_run_results  métricas por modelo por run (F1, ROC-AUC, FPR, segmentação, promoção)
+```
+
+Views analíticas:
+
+```
+churn.model_performance      consolidação de evaluation_run_results + runs (view principal de análise)
+churn.evaluation_comparison  delta vs champion por run (F1, recall, custo)
 ```
 
 > A tabela `churn.customers` replica fielmente o schema do [IBM Telco Customer Churn Dataset](https://www.kaggle.com/datasets/yeanzc/telco-customer-churn-ibm-dataset/data), incluindo todas as colunas originais com seus tipos, constraints e comentários de documentação. O campo `is_synthetic` distingue registros originais do dataset de dados gerados sinteticamente. Na versão atual, apenas dados reais do IBM Telco são utilizados — o campo está reservado para versões futuras que incorporem geração de dados sintéticos para balanceamento ou aumento do dataset.
@@ -375,16 +397,26 @@ churn-prediction-ml-platform/
 ├── data/                           # arquivos locais opcionais (não versionados)
 ├── estudos/                        # exercícios de fixação de conceitos de ML
 ├── ml/                             # pipeline de treinamento multi-tenant (ver ml/README.md)
-│   ├── README.md                   # documentação do módulo e uso da CLI
-│   ├── config.py                   # constantes e feature lists
-│   ├── preprocessing.py            # carregamento com filtro por escopo + preprocessor sklearn
-│   ├── baseline.py                 # treino, avaliação e registro (CLI multi-tenant)
-│   └── BASELINE.md                 # resultados do experimento baseline
+│   ├── README.md                   # documentação do módulo e resultados consolidados
+│   ├── core/                       # infraestrutura genérica (logger, model_spec)
+│   ├── config/
+│   │   └── settings.py             # features, DROP_COLS, MLflow URI
+│   ├── data/
+│   │   └── preprocessing.py        # load_data() com filtro por split + build_preprocessor()
+│   ├── models/
+│   │   ├── baseline/               # DummyClassifier + Logistic Regression
+│   │   └── random_forest/          # RandomForestClassifier
+│   └── evaluate_production.py      # avaliação predictions × outcomes → evaluation_run_results
 ├── models/                         # artefatos de modelos exportados — a implementar
 ├── notebooks/
 │   ├── 01_eda.ipynb                # análise exploratória completa (13 visualizações)
 │   └── relatorio_negocio.md        # relatório executivo com achados e recomendações
 ├── tests/                          # testes automatizados (unit, smoke, schema, api)
+│
+├── scripts/
+│   ├── seed_outcomes_from_customers.py  # popula churn.outcomes com ground truth do holdout
+│   ├── predict_holdout_batch.py         # envia clientes holdout para a API em lote
+│   └── optimize_threshold.py            # varre thresholds → ponto ótimo de custo por modelo
 │
 ├── pipeline/
 │   └── load_ibm_telco.py           # download via kagglehub + bulk insert em churn.customers
@@ -408,7 +440,13 @@ churn-prediction-ml-platform/
     │   ├── 09_models_status.sql    # status técnico: trained, validated, approved, archived
     │   ├── 10_api_keys.sql         # tabela de API keys para autenticação de inferência
     │   ├── 11_models_status_and_project_config_semantics.sql  # semântica de produção via project_model_config
-    │   └── 12_champion_challenger.sql # champion/challenger e traffic split
+    │   ├── 12_champion_challenger.sql # champion/challenger e traffic split
+    │   ├── 13_production_evaluation.sql  # coluna split em customers + tabela outcomes (base)
+    │   ├── 14_holdout_evaluation.sql     # tabela outcomes (versão final com FKs)
+    │   ├── 15_evaluation_runs.sql        # tabelas evaluation_runs + evaluation_run_results
+    │   ├── 16_deprecate_cost_analysis.sql # deprecação de cost_analysis
+    │   ├── 17_comments.sql               # COMMENTs de documentação nas tabelas
+    │   └── 18_analytics_enhancements.sql # taxas derivadas, segmentação, promoção, views
     ├── revert/                     # scripts de rollback
     └── verify/                     # scripts de verificação pós-deploy
 ```
@@ -427,8 +465,10 @@ churn-prediction-ml-platform/
 | Random Forest (`ml/models/random_forest/`) | ✅ Completo |
 | Semântica de status técnico (`churn.models`) e configuração de produção (`churn.project_model_config`) | ✅ Completo |
 | API de inferência (FastAPI) — predição individual e em lote | ✅ Completo |
+| Avaliação em produção — holdout split + outcomes + evaluation runs | ✅ Completo |
+| Análise de custo com matriz de confusão (`churn.evaluation_run_results`) | ✅ Completo |
+| Otimização de threshold (`scripts/optimize_threshold.py`) | ✅ Completo |
 | Próximos experimentos (`ml/`) — XGBoost, MLP | 🔲 Pendente |
-| Análise de custo (`churn.cost_analysis`) | 🔲 Pendente |
 
 ---
 

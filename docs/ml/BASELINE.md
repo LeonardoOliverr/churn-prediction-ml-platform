@@ -12,8 +12,8 @@
 
 | Modelo | F1 | ROC-AUC | Recall | Precision |
 |---|---|---|---|---|
-| DummyClassifier (estratificado) | 0.2413 ± 0.0014 | 0.4828 | 24.2% | 24.0% |
-| **Logistic Regression** | **0.6379 ± 0.0160** | **0.8575** | **80.7%** | **52.7%** |
+| DummyClassifier (estratificado) | 0.3148 | 0.5347 | 30.9% | 32.0% |
+| **Logistic Regression** | **0.6586** | **0.8636** | **82.3%** | **54.9%** |
 
 ---
 
@@ -23,10 +23,10 @@
 ROC-AUC de 0.48 — ligeiramente abaixo de 0.50 (pior que aleatório no ranking). Era esperado: ele não aprende nada, apenas reproduz a distribuição do target. Serve como zero absoluto de comparação.
 
 ### Logistic Regression
-- **F1 = 0.6379** com desvio padrão de ±0.016 — estável entre os folds, sem overfitting por fold.
-- **ROC-AUC = 0.8575** — excelente para um modelo linear sem nenhum tuning. Significa que o modelo separa bem churners de não-churners em qualquer threshold.
-- **Recall = 80.7%** — o modelo detecta 4 em cada 5 clientes que vão cancelar. Para o negócio de retenção, esse é o número mais importante: falso negativo = churner que escapou = receita perdida.
-- **Precision = 52.7%** — tradeoff esperado: metade dos clientes alertados não iam cancelar. Isso define o custo das ações de retenção (descontos, ligações desnecessárias).
+- **F1 = 0.6586** — entrega sólida sem nenhum tuning, estabelece o piso de qualidade.
+- **ROC-AUC = 0.8636** — separa bem churners de não-churners em qualquer threshold.
+- **Recall = 82.3%** — o modelo detecta 4 em cada 5 clientes que vão cancelar. Para o negócio de retenção, esse é o número mais importante: falso negativo = churner que escapou = receita perdida.
+- **Precision = 54.9%** — tradeoff esperado: metade dos clientes alertados não iam cancelar. Isso define o custo das ações de retenção (descontos, ligações desnecessárias).
 
 ---
 
@@ -36,9 +36,9 @@ A Logistic Regression, sendo o modelo mais simples que realmente aprende, entreg
 
 | Métrica | Piso (Logistic Regression) | Meta para próximo modelo |
 |---|---|---|
-| F1 | 0.6379 | > 0.68 |
-| ROC-AUC | 0.8575 | > 0.88 |
-| Recall | 0.8074 | > 0.82 |
+| F1 | 0.6586 | > 0.68 |
+| ROC-AUC | 0.8636 | > 0.88 |
+| Recall | 0.8226 | > 0.83 |
 
 Se Random Forest ou XGBoost ficarem dentro de 2–3 pontos nessas métricas, a Logistic Regression vence — ela é mais rápida, mais interpretável e mais fácil de manter em produção.
 
