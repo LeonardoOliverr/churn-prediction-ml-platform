@@ -22,3 +22,4 @@
 17_comments [16_deprecate_cost_analysis] 2026-05-07T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona COMMENT ON TABLE em todas as tabelas e preenche colunas ausentes em customers
 18_analytics_enhancements [17_comments] 2026-05-09T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona taxas derivadas, segmentacao de risco e recomendacao de promocao; cria view evaluation_comparison
 19_grafana_readonly [18_analytics_enhancements] 2026-05-10T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Cria role grafana_readonly e user grafana_user para acesso read-only ao Grafana
+20_challenger_cost_normalization [19_grafana_readonly] 2026-05-10T12:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona cost_per_prediction e traffic_split_pct; recria evaluation_comparison com delta normalizado
