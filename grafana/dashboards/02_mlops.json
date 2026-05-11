@@ -1,11 +1,17 @@
 {
   "uid": "churn-mlops-02",
   "title": "MLOps | Model Performance",
-  "tags": ["mlops", "models"],
+  "tags": [
+    "mlops",
+    "models"
+  ],
   "timezone": "browser",
   "refresh": "5m",
   "schemaVersion": 39,
-  "time": { "from": "now-30d", "to": "now" },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
   "templating": {
     "list": [
       {
@@ -47,135 +53,726 @@
       "id": 1,
       "title": "F1 Score por Modelo (histórico de runs)",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
-      "fieldConfig": {
-        "defaults": { "unit": "percentunit", "min": 0, "max": 1, "color": { "mode": "palette-classic" } },
-        "overrides": [{ "matcher": { "id": "byName", "options": "champion" }, "properties": [{ "id": "custom.lineWidth", "value": 3 }] }]
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
       },
-      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "list", "placement": "bottom" } },
-      "targets": [{
-        "datasource": "PostgreSQL",
-        "rawSql": "SELECT evaluated_at AS time, model_name_snapshot || ' (' || model_role_snapshot || ')' AS metric, f1_score AS value FROM churn.model_performance WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY 1",
-        "format": "time_series"
-      }]
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "champion"
+            },
+            "properties": [
+              {
+                "id": "custom.lineWidth",
+                "value": 3
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "rawSql": "SELECT evaluated_at AS time, model_name_snapshot || ' (' || model_role_snapshot || ')' AS metric, f1_score AS value FROM churn.model_performance WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY 1",
+          "format": "time_series"
+        }
+      ]
     },
     {
       "id": 2,
       "title": "ROC-AUC por Modelo (histórico de runs)",
       "type": "timeseries",
-      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
-      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "color": { "mode": "palette-classic" } } },
-      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "list", "placement": "bottom" } },
-      "targets": [{
-        "datasource": "PostgreSQL",
-        "rawSql": "SELECT evaluated_at AS time, model_name_snapshot || ' (' || model_role_snapshot || ')' AS metric, roc_auc AS value FROM churn.model_performance WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY 1",
-        "format": "time_series"
-      }]
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "color": {
+            "mode": "palette-classic"
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "rawSql": "SELECT evaluated_at AS time, model_name_snapshot || ' (' || model_role_snapshot || ')' AS metric, roc_auc AS value FROM churn.model_performance WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY 1",
+          "format": "time_series"
+        }
+      ]
     },
     {
       "id": 3,
       "title": "Métricas do Último Run — Precision / Recall / F1 / ROC-AUC",
       "type": "table",
-      "gridPos": { "x": 0, "y": 8, "w": 14, "h": 7 },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 14,
+        "h": 7
+      },
       "fieldConfig": {
-        "defaults": { "unit": "none" },
+        "defaults": {
+          "unit": "none"
+        },
         "overrides": [
-          { "matcher": { "id": "byName", "options": "f1_score" }, "properties": [{ "id": "displayName", "value": "F1" }, { "id": "unit", "value": "percentunit" }, { "id": "custom.displayMode", "value": "color-background" }, { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 0.6 }, { "color": "green", "value": 0.7 }] } }] },
-          { "matcher": { "id": "byName", "options": "recall_score" }, "properties": [{ "id": "displayName", "value": "Recall" }, { "id": "unit", "value": "percentunit" }] },
-          { "matcher": { "id": "byName", "options": "precision_score" }, "properties": [{ "id": "displayName", "value": "Precision" }, { "id": "unit", "value": "percentunit" }] },
-          { "matcher": { "id": "byName", "options": "roc_auc" }, "properties": [{ "id": "displayName", "value": "ROC-AUC" }, { "id": "unit", "value": "percentunit" }] },
-          { "matcher": { "id": "byName", "options": "model_name_snapshot" }, "properties": [{ "id": "displayName", "value": "Modelo" }] },
-          { "matcher": { "id": "byName", "options": "model_role_snapshot" }, "properties": [{ "id": "displayName", "value": "Papel" }] }
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "f1_score"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "F1"
+              },
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 0.6
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.7
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "recall_score"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Recall"
+              },
+              {
+                "id": "unit",
+                "value": "percentunit"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "precision_score"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Precision"
+              },
+              {
+                "id": "unit",
+                "value": "percentunit"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "roc_auc"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "ROC-AUC"
+              },
+              {
+                "id": "unit",
+                "value": "percentunit"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "model_name_snapshot"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Modelo"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "model_role_snapshot"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Papel"
+              }
+            ]
+          }
         ]
       },
-      "options": { "sortBy": [{ "displayName": "F1", "desc": true }] },
-      "targets": [{
-        "datasource": "PostgreSQL",
-        "rawSql": "SELECT model_name_snapshot, model_role_snapshot, precision_score, recall_score, f1_score, roc_auc FROM churn.model_performance WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') AND evaluated_at = (SELECT MAX(evaluated_at) FROM churn.model_performance WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}')) ORDER BY model_role_snapshot",
-        "format": "table"
-      }]
+      "options": {
+        "sortBy": [
+          {
+            "displayName": "F1",
+            "desc": true
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "rawSql": "SELECT model_name_snapshot, model_role_snapshot, precision_score, recall_score, f1_score, roc_auc FROM churn.model_performance WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') AND evaluated_at = (SELECT MAX(evaluated_at) FROM churn.model_performance WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}')) ORDER BY model_role_snapshot",
+          "format": "table"
+        }
+      ]
     },
     {
       "id": 4,
       "title": "FPR / FNR / Especificidade — Último Run",
       "type": "table",
-      "gridPos": { "x": 14, "y": 8, "w": 10, "h": 7 },
+      "gridPos": {
+        "x": 14,
+        "y": 8,
+        "w": 10,
+        "h": 7
+      },
       "fieldConfig": {
-        "defaults": { "unit": "percentunit" },
+        "defaults": {
+          "unit": "percentunit"
+        },
         "overrides": [
-          { "matcher": { "id": "byName", "options": "false_positive_rate" }, "properties": [{ "id": "displayName", "value": "FPR" }, { "id": "custom.displayMode", "value": "color-background" }, { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 0.15 }, { "color": "red", "value": 0.25 }] } }] },
-          { "matcher": { "id": "byName", "options": "false_negative_rate" }, "properties": [{ "id": "displayName", "value": "FNR" }, { "id": "custom.displayMode", "value": "color-background" }, { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 0.15 }, { "color": "red", "value": 0.25 }] } }] },
-          { "matcher": { "id": "byName", "options": "specificity" }, "properties": [{ "id": "displayName", "value": "Especificidade" }] },
-          { "matcher": { "id": "byName", "options": "model_name_snapshot" }, "properties": [{ "id": "displayName", "value": "Modelo" }] }
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "false_positive_rate"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "FPR"
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 0.15
+                    },
+                    {
+                      "color": "red",
+                      "value": 0.25
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "false_negative_rate"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "FNR"
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 0.15
+                    },
+                    {
+                      "color": "red",
+                      "value": 0.25
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "specificity"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Especificidade"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "model_name_snapshot"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Modelo"
+              }
+            ]
+          }
         ]
       },
-      "targets": [{
-        "datasource": "PostgreSQL",
-        "rawSql": "SELECT model_name_snapshot, false_positive_rate, false_negative_rate, specificity FROM churn.model_performance WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') AND evaluated_at = (SELECT MAX(evaluated_at) FROM churn.model_performance WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}')) ORDER BY model_name_snapshot",
-        "format": "table"
-      }]
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "rawSql": "SELECT model_name_snapshot, false_positive_rate, false_negative_rate, specificity FROM churn.model_performance WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') AND evaluated_at = (SELECT MAX(evaluated_at) FROM churn.model_performance WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}')) ORDER BY model_name_snapshot",
+          "format": "table"
+        }
+      ]
     },
     {
       "id": 5,
       "title": "Segmentação de Risco — Último Run",
       "type": "barchart",
-      "gridPos": { "x": 0, "y": 15, "w": 12, "h": 8 },
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 12,
+        "h": 8
+      },
       "fieldConfig": {
-        "defaults": { "unit": "short", "color": { "mode": "palette-classic" } },
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
         "overrides": [
-          { "matcher": { "id": "byName", "options": "high_risk_count" }, "properties": [{ "id": "displayName", "value": "Alto (>0.7)" }, { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
-          { "matcher": { "id": "byName", "options": "medium_risk_count" }, "properties": [{ "id": "displayName", "value": "Médio (0.3–0.7)" }, { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
-          { "matcher": { "id": "byName", "options": "low_risk_count" }, "properties": [{ "id": "displayName", "value": "Baixo (<0.3)" }, { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] }
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "high_risk_count"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Alto (>0.7)"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "medium_risk_count"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Médio (0.3–0.7)"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "low_risk_count"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Baixo (<0.3)"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
         ]
       },
-      "options": { "xField": "model_name_snapshot", "stacking": { "mode": "normal", "group": "A" }, "tooltip": { "mode": "multi" }, "legend": { "displayMode": "list", "placement": "bottom" } },
-      "targets": [{
-        "datasource": "PostgreSQL",
-        "rawSql": "SELECT model_name_snapshot, high_risk_count, medium_risk_count, low_risk_count FROM churn.model_performance WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') AND evaluated_at = (SELECT MAX(evaluated_at) FROM churn.model_performance WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}')) ORDER BY model_name_snapshot",
-        "format": "table"
-      }]
+      "options": {
+        "xField": "model_name_snapshot",
+        "stacking": {
+          "mode": "normal",
+          "group": "A"
+        },
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "rawSql": "SELECT model_name_snapshot, high_risk_count, medium_risk_count, low_risk_count FROM churn.model_performance WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') AND evaluated_at = (SELECT MAX(evaluated_at) FROM churn.model_performance WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}')) ORDER BY model_name_snapshot",
+          "format": "table"
+        }
+      ]
     },
     {
       "id": 6,
       "title": "Delta vs Champion — Último Run",
       "type": "table",
-      "gridPos": { "x": 12, "y": 15, "w": 12, "h": 8 },
+      "gridPos": {
+        "x": 12,
+        "y": 15,
+        "w": 12,
+        "h": 8
+      },
       "fieldConfig": {
-        "defaults": { "unit": "none" },
+        "defaults": {
+          "unit": "none"
+        },
         "overrides": [
-          { "matcher": { "id": "byName", "options": "delta_f1" }, "properties": [{ "id": "displayName", "value": "ΔF1" }, { "id": "unit", "value": "percentunit" }, { "id": "custom.displayMode", "value": "color-background" }, { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 0 }] } }] },
-          { "matcher": { "id": "byName", "options": "delta_recall" }, "properties": [{ "id": "displayName", "value": "ΔRecall" }, { "id": "unit", "value": "percentunit" }, { "id": "custom.displayMode", "value": "color-background" }, { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 0 }] } }] },
-          { "matcher": { "id": "byName", "options": "delta_cost" }, "properties": [{ "id": "displayName", "value": "ΔCusto (R$)" }, { "id": "unit", "value": "currencyBRL" }, { "id": "custom.displayMode", "value": "color-background" }, { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0 }] } }] },
-          { "matcher": { "id": "byName", "options": "delta_cost_pct" }, "properties": [{ "id": "displayName", "value": "ΔCusto %" }, { "id": "unit", "value": "percent" }] },
-          { "matcher": { "id": "byName", "options": "model_name_snapshot" }, "properties": [{ "id": "displayName", "value": "Modelo (Challenger)" }] }
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "delta_f1"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "ΔF1"
+              },
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 0
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "delta_recall"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "ΔRecall"
+              },
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 0
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "delta_cost_per_pred"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "ΔCusto/pred (R$)"
+              },
+              {
+                "id": "unit",
+                "value": "currencyBRL"
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 0
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "delta_cost_per_pred_pct"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "ΔCusto/pred %"
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "model_name_snapshot"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Modelo (Challenger)"
+              }
+            ]
+          }
         ]
       },
-      "targets": [{
-        "datasource": "PostgreSQL",
-        "rawSql": "SELECT model_name_snapshot, delta_f1, delta_recall, delta_cost, delta_cost_pct FROM churn.evaluation_comparison WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') AND evaluation_run_id = (SELECT evaluation_run_id FROM churn.evaluation_run_results WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY created_at DESC LIMIT 1) AND model_role_snapshot <> 'champion' ORDER BY model_name_snapshot",
-        "format": "table"
-      }]
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "rawSql": "SELECT model_name_snapshot, delta_f1, delta_recall, delta_cost_per_pred, delta_cost_per_pred_pct FROM churn.evaluation_comparison WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') AND evaluation_run_id = (SELECT evaluation_run_id FROM churn.evaluation_run_results WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY created_at DESC LIMIT 1) AND model_role_snapshot <> 'champion' ORDER BY model_name_snapshot",
+          "format": "table"
+        }
+      ]
     },
     {
       "id": 7,
       "title": "Recomendação de Promoção — Último Run",
       "type": "table",
-      "gridPos": { "x": 0, "y": 23, "w": 24, "h": 5 },
+      "gridPos": {
+        "x": 0,
+        "y": 23,
+        "w": 24,
+        "h": 5
+      },
       "fieldConfig": {
-        "defaults": { "unit": "none" },
+        "defaults": {
+          "unit": "none"
+        },
         "overrides": [
-          { "matcher": { "id": "byName", "options": "promotion_candidate" }, "properties": [{ "id": "displayName", "value": "Candidato?" }, { "id": "custom.displayMode", "value": "color-background" }, { "id": "mappings", "value": [{ "type": "value", "options": { "true": { "text": "Sim", "color": "green" }, "false": { "text": "Não", "color": "red" } } }] }] },
-          { "matcher": { "id": "byName", "options": "recommendation_reason" }, "properties": [{ "id": "displayName", "value": "Justificativa" }, { "id": "custom.width", "value": 500 }] },
-          { "matcher": { "id": "byName", "options": "model_name_snapshot" }, "properties": [{ "id": "displayName", "value": "Modelo" }] },
-          { "matcher": { "id": "byName", "options": "model_role_snapshot" }, "properties": [{ "id": "displayName", "value": "Papel" }] },
-          { "matcher": { "id": "byName", "options": "threshold_used" }, "properties": [{ "id": "displayName", "value": "Threshold" }] }
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "promotion_candidate"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Candidato?"
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "true": {
+                        "text": "Sim",
+                        "color": "green"
+                      },
+                      "false": {
+                        "text": "Não",
+                        "color": "red"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "recommendation_reason"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Justificativa"
+              },
+              {
+                "id": "custom.width",
+                "value": 500
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "model_name_snapshot"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Modelo"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "model_role_snapshot"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Papel"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "threshold_used"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Threshold"
+              }
+            ]
+          }
         ]
       },
-      "targets": [{
-        "datasource": "PostgreSQL",
-        "rawSql": "SELECT model_name_snapshot, model_role_snapshot, threshold_used, promotion_candidate, recommendation_reason FROM churn.model_performance WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') AND evaluated_at = (SELECT MAX(evaluated_at) FROM churn.model_performance WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}')) ORDER BY model_role_snapshot",
-        "format": "table"
-      }]
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "rawSql": "SELECT model_name_snapshot, model_role_snapshot, threshold_used, promotion_candidate, recommendation_reason FROM churn.model_performance WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') AND evaluated_at = (SELECT MAX(evaluated_at) FROM churn.model_performance WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}')) ORDER BY model_role_snapshot",
+          "format": "table"
+        }
+      ]
     }
   ]
 }
