@@ -366,8 +366,11 @@ def main() -> None:
     df = _load_best_runs(args.tenant, args.project)
     xy_output, decision_output = _derived_outputs(args.output, args.xy_output, args.decision_output)
 
-    logger.info("models_found", count=len(df))
-    print(df[["model", "f1_mean", "roc_auc_mean", "recall_mean", "precision_mean", "train_f1_mean"]].to_string(index=False))
+    logger.info(
+        "models_found",
+        count=len(df),
+        report=df[["model", "f1_mean", "roc_auc_mean", "recall_mean", "precision_mean", "train_f1_mean"]].to_string(index=False),
+    )
 
     _plot(df, args.output)
     _plot_precision_recall(df, xy_output)

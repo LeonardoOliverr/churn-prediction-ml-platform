@@ -11,7 +11,11 @@ import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 
+from core.logger import get_logger
+
 load_dotenv()
+
+logger = get_logger()
 
 TENANT_SLUG = "ibm-telco"
 PROJECT_SLUG = "telco-churn-2018"
@@ -83,11 +87,11 @@ def build_engine():
 
 
 def fetch_dataset() -> pd.DataFrame:
-    print("Baixando dataset via kagglehub...")
+    logger.info("baixando dataset", source="kagglehub")
     path = kagglehub.dataset_download("yeanzc/telco-customer-churn-ibm-dataset")
     xlsx = os.path.join(path, "Telco_customer_churn.xlsx")
     df = pd.read_excel(xlsx)
-    print(f"  {len(df)} registros carregados do arquivo.")
+    logger.info("dataset carregado", records=len(df))
     return df
 
 
@@ -129,7 +133,7 @@ def load(df: pd.DataFrame, engine, tenant_id: str, project_id: str):
     db_cols = list(COLUMN_MAP.values()) + ["tenant_id", "project_id", "is_synthetic", "split"]
     df = df[db_cols]
 
-    print(f"Inserindo {len(df)} registros em churn.customers...")
+    logger.info("inserindo registros", table="churn.customers", count=len(df))
     df.to_sql(
         name="customers",
         schema="churn",
@@ -139,7 +143,7 @@ def load(df: pd.DataFrame, engine, tenant_id: str, project_id: str):
         chunksize=500,
         method="multi",
     )
-    print("  Carga concluída.")
+    logger.info("carga concluída", table="churn.customers")
 
 
 def main():
