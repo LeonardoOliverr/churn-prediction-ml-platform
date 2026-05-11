@@ -97,25 +97,28 @@ def _sweep(
     return results
 
 
-def _print_sweep(
+def _format_sweep(
     model_name: str,
     model_version: str,
     rows: list[dict],
     fp_cost: float,
     fn_cost: float,
     current_threshold: float,
-) -> None:
+) -> str:
     best_cost = min(rows, key=lambda r: r["cost"])
     best_f1   = max(rows, key=lambda r: r["f1"])
     bayes     = _bayes_threshold(fp_cost, fn_cost)
+    n         = rows[0]["tp"] + rows[0]["fp"] + rows[0]["fn"] + rows[0]["tn"]
 
-    print(f"\n{_SEP}")
-    print(f"Modelo: {model_name} {model_version}  |  n={rows[0]['tp']+rows[0]['fp']+rows[0]['fn']+rows[0]['tn']}")
-    print(f"FP: R${fp_cost:,.2f}  |  FN: R${fn_cost:,.2f}  |  Bayes ótimo: {bayes:.3f}  |  Atual: {current_threshold:.2f}")
-    print(_SUBSEP)
-    print(f"{'Threshold':>10}  {'TP':>5}  {'FP':>5}  {'FN':>5}  {'TN':>5}  "
-          f"{'Prec':>7}  {'Rec':>7}  {'F1':>7}  {'Custo':>14}  {'':4}")
-    print(_SUBSEP)
+    lines = [
+        f"\n{_SEP}",
+        f"Modelo: {model_name} {model_version}  |  n={n}",
+        f"FP: R${fp_cost:,.2f}  |  FN: R${fn_cost:,.2f}  |  Bayes ótimo: {bayes:.3f}  |  Atual: {current_threshold:.2f}",
+        _SUBSEP,
+        f"{'Threshold':>10}  {'TP':>5}  {'FP':>5}  {'FN':>5}  {'TN':>5}  "
+        f"{'Prec':>7}  {'Rec':>7}  {'F1':>7}  {'Custo':>14}  {'':4}",
+        _SUBSEP,
+    ]
 
     for r in rows:
         flags = []
@@ -126,22 +129,28 @@ def _print_sweep(
         if abs(r["threshold"] - current_threshold) < 1e-6:
             flags.append("→ atual")
 
-        print(
+        lines.append(
             f"{r['threshold']:>10.2f}  {r['tp']:>5}  {r['fp']:>5}  {r['fn']:>5}  {r['tn']:>5}  "
             f"{r['precision']:>7.4f}  {r['recall']:>7.4f}  {r['f1']:>7.4f}  "
             f"R${r['cost']:>12,.2f}  {'  '.join(flags)}"
         )
 
-    print(_SUBSEP)
-    print(f"  ★ Threshold ótimo por custo : {best_cost['threshold']:.2f}  "
-          f"→ R${best_cost['cost']:,.2f}  (FP={best_cost['fp']}, FN={best_cost['fn']})")
-    print(f"  ◆ Threshold ótimo por F1    : {best_f1['threshold']:.2f}  "
-          f"→ F1={best_f1['f1']:.4f}")
+    lines.append(_SUBSEP)
+    lines.append(
+        f"  ★ Threshold ótimo por custo : {best_cost['threshold']:.2f}  "
+        f"→ R${best_cost['cost']:,.2f}  (FP={best_cost['fp']}, FN={best_cost['fn']})"
+    )
+    lines.append(
+        f"  ◆ Threshold ótimo por F1    : {best_f1['threshold']:.2f}  "
+        f"→ F1={best_f1['f1']:.4f}"
+    )
 
     if best_cost["threshold"] != current_threshold:
         saving = rows[next(i for i, r in enumerate(rows) if abs(r["threshold"] - current_threshold) < 1e-6)]["cost"] - best_cost["cost"]
-        print(f"  💡 Troca para {best_cost['threshold']:.2f} economizaria R${saving:,.2f} por ciclo de avaliação.")
-    print(_SEP)
+        lines.append(f"  💡 Troca para {best_cost['threshold']:.2f} economizaria R${saving:,.2f} por ciclo de avaliação.")
+
+    lines.append(_SEP)
+    return "\n".join(lines)
 
 
 def optimize(
@@ -170,8 +179,7 @@ def optimize(
         ).fetchall()
 
     if not all_rows:
-        logger.warning("no_data_found", project=project_slug, days=days)
-        print("Nenhuma predição com outcome encontrada no período.")
+        logger.warning("sem predições com outcome no período", project=project_slug, days=days)
         return
 
     # Agrupar por modelo
@@ -188,7 +196,18 @@ def optimize(
         current_threshold = 0.5
 
         sweep_results = _sweep(y_prob, y_true, fp_cost, fn_cost, thresholds)
-        _print_sweep(model_name, model_version, sweep_results, fp_cost, fn_cost, current_threshold)
+        tabela = _format_sweep(model_name, model_version, sweep_results, fp_cost, fn_cost, current_threshold)
+        best_cost_row = min(sweep_results, key=lambda r: r["cost"])
+        best_f1_row   = max(sweep_results, key=lambda r: r["f1"])
+        logger.info(
+            "sweep de threshold",
+            model=model_name,
+            version=model_version,
+            n=len(rows),
+            threshold_cost=best_cost_row["threshold"],
+            threshold_f1=best_f1_row["threshold"],
+            report=tabela,
+        )
 
 
 def _parse_args() -> argparse.Namespace:
@@ -210,7 +229,7 @@ def main() -> None:
     args  = _parse_args()
     since = args.since
     if not since.endswith("d") or not since[:-1].isdigit():
-        print(f"Formato inválido para --since: {since!r}. Use ex: '90d'.")
+        logger.error("formato inválido para --since", value=since, example="90d")
         sys.exit(1)
     days = int(since[:-1])
 
