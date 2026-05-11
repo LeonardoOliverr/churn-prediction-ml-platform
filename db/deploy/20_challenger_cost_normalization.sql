@@ -73,4 +73,7 @@ COMMENT ON VIEW churn.evaluation_comparison IS
     'delta_cost e delta_cost_pct são mantidos por compatibilidade mas introduzem bias de volume. '
     'Todos os deltas são NULL para o próprio champion.';
 
+-- Re-concede permissão ao grafana_readonly após DROP/CREATE da view
+GRANT SELECT ON churn.evaluation_comparison TO grafana_readonly;
+
 COMMIT;
