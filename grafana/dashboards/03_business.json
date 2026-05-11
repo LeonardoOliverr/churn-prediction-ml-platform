@@ -1,11 +1,19 @@
 {
   "uid": "churn-business-03",
   "title": "Business | Impacto Estratégico",
-  "tags": ["business", "executive", "cost", "churn"],
+  "tags": [
+    "business",
+    "executive",
+    "cost",
+    "churn"
+  ],
   "timezone": "browser",
   "refresh": "5m",
   "schemaVersion": 39,
-  "time": { "from": "now-30d", "to": "now" },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
   "templating": {
     "list": [
       {
@@ -48,149 +56,401 @@
       "title": "Receita em Risco",
       "description": "Valor de churners que o modelo não detectou — quanto estamos deixando escapar (FN × custo por churner)",
       "type": "stat",
-      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 5 },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none", "textMode": "auto" },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 4,
+        "h": 5
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "currencyBRL",
           "displayName": "Receita em Risco",
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 50000 }, { "color": "red", "value": 150000 }] }
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50000
+              },
+              {
+                "color": "red",
+                "value": 150000
+              }
+            ]
+          }
         }
       },
-      "targets": [{
-        "datasource": "PostgreSQL",
-        "rawSql": "SELECT ROUND((fn * false_negative_cost)::numeric, 2) AS value FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY evaluated_at DESC LIMIT 1",
-        "format": "table"
-      }]
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "rawSql": "SELECT ROUND((fn * false_negative_cost)::numeric, 2) AS value FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY evaluated_at DESC LIMIT 1",
+          "format": "table"
+        }
+      ]
     },
     {
       "id": 2,
       "title": "Valor Protegido pelo Modelo",
       "description": "Estimativa de receita salva ao identificar churners antes que saiam (TP × custo por churner)",
       "type": "stat",
-      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 5 },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none", "textMode": "auto" },
+      "gridPos": {
+        "x": 4,
+        "y": 0,
+        "w": 4,
+        "h": 5
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "currencyBRL",
           "displayName": "Valor Protegido",
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 100000 }, { "color": "green", "value": 300000 }] }
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 100000
+              },
+              {
+                "color": "green",
+                "value": 300000
+              }
+            ]
+          }
         }
       },
-      "targets": [{
-        "datasource": "PostgreSQL",
-        "rawSql": "SELECT ROUND((tp * false_negative_cost)::numeric, 2) AS value FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY evaluated_at DESC LIMIT 1",
-        "format": "table"
-      }]
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "rawSql": "SELECT ROUND((tp * false_negative_cost)::numeric, 2) AS value FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY evaluated_at DESC LIMIT 1",
+          "format": "table"
+        }
+      ]
     },
     {
       "id": 3,
       "title": "Saldo Operacional",
       "description": "Valor protegido menos custo de retenções desnecessárias — benefício líquido do modelo",
       "type": "stat",
-      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 5 },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none", "textMode": "auto" },
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 4,
+        "h": 5
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "currencyBRL",
           "displayName": "Saldo Operacional",
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 0 }, { "color": "green", "value": 50000 }] }
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 50000
+              }
+            ]
+          }
         }
       },
-      "targets": [{
-        "datasource": "PostgreSQL",
-        "rawSql": "SELECT ROUND(((tp * false_negative_cost) - (fp * false_positive_cost))::numeric, 2) AS value FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY evaluated_at DESC LIMIT 1",
-        "format": "table"
-      }]
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "rawSql": "SELECT ROUND(((tp * false_negative_cost) - (fp * false_positive_cost))::numeric, 2) AS value FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY evaluated_at DESC LIMIT 1",
+          "format": "table"
+        }
+      ]
     },
     {
       "id": 4,
       "title": "Taxa de Captura de Churners",
       "description": "% de clientes que realmente churnariam e foram identificados — quanto o modelo não deixa passar",
       "type": "stat",
-      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 5 },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none", "textMode": "auto" },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 4,
+        "h": 5
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
           "decimals": 1,
           "displayName": "Taxa de Captura",
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 60 }, { "color": "green", "value": 75 }] }
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 60
+              },
+              {
+                "color": "green",
+                "value": 75
+              }
+            ]
+          }
         }
       },
-      "targets": [{
-        "datasource": "PostgreSQL",
-        "rawSql": "SELECT ROUND((tp::float / NULLIF(tp + fn, 0) * 100)::numeric, 1) AS value FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY evaluated_at DESC LIMIT 1",
-        "format": "table"
-      }]
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "rawSql": "SELECT ROUND((tp::float / NULLIF(tp + fn, 0) * 100)::numeric, 1) AS value FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY evaluated_at DESC LIMIT 1",
+          "format": "table"
+        }
+      ]
     },
     {
       "id": 5,
       "title": "Eficiência de Retenção",
       "description": "% das ações de retenção disparadas que eram realmente necessárias — evita desperdício orçamentário",
       "type": "stat",
-      "gridPos": { "x": 16, "y": 0, "w": 4, "h": 5 },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none", "textMode": "auto" },
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 4,
+        "h": 5
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
           "decimals": 1,
           "displayName": "Eficiência de Retenção",
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 50 }, { "color": "green", "value": 65 }] }
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "green",
+                "value": 65
+              }
+            ]
+          }
         }
       },
-      "targets": [{
-        "datasource": "PostgreSQL",
-        "rawSql": "SELECT ROUND((tp::float / NULLIF(tp + fp, 0) * 100)::numeric, 1) AS value FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY evaluated_at DESC LIMIT 1",
-        "format": "table"
-      }]
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "rawSql": "SELECT ROUND((tp::float / NULLIF(tp + fp, 0) * 100)::numeric, 1) AS value FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY evaluated_at DESC LIMIT 1",
+          "format": "table"
+        }
+      ]
     },
     {
       "id": 6,
       "title": "Clientes em Risco Alto",
       "description": "Clientes com probabilidade de churn acima de 70% — pipeline de risco imediato para ação comercial",
       "type": "stat",
-      "gridPos": { "x": 20, "y": 0, "w": 4, "h": 5 },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none", "textMode": "auto" },
+      "gridPos": {
+        "x": 20,
+        "y": 0,
+        "w": 4,
+        "h": 5
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
           "displayName": "Clientes em Risco Alto",
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 200 }, { "color": "red", "value": 500 }] }
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 200
+              },
+              {
+                "color": "red",
+                "value": 500
+              }
+            ]
+          }
         }
       },
-      "targets": [{
-        "datasource": "PostgreSQL",
-        "rawSql": "SELECT high_risk_count AS value FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY evaluated_at DESC LIMIT 1",
-        "format": "table"
-      }]
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "rawSql": "SELECT high_risk_count AS value FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY evaluated_at DESC LIMIT 1",
+          "format": "table"
+        }
+      ]
     },
     {
       "id": 7,
       "title": "Evolução do Impacto Financeiro — Champion",
       "description": "Tendência histórica: quanto o modelo está protegendo vs. quanto está escapando a cada evaluation run",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 5, "w": 14, "h": 9 },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 14,
+        "h": 9
+      },
       "fieldConfig": {
-        "defaults": { "unit": "currencyBRL", "color": { "mode": "palette-classic" } },
+        "defaults": {
+          "unit": "currencyBRL",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Valor Protegido" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }, { "id": "custom.fillOpacity", "value": 10 }]
+            "matcher": {
+              "id": "byName",
+              "options": "Valor Protegido"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 10
+              }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "Receita em Risco" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }, { "id": "custom.fillOpacity", "value": 10 }]
+            "matcher": {
+              "id": "byName",
+              "options": "Receita em Risco"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 10
+              }
+            ]
           }
         ]
       },
-      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "list", "placement": "bottom" } },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
       "targets": [
         {
           "datasource": "PostgreSQL",
@@ -209,158 +469,436 @@
       "title": "Perfil de Risco da Base de Clientes",
       "description": "Distribuição estratégica dos clientes por nível de propensão ao churn — último evaluation run",
       "type": "piechart",
-      "gridPos": { "x": 14, "y": 5, "w": 10, "h": 9 },
+      "gridPos": {
+        "x": 14,
+        "y": 5,
+        "w": 10,
+        "h": 9
+      },
       "fieldConfig": {
-        "defaults": { "unit": "short", "color": { "mode": "palette-classic" } },
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
         "overrides": [
-          { "matcher": { "id": "byName", "options": "Alto Risco (>70%)" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
-          { "matcher": { "id": "byName", "options": "Risco Médio (30–70%)" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
-          { "matcher": { "id": "byName", "options": "Baixo Risco (<30%)" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] }
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Alto Risco (>70%)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Risco Médio (30–70%)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Baixo Risco (<30%)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
         ]
       },
       "options": {
         "pieType": "donut",
-        "tooltip": { "mode": "single" },
-        "legend": { "displayMode": "list", "placement": "right" },
-        "displayLabels": ["percent", "name"]
+        "tooltip": {
+          "mode": "single"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "right"
+        },
+        "displayLabels": [
+          "percent",
+          "name"
+        ]
       },
-      "targets": [{
-        "datasource": "PostgreSQL",
-        "rawSql": "SELECT 'Alto Risco (>70%)' AS segmento, SUM(high_risk_count) AS total FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') AND evaluated_at = (SELECT MAX(evaluated_at) FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}')) UNION ALL SELECT 'Risco Médio (30–70%)', SUM(medium_risk_count) FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') AND evaluated_at = (SELECT MAX(evaluated_at) FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}')) UNION ALL SELECT 'Baixo Risco (<30%)', SUM(low_risk_count) FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') AND evaluated_at = (SELECT MAX(evaluated_at) FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}'))",
-        "format": "table"
-      }]
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "rawSql": "SELECT 'Alto Risco (>70%)' AS segmento, SUM(high_risk_count) AS total FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') AND evaluated_at = (SELECT MAX(evaluated_at) FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}')) UNION ALL SELECT 'Risco Médio (30–70%)', SUM(medium_risk_count) FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') AND evaluated_at = (SELECT MAX(evaluated_at) FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}')) UNION ALL SELECT 'Baixo Risco (<30%)', SUM(low_risk_count) FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') AND evaluated_at = (SELECT MAX(evaluated_at) FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}'))",
+          "format": "table"
+        }
+      ]
     },
     {
       "id": 9,
       "title": "Exposição Financeira vs Ineficiência Operacional — Último Run",
-      "description": "Comparativo por modelo: quanto estamos expondo em receita perdida (FN) vs. quanto desperdiçamos em retenções inúteis (FP)",
+      "description": "Comparativo por modelo: quanto estamos expondo em receita perdida (FN) vs. quanto desperdiçamos em retenções inúteis (FP) | Atenção: contagens brutas (FP/FN) refletem o volume de tráfego recebido por cada modelo. Champion recebe 100% do tráfego; challenger recebe apenas a fração configurada (ex: 20%). Use as métricas por predição (cost_per_prediction) para comparações normalizadas.",
       "type": "barchart",
-      "gridPos": { "x": 0, "y": 14, "w": 14, "h": 8 },
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 14,
+        "h": 8
+      },
       "fieldConfig": {
-        "defaults": { "unit": "currencyBRL", "color": { "mode": "palette-classic" } },
+        "defaults": {
+          "unit": "currencyBRL",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "exposicao_financeira" },
+            "matcher": {
+              "id": "byName",
+              "options": "exposicao_financeira"
+            },
             "properties": [
-              { "id": "displayName", "value": "Exposição Financeira (Churners Perdidos)" },
-              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
+              {
+                "id": "displayName",
+                "value": "Exposição Financeira (Churners Perdidos)"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "custo_ineficiencia" },
+            "matcher": {
+              "id": "byName",
+              "options": "custo_ineficiencia"
+            },
             "properties": [
-              { "id": "displayName", "value": "Ineficiência Operacional (Retenção Desnecessária)" },
-              { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }
+              {
+                "id": "displayName",
+                "value": "Ineficiência Operacional (Retenção Desnecessária)"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
             ]
           }
         ]
       },
       "options": {
         "xField": "model_name_snapshot",
-        "stacking": { "mode": "none", "group": "A" },
-        "tooltip": { "mode": "multi" },
-        "legend": { "displayMode": "list", "placement": "bottom" }
+        "stacking": {
+          "mode": "none",
+          "group": "A"
+        },
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
       },
-      "targets": [{
-        "datasource": "PostgreSQL",
-        "rawSql": "SELECT model_name_snapshot, ROUND((fp * false_positive_cost)::numeric, 2) AS custo_ineficiencia, ROUND((fn * false_negative_cost)::numeric, 2) AS exposicao_financeira FROM churn.model_performance WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') AND evaluated_at = (SELECT MAX(evaluated_at) FROM churn.model_performance WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}')) ORDER BY model_name_snapshot",
-        "format": "table"
-      }]
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "rawSql": "SELECT model_name_snapshot, ROUND((fp * false_positive_cost)::numeric, 2) AS custo_ineficiencia, ROUND((fn * false_negative_cost)::numeric, 2) AS exposicao_financeira FROM churn.model_performance WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') AND evaluated_at = (SELECT MAX(evaluated_at) FROM churn.model_performance WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}')) ORDER BY model_name_snapshot",
+          "format": "table"
+        }
+      ]
     },
     {
       "id": 10,
       "title": "Custo por Churner Evitado",
       "description": "Custo operacional total por churner identificado — quanto investimos para salvar cada cliente",
       "type": "stat",
-      "gridPos": { "x": 14, "y": 14, "w": 5, "h": 4 },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" },
+      "gridPos": {
+        "x": 14,
+        "y": 14,
+        "w": 5,
+        "h": 4
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "currencyBRL",
           "decimals": 2,
           "displayName": "Custo por Churner Evitado",
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 500 }, { "color": "red", "value": 1000 }] }
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 500
+              },
+              {
+                "color": "red",
+                "value": 1000
+              }
+            ]
+          }
         }
       },
-      "targets": [{
-        "datasource": "PostgreSQL",
-        "rawSql": "SELECT ROUND((total_cost::float / NULLIF(tp, 0))::numeric, 2) AS value FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY evaluated_at DESC LIMIT 1",
-        "format": "table"
-      }]
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "rawSql": "SELECT ROUND((total_cost::float / NULLIF(tp, 0))::numeric, 2) AS value FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY evaluated_at DESC LIMIT 1",
+          "format": "table"
+        }
+      ]
     },
     {
       "id": 11,
       "title": "Cobertura da Base em Alerta",
       "description": "% da base de clientes que está sob monitoramento ativo de churn — equilíbrio entre cobertura e precisão",
       "type": "stat",
-      "gridPos": { "x": 19, "y": 14, "w": 5, "h": 4 },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" },
+      "gridPos": {
+        "x": 19,
+        "y": 14,
+        "w": 5,
+        "h": 4
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
           "decimals": 1,
           "displayName": "Cobertura em Alerta",
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 30 }, { "color": "red", "value": 50 }] }
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 30
+              },
+              {
+                "color": "red",
+                "value": 50
+              }
+            ]
+          }
         }
       },
-      "targets": [{
-        "datasource": "PostgreSQL",
-        "rawSql": "SELECT ROUND(((tp + fp)::float / NULLIF(total_predictions, 0) * 100)::numeric, 1) AS value FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY evaluated_at DESC LIMIT 1",
-        "format": "table"
-      }]
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "rawSql": "SELECT ROUND(((tp + fp)::float / NULLIF(total_predictions, 0) * 100)::numeric, 1) AS value FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY evaluated_at DESC LIMIT 1",
+          "format": "table"
+        }
+      ]
     },
     {
       "id": 12,
       "title": "Comparativo Champion vs Challenger — Último Run",
       "description": "Modelos challenger com potencial de redução de custo ou melhora na taxa de captura",
       "type": "table",
-      "gridPos": { "x": 14, "y": 18, "w": 10, "h": 4 },
+      "gridPos": {
+        "x": 14,
+        "y": 18,
+        "w": 10,
+        "h": 4
+      },
       "fieldConfig": {
-        "defaults": { "unit": "none" },
+        "defaults": {
+          "unit": "none"
+        },
         "overrides": [
-          { "matcher": { "id": "byName", "options": "challenger" }, "properties": [{ "id": "displayName", "value": "Challenger" }] },
           {
-            "matcher": { "id": "byName", "options": "delta_custo" },
+            "matcher": {
+              "id": "byName",
+              "options": "challenger"
+            },
             "properties": [
-              { "id": "displayName", "value": "ΔCusto (R$)" },
-              { "id": "unit", "value": "currencyBRL" },
-              { "id": "custom.displayMode", "value": "color-background" },
-              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0 }] } }
+              {
+                "id": "displayName",
+                "value": "Challenger"
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "delta_custo_pct" },
+            "matcher": {
+              "id": "byName",
+              "options": "delta_custo"
+            },
             "properties": [
-              { "id": "displayName", "value": "ΔCusto %" },
-              { "id": "unit", "value": "percent" },
-              { "id": "custom.displayMode", "value": "color-background" },
-              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0 }] } }
+              {
+                "id": "displayName",
+                "value": "ΔCusto/pred (R$)"
+              },
+              {
+                "id": "unit",
+                "value": "currencyBRL"
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 0
+                    }
+                  ]
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "delta_captura" },
+            "matcher": {
+              "id": "byName",
+              "options": "delta_custo_pct"
+            },
             "properties": [
-              { "id": "displayName", "value": "ΔCaptura (Recall)" },
-              { "id": "unit", "value": "percentunit" },
-              { "id": "custom.displayMode", "value": "color-background" },
-              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 0 }] } }
+              {
+                "id": "displayName",
+                "value": "ΔCusto/pred %"
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 0
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "delta_captura"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "ΔCaptura (Recall)"
+              },
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 0
+                    }
+                  ]
+                }
+              }
             ]
           }
         ]
       },
-      "targets": [{
-        "datasource": "PostgreSQL",
-        "rawSql": "SELECT model_name_snapshot AS challenger, ROUND(delta_cost::numeric, 2) AS delta_custo, ROUND(delta_cost_pct::numeric, 1) AS delta_custo_pct, ROUND(delta_recall::numeric, 4) AS delta_captura FROM churn.evaluation_comparison WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') AND evaluation_run_id = (SELECT evaluation_run_id FROM churn.evaluation_run_results WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY created_at DESC LIMIT 1) AND model_role_snapshot <> 'champion' ORDER BY delta_cost ASC",
-        "format": "table"
-      }]
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "rawSql": "SELECT model_name_snapshot AS challenger, ROUND(delta_cost_per_pred::numeric, 4) AS delta_custo, ROUND(delta_cost_per_pred_pct::numeric, 1) AS delta_custo_pct, ROUND(delta_recall::numeric, 4) AS delta_captura FROM churn.evaluation_comparison WHERE tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') AND evaluation_run_id = (SELECT evaluation_run_id FROM churn.evaluation_run_results WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY created_at DESC LIMIT 1) AND model_role_snapshot <> 'champion' ORDER BY delta_cost_per_pred ASC",
+          "format": "table"
+        }
+      ]
     },
     {
       "id": 13,
       "title": "Análise de Threshold — Champion",
       "type": "row",
-      "gridPos": { "x": 0, "y": 22, "w": 24, "h": 1 },
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 24,
+        "h": 1
+      },
       "collapsed": false,
       "panels": []
     },
@@ -369,63 +907,115 @@
       "title": "Threshold vs Custo Total",
       "description": "Custo operacional total a cada nível de threshold — identifica o ponto ótimo de menor custo. Calculado sobre predições com outcomes registrados.",
       "type": "barchart",
-      "gridPos": { "x": 0, "y": 23, "w": 8, "h": 9 },
+      "gridPos": {
+        "x": 0,
+        "y": 23,
+        "w": 8,
+        "h": 9
+      },
       "fieldConfig": {
-        "defaults": { "unit": "currencyBRL", "color": { "fixedColor": "blue", "mode": "fixed" } },
+        "defaults": {
+          "unit": "currencyBRL",
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          }
+        },
         "overrides": []
       },
       "options": {
         "xTickLabelRotation": 0,
-        "tooltip": { "mode": "single" },
-        "legend": { "displayMode": "hidden" }
+        "tooltip": {
+          "mode": "single"
+        },
+        "legend": {
+          "displayMode": "hidden"
+        }
       },
-      "targets": [{
-        "datasource": "PostgreSQL",
-        "rawSql": "WITH thresholds AS (SELECT generate_series(5, 90, 5) / 100.0 AS thr), costs AS (SELECT false_positive_cost AS fp_cost, false_negative_cost AS fn_cost FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY evaluated_at DESC LIMIT 1), preds AS (SELECT p.churn_prob::numeric AS prob, o.churned FROM churn.outcomes o JOIN churn.predictions p ON p.id = o.prediction_id WHERE p.churn_prob IS NOT NULL AND p.tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}')), sweep AS (SELECT ROUND(t.thr::numeric, 2) AS thr, COUNT(*) FILTER (WHERE p.prob >= t.thr AND NOT p.churned) AS fp, COUNT(*) FILTER (WHERE p.prob < t.thr AND p.churned) AS fn FROM thresholds t CROSS JOIN preds p GROUP BY t.thr) SELECT s.thr::text AS threshold, ROUND((s.fp * c.fp_cost + s.fn * c.fn_cost)::numeric, 0) AS custo_total FROM sweep s, costs c ORDER BY s.thr",
-        "format": "table"
-      }]
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "rawSql": "WITH thresholds AS (SELECT generate_series(5, 90, 5) / 100.0 AS thr), costs AS (SELECT false_positive_cost AS fp_cost, false_negative_cost AS fn_cost FROM churn.model_performance WHERE model_role_snapshot = 'champion' AND tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}') ORDER BY evaluated_at DESC LIMIT 1), preds AS (SELECT p.churn_prob::numeric AS prob, o.churned FROM churn.outcomes o JOIN churn.predictions p ON p.id = o.prediction_id WHERE p.churn_prob IS NOT NULL AND p.tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}')), sweep AS (SELECT ROUND(t.thr::numeric, 2) AS thr, COUNT(*) FILTER (WHERE p.prob >= t.thr AND NOT p.churned) AS fp, COUNT(*) FILTER (WHERE p.prob < t.thr AND p.churned) AS fn FROM thresholds t CROSS JOIN preds p GROUP BY t.thr) SELECT s.thr::text AS threshold, ROUND((s.fp * c.fp_cost + s.fn * c.fn_cost)::numeric, 0) AS custo_total FROM sweep s, costs c ORDER BY s.thr",
+          "format": "table"
+        }
+      ]
     },
     {
       "id": 15,
       "title": "Threshold vs Falsos Negativos",
       "description": "Churners não detectados a cada nível de threshold — quanto maior o threshold, mais churners passam despercebidos e viram receita perdida.",
       "type": "barchart",
-      "gridPos": { "x": 8, "y": 23, "w": 8, "h": 9 },
+      "gridPos": {
+        "x": 8,
+        "y": 23,
+        "w": 8,
+        "h": 9
+      },
       "fieldConfig": {
-        "defaults": { "unit": "short", "color": { "fixedColor": "red", "mode": "fixed" } },
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "fixedColor": "red",
+            "mode": "fixed"
+          }
+        },
         "overrides": []
       },
       "options": {
         "xTickLabelRotation": 0,
-        "tooltip": { "mode": "single" },
-        "legend": { "displayMode": "hidden" }
+        "tooltip": {
+          "mode": "single"
+        },
+        "legend": {
+          "displayMode": "hidden"
+        }
       },
-      "targets": [{
-        "datasource": "PostgreSQL",
-        "rawSql": "WITH thresholds AS (SELECT generate_series(5, 90, 5) / 100.0 AS thr), preds AS (SELECT p.churn_prob::numeric AS prob, o.churned FROM churn.outcomes o JOIN churn.predictions p ON p.id = o.prediction_id WHERE p.churn_prob IS NOT NULL AND p.tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}')), sweep AS (SELECT ROUND(t.thr::numeric, 2) AS thr, COUNT(*) FILTER (WHERE p.prob < t.thr AND p.churned) AS fn FROM thresholds t CROSS JOIN preds p GROUP BY t.thr) SELECT s.thr::text AS threshold, s.fn AS churners_perdidos FROM sweep s ORDER BY s.thr",
-        "format": "table"
-      }]
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "rawSql": "WITH thresholds AS (SELECT generate_series(5, 90, 5) / 100.0 AS thr), preds AS (SELECT p.churn_prob::numeric AS prob, o.churned FROM churn.outcomes o JOIN churn.predictions p ON p.id = o.prediction_id WHERE p.churn_prob IS NOT NULL AND p.tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}')), sweep AS (SELECT ROUND(t.thr::numeric, 2) AS thr, COUNT(*) FILTER (WHERE p.prob < t.thr AND p.churned) AS fn FROM thresholds t CROSS JOIN preds p GROUP BY t.thr) SELECT s.thr::text AS threshold, s.fn AS churners_perdidos FROM sweep s ORDER BY s.thr",
+          "format": "table"
+        }
+      ]
     },
     {
       "id": 16,
       "title": "Threshold vs Recall",
       "description": "Taxa de captura de churners a cada nível de threshold — onde o modelo captura mais, mas a que custo operacional?",
       "type": "barchart",
-      "gridPos": { "x": 16, "y": 23, "w": 8, "h": 9 },
+      "gridPos": {
+        "x": 16,
+        "y": 23,
+        "w": 8,
+        "h": 9
+      },
       "fieldConfig": {
-        "defaults": { "unit": "percent", "decimals": 1, "color": { "fixedColor": "green", "mode": "fixed" } },
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "color": {
+            "fixedColor": "green",
+            "mode": "fixed"
+          }
+        },
         "overrides": []
       },
       "options": {
         "xTickLabelRotation": 0,
-        "tooltip": { "mode": "single" },
-        "legend": { "displayMode": "hidden" }
+        "tooltip": {
+          "mode": "single"
+        },
+        "legend": {
+          "displayMode": "hidden"
+        }
       },
-      "targets": [{
-        "datasource": "PostgreSQL",
-        "rawSql": "WITH thresholds AS (SELECT generate_series(5, 90, 5) / 100.0 AS thr), preds AS (SELECT p.churn_prob::numeric AS prob, o.churned FROM churn.outcomes o JOIN churn.predictions p ON p.id = o.prediction_id WHERE p.churn_prob IS NOT NULL AND p.tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}')), sweep AS (SELECT ROUND(t.thr::numeric, 2) AS thr, COUNT(*) FILTER (WHERE p.prob >= t.thr AND p.churned) AS tp, COUNT(*) FILTER (WHERE p.prob < t.thr AND p.churned) AS fn FROM thresholds t CROSS JOIN preds p GROUP BY t.thr) SELECT s.thr::text AS threshold, ROUND((s.tp::float / NULLIF(s.tp + s.fn, 0) * 100)::numeric, 1) AS recall_pct FROM sweep s ORDER BY s.thr",
-        "format": "table"
-      }]
+      "targets": [
+        {
+          "datasource": "PostgreSQL",
+          "rawSql": "WITH thresholds AS (SELECT generate_series(5, 90, 5) / 100.0 AS thr), preds AS (SELECT p.churn_prob::numeric AS prob, o.churned FROM churn.outcomes o JOIN churn.predictions p ON p.id = o.prediction_id WHERE p.churn_prob IS NOT NULL AND p.tenant_id = (SELECT id FROM churn.tenants WHERE slug = '${tenant}')), sweep AS (SELECT ROUND(t.thr::numeric, 2) AS thr, COUNT(*) FILTER (WHERE p.prob >= t.thr AND p.churned) AS tp, COUNT(*) FILTER (WHERE p.prob < t.thr AND p.churned) AS fn FROM thresholds t CROSS JOIN preds p GROUP BY t.thr) SELECT s.thr::text AS threshold, ROUND((s.tp::float / NULLIF(s.tp + s.fn, 0) * 100)::numeric, 1) AS recall_pct FROM sweep s ORDER BY s.thr",
+          "format": "table"
+        }
+      ]
     }
   ]
 }
