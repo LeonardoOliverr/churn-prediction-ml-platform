@@ -122,7 +122,8 @@ _INSERT_RESULT = text("""
         evaluated_predictions, missing_actual_labels,
         false_positive_rate, false_negative_rate, specificity,
         high_risk_count, medium_risk_count, low_risk_count,
-        promotion_candidate, recommendation_reason
+        promotion_candidate, recommendation_reason,
+        cost_per_prediction, traffic_split_pct
     ) VALUES (
         :run_id, :tenant_id, :project_id, :model_id,
         :model_name, :model_version,
@@ -134,7 +135,8 @@ _INSERT_RESULT = text("""
         :evaluated_predictions, :missing_actual_labels,
         :false_positive_rate, :false_negative_rate, :specificity,
         :high_risk_count, :medium_risk_count, :low_risk_count,
-        :promotion_candidate, :recommendation_reason
+        :promotion_candidate, :recommendation_reason,
+        :cost_per_prediction, :traffic_split_pct
     )
     ON CONFLICT (evaluation_run_id, model_id, threshold_used) DO NOTHING
 """)
@@ -425,20 +427,23 @@ def evaluate(
             ).fetchone()
             model_role    = role_row.role          if role_row else "unknown"
             traffic_split = float(role_row.traffic_split) if role_row and role_row.traffic_split else None
+            total         = len(group)
 
             model_results.append({
-                "model_id":       str(model_id),
-                "model_name":     model_name,
-                "model_version":  str(model_version),
-                "model_role":     model_role,
-                "traffic_split":  traffic_split,
-                "threshold":      float(threshold),
-                "total":          len(group),
-                "cm":             cm,
-                "metrics":        metrics,
-                "cost":           cost,
-                "roc_auc":        roc_auc,
-                "missing_labels": missing_by_model.get(str(model_id), 0),
+                "model_id":           str(model_id),
+                "model_name":         model_name,
+                "model_version":      str(model_version),
+                "model_role":         model_role,
+                "traffic_split":      traffic_split,
+                "threshold":          float(threshold),
+                "total":              total,
+                "cm":                 cm,
+                "metrics":            metrics,
+                "cost":               cost,
+                "roc_auc":            roc_auc,
+                "missing_labels":     missing_by_model.get(str(model_id), 0),
+                "cost_per_prediction": round(cost / total, 4) if total > 0 else None,
+                "traffic_split_pct":  round(traffic_split * 100, 2) if traffic_split is not None else None,
                 **derived,
                 **risk,
             })
@@ -531,6 +536,8 @@ def evaluate(
                         "low_risk_count":       r["low_risk_count"],
                         "promotion_candidate":  r["promotion_candidate"],
                         "recommendation_reason": r["recommendation_reason"],
+                        "cost_per_prediction":  r["cost_per_prediction"],
+                        "traffic_split_pct":    r["traffic_split_pct"],
                     },
                 )
 
