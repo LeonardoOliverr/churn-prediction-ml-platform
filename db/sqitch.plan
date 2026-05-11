@@ -23,3 +23,5 @@
 18_analytics_enhancements [17_comments] 2026-05-09T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona taxas derivadas, segmentacao de risco e recomendacao de promocao; cria view evaluation_comparison
 19_grafana_readonly [18_analytics_enhancements] 2026-05-10T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Cria role grafana_readonly e user grafana_user para acesso read-only ao Grafana
 20_challenger_cost_normalization [19_grafana_readonly] 2026-05-10T12:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona cost_per_prediction e traffic_split_pct; recria evaluation_comparison com delta normalizado
+21_cost_model_config [20_challenger_cost_normalization] 2026-05-11T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Tabela cost_model_config para custo real por cliente via cltv e monthly_charges
+22_model_performance_result_costs [21_cost_model_config] 2026-05-11T03:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # model_performance passa a usar fp_cost/fn_cost do resultado (custo medio real) em vez do run (valor CLI)
