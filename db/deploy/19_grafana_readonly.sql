@@ -6,7 +6,13 @@
 
 BEGIN;
 
-CREATE ROLE grafana_readonly;
+-- Roles são objetos de cluster (compartilhados entre databases).
+-- DO block evita falha quando a role já existe em outro database do mesmo cluster.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'grafana_readonly') THEN
+    CREATE ROLE grafana_readonly;
+  END IF;
+END $$;
 
 DO $$ BEGIN
   EXECUTE format(
@@ -29,6 +35,10 @@ GRANT SELECT ON
     churn.evaluation_comparison
 TO grafana_readonly;
 
-CREATE USER grafana_user WITH PASSWORD 'grafana_pass' IN ROLE grafana_readonly;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'grafana_user') THEN
+    CREATE USER grafana_user WITH PASSWORD 'grafana_pass' IN ROLE grafana_readonly;
+  END IF;
+END $$;
 
 COMMIT;

@@ -438,3 +438,422 @@ def test_promotion_volume_bias_corrected():
     )
     # F1 pior e custo/pred maior → não deve promover
     assert result["promotion_candidate"] is False
+
+
+# ---------------------------------------------------------------------------
+# _compute_roc_auc()
+# ---------------------------------------------------------------------------
+
+
+def test_compute_roc_auc_returns_float_for_binary_classes():
+    """ROC-AUC calculado com duas classes distintas retorna float em [0,1]."""
+    from ml.evaluate_production import _compute_roc_auc
+    rows = [
+        SimpleNamespace(churned=True,  churn_prob=0.9),
+        SimpleNamespace(churned=True,  churn_prob=0.8),
+        SimpleNamespace(churned=False, churn_prob=0.2),
+        SimpleNamespace(churned=False, churn_prob=0.1),
+    ]
+    auc = _compute_roc_auc(rows)
+    assert auc is not None
+    assert 0.0 <= auc <= 1.0
+
+
+def test_compute_roc_auc_single_class_returns_none():
+    """Apenas uma classe nos outcomes torna AUC indefinido — retorna None."""
+    from ml.evaluate_production import _compute_roc_auc
+    rows = [SimpleNamespace(churned=True, churn_prob=0.8)] * 5
+    assert _compute_roc_auc(rows) is None
+
+
+def test_compute_roc_auc_perfect_discrimination():
+    """Separação perfeita → AUC = 1.0."""
+    from ml.evaluate_production import _compute_roc_auc
+    rows = [
+        SimpleNamespace(churned=True,  churn_prob=1.0),
+        SimpleNamespace(churned=False, churn_prob=0.0),
+    ]
+    assert _compute_roc_auc(rows) == pytest.approx(1.0)
+
+
+# ---------------------------------------------------------------------------
+# _compute_row_cost()
+# ---------------------------------------------------------------------------
+
+
+def _full_row(monthly: float = 50.0, cltv: float = 1000.0):
+    return SimpleNamespace(monthly_charges=monthly, cltv=cltv, churn_pred=True, churned=False)
+
+
+def test_compute_row_cost_flat_when_no_config():
+    """Sem config retorna os custos flat do CLI."""
+    from ml.evaluate_production import _compute_row_cost
+    fp, fn = _compute_row_cost(_full_row(), config=None, fp_cost_flat=100.0, fn_cost_flat=2000.0)
+    assert fp == 100.0
+    assert fn == 2000.0
+
+
+def test_compute_row_cost_flat_config_returns_flat_values():
+    """Config com cost_model=flat usa os valores flat do CLI."""
+    from ml.evaluate_production import _compute_row_cost
+    from domain.constants import CostModel
+    config = {
+        "cost_model": CostModel.FLAT,
+        "fp_cost_months": 3, "fp_cost_discount": 0.5,
+        "fn_cost_cltv_multiplier": 2.0, "fn_cost_months_multiplier": 6,
+    }
+    fp, fn = _compute_row_cost(_full_row(), config=config, fp_cost_flat=100.0, fn_cost_flat=2000.0)
+    assert fp == 100.0
+    assert fn == 2000.0
+
+
+def test_compute_row_cost_cltv_model():
+    """Config CLTV: FP baseado em monthly * meses * desconto; FN baseado em CLTV."""
+    from ml.evaluate_production import _compute_row_cost
+    from domain.constants import CostModel
+    config = {
+        "cost_model": CostModel.CLTV,
+        "fp_cost_months": 2.0, "fp_cost_discount": 0.5,
+        "fn_cost_cltv_multiplier": 3.0, "fn_cost_months_multiplier": 6,
+    }
+    row = _full_row(monthly=100.0, cltv=500.0)
+    fp, fn = _compute_row_cost(row, config=config, fp_cost_flat=99.0, fn_cost_flat=99.0)
+    assert fp == pytest.approx(100.0 * 2.0 * 0.5)   # 100.0
+    assert fn == pytest.approx(500.0 * 3.0)          # 1500.0
+
+
+def test_compute_row_cost_monthly_charges_model():
+    """Config MONTHLY_CHARGES: FN baseado em monthly * meses."""
+    from ml.evaluate_production import _compute_row_cost
+    from domain.constants import CostModel
+    config = {
+        "cost_model": CostModel.MONTHLY_CHARGES,
+        "fp_cost_months": 1.0, "fp_cost_discount": 1.0,
+        "fn_cost_cltv_multiplier": 2.0, "fn_cost_months_multiplier": 12,
+    }
+    row = _full_row(monthly=200.0, cltv=0.0)
+    fp, fn = _compute_row_cost(row, config=config, fp_cost_flat=99.0, fn_cost_flat=99.0)
+    assert fp == pytest.approx(200.0 * 1.0 * 1.0)   # 200.0
+    assert fn == pytest.approx(200.0 * 12)           # 2400.0
+
+
+# ---------------------------------------------------------------------------
+# _compute_cost_weighted()
+# ---------------------------------------------------------------------------
+
+
+def _pred_row(pred: bool, churned: bool, monthly: float = 50.0, cltv: float = 1000.0):
+    return SimpleNamespace(
+        churn_pred=pred, churned=churned, monthly_charges=monthly, cltv=cltv
+    )
+
+
+def test_compute_cost_weighted_flat_no_config():
+    """Custo ponderado flat: FP*fp_cost + FN*fn_cost, averages são os custos flat."""
+    from ml.evaluate_production import _compute_cost_weighted
+    rows = [
+        _pred_row(True,  False),   # FP
+        _pred_row(False, True),    # FN
+        _pred_row(True,  True),    # TP — sem custo
+        _pred_row(False, False),   # TN — sem custo
+    ]
+    total, avg_fp, avg_fn = _compute_cost_weighted(rows, None, fp_cost_flat=100.0, fn_cost_flat=2000.0)
+    assert total == pytest.approx(100.0 + 2000.0)
+    assert avg_fp == pytest.approx(100.0)
+    assert avg_fn == pytest.approx(2000.0)
+
+
+def test_compute_cost_weighted_no_fp_no_fn_returns_flat_averages():
+    """Sem FP e sem FN o custo total é zero e os averages caem para os custos flat."""
+    from ml.evaluate_production import _compute_cost_weighted
+    rows = [
+        _pred_row(True,  True),    # TP
+        _pred_row(False, False),   # TN
+    ]
+    total, avg_fp, avg_fn = _compute_cost_weighted(rows, None, fp_cost_flat=100.0, fn_cost_flat=2000.0)
+    assert total == 0.0
+    assert avg_fp == 100.0
+    assert avg_fn == 2000.0
+
+
+# ---------------------------------------------------------------------------
+# _build_report() / _format_row()
+# ---------------------------------------------------------------------------
+
+
+def _model_result(name="rf", role="champion", version="v1", f1=0.8, cost=1000.0):
+    return {
+        "model_name": name, "model_role": role, "model_version": version,
+        "total": 100,
+        "cm": {"tp": 40, "fp": 10, "fn": 10, "tn": 40},
+        "metrics": {"precision": 0.8, "recall": 0.8, "f1": f1},
+        "cost": cost,
+    }
+
+
+def test_build_report_contains_project_and_window():
+    """Relatório inclui slug do projeto e janela temporal."""
+    from ml.evaluate_production import _build_report
+    results = [_model_result()]
+    report = _build_report(results, "telco-churn", "90d", 100.0, 2000.0, run_id=None)
+    assert "telco-churn" in report
+    assert "90d" in report
+
+
+def test_build_report_shows_dry_run_marker_when_no_run_id():
+    """Sem run_id indica 'dry-run' no cabeçalho."""
+    from ml.evaluate_production import _build_report
+    results = [_model_result()]
+    report = _build_report(results, "proj", "30d", 100.0, 2000.0, run_id=None)
+    assert "dry-run" in report
+
+
+def test_build_report_shows_run_id_when_provided():
+    """Com run_id exibe o ID no cabeçalho."""
+    from ml.evaluate_production import _build_report
+    results = [_model_result()]
+    report = _build_report(results, "proj", "30d", 100.0, 2000.0, run_id="abc-123")
+    assert "abc-123" in report
+
+
+def test_build_report_highlights_best_f1_and_lowest_cost():
+    """Relatório indica o modelo com melhor F1 e o de menor custo."""
+    from ml.evaluate_production import _build_report
+    results = [
+        _model_result("rf", "champion", "v1", f1=0.85, cost=1000.0),
+        _model_result("xgb", "challenger", "v2", f1=0.90, cost=800.0),
+    ]
+    report = _build_report(results, "proj", "30d", 100.0, 2000.0, run_id=None)
+    assert "xgb" in report  # melhor F1 e menor custo
+    assert "Melhor F1" in report
+    assert "Menor custo" in report
+
+
+# ---------------------------------------------------------------------------
+# evaluate() — orquestração com banco mockado
+# ---------------------------------------------------------------------------
+
+
+def _make_engine_mock(mock_conn):
+    """Cria mock de engine com context managers configurados."""
+    from unittest.mock import MagicMock
+    ctx = MagicMock()
+    ctx.__enter__ = MagicMock(return_value=mock_conn)
+    ctx.__exit__ = MagicMock(return_value=False)
+    engine = MagicMock()
+    engine.connect.return_value = ctx
+    begin_ctx = MagicMock()
+    begin_ctx.__enter__ = MagicMock(return_value=mock_conn)
+    begin_ctx.__exit__ = MagicMock(return_value=False)
+    engine.begin.return_value = begin_ctx
+    return engine
+
+
+def test_evaluate_returns_empty_when_no_rows():
+    """evaluate() retorna [] quando não há predições com outcomes no período."""
+    from unittest.mock import MagicMock, patch
+    from ml.evaluate_production import evaluate
+
+    mock_conn = MagicMock()
+    mock_conn.execute.return_value.fetchone.return_value = None
+    mock_conn.execute.return_value.mappings.return_value.first.return_value = None
+    mock_conn.execute.return_value.fetchall.return_value = []
+
+    engine = _make_engine_mock(mock_conn)
+
+    with patch("ml.evaluate_production._build_engine", return_value=engine), \
+         patch("ml.evaluate_production._resolve_tenant_id", return_value="t-uuid"), \
+         patch("ml.evaluate_production._resolve_project_id", return_value="p-uuid"):
+        result = evaluate("ibm-telco", "telco-churn", days=90, fp_cost=100.0, fn_cost=2000.0)
+
+    assert result == []
+
+
+def test_evaluate_with_cost_config_logs_model_name():
+    """evaluate() com cost_model_config no banco usa o cost_model do config, não flat_cli."""
+    from unittest.mock import MagicMock, patch
+    from ml.evaluate_production import evaluate
+    from domain.constants import CostModel
+
+    rows = [
+        SimpleNamespace(
+            model_id="m1", model_name="rf", model_version="v1", threshold_used=0.5,
+            churn_pred=True, churned=True, churn_prob=0.85,
+            monthly_charges=50.0, cltv=1200.0,
+        ),
+        SimpleNamespace(
+            model_id="m1", model_name="rf", model_version="v1", threshold_used=0.5,
+            churn_pred=False, churned=False, churn_prob=0.15,
+            monthly_charges=40.0, cltv=900.0,
+        ),
+    ]
+    role_row = SimpleNamespace(role="champion", traffic_split=None)
+    cost_config_row = {
+        "cost_model": CostModel.FLAT,
+        "fp_cost_flat": 100.0, "fn_cost_flat": 2000.0,
+        "fp_cost_months": 3, "fp_cost_discount": 0.5,
+        "fn_cost_cltv_multiplier": 2.0, "fn_cost_months_multiplier": 6,
+    }
+
+    mock_conn = MagicMock()
+    mock_conn.execute.return_value.fetchone.side_effect = [None, role_row]
+    mock_conn.execute.return_value.mappings.return_value.first.return_value = cost_config_row
+    mock_conn.execute.return_value.fetchall.side_effect = [rows, []]
+
+    engine = _make_engine_mock(mock_conn)
+
+    with patch("ml.evaluate_production._build_engine", return_value=engine), \
+         patch("ml.evaluate_production._resolve_tenant_id", return_value="t-uuid"), \
+         patch("ml.evaluate_production._resolve_project_id", return_value="p-uuid"):
+        result = evaluate(
+            "ibm-telco", "telco-churn", days=30,
+            fp_cost=100.0, fn_cost=2000.0, dry_run=True,
+        )
+
+    assert len(result) == 1
+    assert result[0]["cost_model"] == CostModel.FLAT
+
+
+def test_evaluate_returns_empty_when_run_already_exists():
+    """evaluate() retorna [] quando já existe um run para o mesmo período."""
+    from unittest.mock import MagicMock, patch
+    from ml.evaluate_production import evaluate
+
+    existing_run = SimpleNamespace(id="existing-run-id")
+    mock_conn = MagicMock()
+    mock_conn.execute.return_value.fetchone.return_value = existing_run
+
+    engine = _make_engine_mock(mock_conn)
+
+    with patch("ml.evaluate_production._build_engine", return_value=engine), \
+         patch("ml.evaluate_production._resolve_tenant_id", return_value="t-uuid"), \
+         patch("ml.evaluate_production._resolve_project_id", return_value="p-uuid"):
+        result = evaluate("ibm-telco", "telco-churn", days=90, fp_cost=100.0, fn_cost=2000.0)
+
+    assert result == []
+
+
+def test_evaluate_dry_run_returns_results_without_writing():
+    """evaluate() dry_run=True retorna resultados calculados sem gravar no banco."""
+    from unittest.mock import MagicMock, patch
+    from ml.evaluate_production import evaluate
+
+    rows = [
+        SimpleNamespace(
+            model_id="m1", model_name="rf", model_version="v1", threshold_used=0.5,
+            churn_pred=True, churned=True, churn_prob=0.85,
+            monthly_charges=50.0, cltv=1200.0,
+        ),
+        SimpleNamespace(
+            model_id="m1", model_name="rf", model_version="v1", threshold_used=0.5,
+            churn_pred=False, churned=False, churn_prob=0.15,
+            monthly_charges=40.0, cltv=900.0,
+        ),
+    ]
+    role_row = SimpleNamespace(role="champion", traffic_split=None)
+
+    mock_conn = MagicMock()
+    mock_conn.execute.return_value.fetchone.side_effect = [None, role_row]
+    mock_conn.execute.return_value.mappings.return_value.first.return_value = None
+    mock_conn.execute.return_value.fetchall.side_effect = [rows, []]
+
+    engine = _make_engine_mock(mock_conn)
+
+    with patch("ml.evaluate_production._build_engine", return_value=engine), \
+         patch("ml.evaluate_production._resolve_tenant_id", return_value="t-uuid"), \
+         patch("ml.evaluate_production._resolve_project_id", return_value="p-uuid"):
+        result = evaluate(
+            "ibm-telco", "telco-churn", days=30,
+            fp_cost=100.0, fn_cost=2000.0, dry_run=True,
+        )
+
+    assert len(result) == 1
+    assert result[0]["model_name"] == "rf"
+    assert result[0]["model_role"] == "champion"
+    assert result[0]["total"] == 2
+
+
+def test_evaluate_full_write_path_inserts_run_and_results():
+    """evaluate() dry_run=False grava evaluation_run e evaluation_run_results no banco."""
+    from unittest.mock import MagicMock, patch
+    from ml.evaluate_production import evaluate
+
+    rows = [
+        SimpleNamespace(
+            model_id="m1", model_name="rf", model_version="v1", threshold_used=0.5,
+            churn_pred=True, churned=True, churn_prob=0.85,
+            monthly_charges=50.0, cltv=1200.0,
+        ),
+        SimpleNamespace(
+            model_id="m1", model_name="rf", model_version="v1", threshold_used=0.5,
+            churn_pred=False, churned=False, churn_prob=0.15,
+            monthly_charges=40.0, cltv=900.0,
+        ),
+    ]
+    role_row = SimpleNamespace(role="champion", traffic_split=None)
+
+    mock_conn = MagicMock()
+    mock_conn.execute.return_value.fetchone.side_effect = [None, role_row]
+    mock_conn.execute.return_value.mappings.return_value.first.return_value = None
+    mock_conn.execute.return_value.fetchall.side_effect = [rows, []]
+    mock_conn.execute.return_value.scalar_one.return_value = "run-uuid-123"
+
+    engine = _make_engine_mock(mock_conn)
+
+    with patch("ml.evaluate_production._build_engine", return_value=engine), \
+         patch("ml.evaluate_production._resolve_tenant_id", return_value="t-uuid"), \
+         patch("ml.evaluate_production._resolve_project_id", return_value="p-uuid"):
+        result = evaluate(
+            "ibm-telco", "telco-churn", days=30,
+            fp_cost=100.0, fn_cost=2000.0, dry_run=False,
+        )
+
+    assert len(result) == 1
+    assert result[0]["model_name"] == "rf"
+    # engine.begin() deve ter sido chamado para gravar o run
+    engine.begin.assert_called()
+
+
+# ---------------------------------------------------------------------------
+# main()
+# ---------------------------------------------------------------------------
+
+
+def test_main_calls_evaluate_with_correct_arguments():
+    """main() parseia sys.argv e delega para evaluate() corretamente."""
+    import sys
+    from unittest.mock import patch
+    from ml.evaluate_production import main
+
+    argv = [
+        "prog",
+        "--project", "telco-churn-2018",
+        "--fp-cost", "100.0",
+        "--fn-cost", "2000.0",
+        "--since", "30d",
+        "--dry-run",
+    ]
+    with patch.object(sys, "argv", argv), \
+         patch("ml.evaluate_production.evaluate", return_value=[]) as mock_eval:
+        main()
+
+    mock_eval.assert_called_once()
+    kwargs = mock_eval.call_args.kwargs
+    assert kwargs["project_slug"] == "telco-churn-2018"
+    assert kwargs["days"] == 30
+    assert kwargs["fp_cost"] == pytest.approx(100.0)
+    assert kwargs["dry_run"] is True
+
+
+def test_main_uses_default_since_when_not_provided():
+    """main() usa '90d' como padrão para --since."""
+    import sys
+    from unittest.mock import patch
+    from ml.evaluate_production import main
+
+    argv = ["prog", "--project", "proj", "--fp-cost", "50.0", "--fn-cost", "1000.0"]
+    with patch.object(sys, "argv", argv), \
+         patch("ml.evaluate_production.evaluate", return_value=[]) as mock_eval:
+        main()
+
+    assert mock_eval.call_args.kwargs["days"] == 90

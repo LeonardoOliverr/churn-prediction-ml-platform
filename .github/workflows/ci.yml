@@ -21,8 +21,8 @@ env:
   PYTHONPATH: ${{ github.workspace }}
 
 jobs:
-  tests:
-    name: Python tests
+  unit-tests:
+    name: Unit tests & coverage
     runs-on: ubuntu-latest
 
     steps:
@@ -40,8 +40,45 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run pytest
-        run: pytest
+      - name: Run unit tests
+        run: pytest tests/unit/
+
+  integration-tests:
+    name: Integration tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: churn_user
+          POSTGRES_PASSWORD: churn_pass
+          POSTGRES_DB: churn_dev
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U churn_user"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run integration tests
+        run: pytest tests/integration/ -m integration -v --no-cov
 
   compose:
     name: Docker Compose config
