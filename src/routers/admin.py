@@ -18,6 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
+from domain.exceptions import ModelNotFoundError, ProjectNotFoundError, TenantNotFoundError
 from src.config import Settings, get_settings
 from src.dependencies import get_current_admin, get_db
 from src.middleware.auth import AdminClaims
@@ -84,7 +85,7 @@ def _get_project(db: Connection, project_id: str) -> dict:
         {"project_id": project_id},
     ).mappings().first()
     if not row:
-        raise _not_found("Projeto não encontrado.")
+        raise ProjectNotFoundError(project_id)
     return dict(row)
 
 
@@ -99,7 +100,7 @@ def _get_tenant(db: Connection, tenant_id: str) -> dict:
         {"tenant_id": tenant_id},
     ).mappings().first()
     if not row:
-        raise _not_found("Tenant não encontrado.")
+        raise TenantNotFoundError(tenant_id)
     return dict(row)
 
 
@@ -114,7 +115,7 @@ def _get_model(db: Connection, model_id: str) -> dict:
         {"model_id": model_id},
     ).mappings().first()
     if not row:
-        raise _not_found("Modelo não encontrado.")
+        raise ModelNotFoundError(f"Modelo não encontrado: {model_id!r}")
     return dict(row)
 
 

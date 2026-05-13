@@ -18,6 +18,8 @@ Contrato esperado de POST /predict-churn:
 
 import pytest
 
+from domain.constants import RiskLevel
+
 
 # ---------------------------------------------------------------------------
 # Definição do contrato
@@ -32,7 +34,7 @@ PREDICT_RESPONSE_CONTRACT: dict[str, type] = {
     "model_version": str,
 }
 
-VALID_RISK_LEVELS = {"low", "medium", "high"}
+VALID_RISK_LEVELS = {r.value for r in RiskLevel}
 VALID_PREDICTIONS = {"churn", "no_churn"}
 
 

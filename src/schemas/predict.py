@@ -5,9 +5,9 @@ A ordem dos campos em CustomerFeatures deve seguir exatamente ml/config.py
 para garantir que o DataFrame gerado tenha as colunas na ordem esperada pelo pipeline.
 """
 
-from typing import Literal
-
 from pydantic import BaseModel, ConfigDict, Field
+
+from domain.constants import RiskLevel
 
 _CUSTOMER_EXAMPLE = {
     "customer_id": "CUST-8301",
@@ -95,7 +95,7 @@ class PredictResponse(BaseModel):
     prediction_id: str = Field(..., description="UUID gerado para esta predição (usado para rastreamento).")
     customer_id: str = Field(..., description="Identificador do cliente enviado na requisição.")
     churn_probability: float = Field(..., description="Probabilidade de churn — valor entre 0.0 e 1.0.")
-    risk_level: Literal["low", "medium", "high"] = Field(
+    risk_level: RiskLevel = Field(
         ..., description='Classificação de risco: `low` (< 0.3) | `medium` (0.3–0.7) | `high` (> 0.7).'
     )
     churn_pred: bool = Field(..., description='`true` se `churn_probability >= threshold_used`.')

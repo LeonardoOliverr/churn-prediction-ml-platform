@@ -12,6 +12,12 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
+from domain.exceptions import (
+    BatchTooLargeError,
+    ModelNotFoundError,
+    ProjectNotFoundError,
+    TenantNotFoundError,
+)
 from src.config import get_settings
 from src.middleware.logging import LoggingMiddleware
 from src.middleware.rate_limit import key_limiter
@@ -132,6 +138,27 @@ def create_app() -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
     )
+
+    # Exception handlers de domínio
+    @app.exception_handler(TenantNotFoundError)
+    async def tenant_not_found_handler(request: Request, exc: TenantNotFoundError):
+        request_id = getattr(request.state, "request_id", "unknown")
+        return JSONResponse(status_code=404, content={"error": "not_found", "message": str(exc), "request_id": request_id})
+
+    @app.exception_handler(ProjectNotFoundError)
+    async def project_not_found_handler(request: Request, exc: ProjectNotFoundError):
+        request_id = getattr(request.state, "request_id", "unknown")
+        return JSONResponse(status_code=404, content={"error": "not_found", "message": str(exc), "request_id": request_id})
+
+    @app.exception_handler(ModelNotFoundError)
+    async def model_not_found_handler(request: Request, exc: ModelNotFoundError):
+        request_id = getattr(request.state, "request_id", "unknown")
+        return JSONResponse(status_code=404, content={"error": "model_not_found", "message": str(exc), "request_id": request_id})
+
+    @app.exception_handler(BatchTooLargeError)
+    async def batch_too_large_handler(request: Request, exc: BatchTooLargeError):
+        request_id = getattr(request.state, "request_id", "unknown")
+        return JSONResponse(status_code=422, content={"error": "batch_too_large", "message": str(exc), "request_id": request_id})
 
     # Rate limiting
     app.state.limiter = key_limiter

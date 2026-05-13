@@ -32,6 +32,7 @@ from sklearn.metrics import roc_auc_score
 
 from sqlalchemy import text
 
+from domain.constants import CostModel, EvaluationType
 from ml.core.logger import get_logger
 from ml.data.preprocessing import _build_engine, _resolve_project_id, _resolve_tenant_id
 
@@ -225,13 +226,13 @@ def _compute_row_cost(
 
     Usa cost_model_config quando disponível; cai para os valores flat do CLI.
     """
-    if config is None or config["cost_model"] == "flat":
+    if config is None or config["cost_model"] == CostModel.FLAT:
         return fp_cost_flat, fn_cost_flat
 
     monthly = float(row.monthly_charges or 0)
     fp_cost = monthly * float(config["fp_cost_months"]) * float(config["fp_cost_discount"])
 
-    if config["cost_model"] == "cltv":
+    if config["cost_model"] == CostModel.CLTV:
         fn_cost = float(row.cltv or 0) * float(config["fn_cost_cltv_multiplier"])
     else:  # monthly_charges
         fn_cost = monthly * float(config["fn_cost_months_multiplier"])
@@ -591,7 +592,7 @@ def evaluate(
                         "fp_cost":         fp_cost,
                         "fn_cost":         fn_cost,
                         "triggered_by":    triggered_by,
-                        "metadata":        json.dumps({"cost_model": cost_config["cost_model"] if cost_config else "flat"}),
+                        "metadata":        json.dumps({"cost_model": cost_config["cost_model"] if cost_config else CostModel.FLAT}),
                     },
                 ).scalar_one()
             )
@@ -669,8 +670,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--since",    default="90d",   help="Janela de avaliação (ex: 90d).")
     parser.add_argument("--fp-cost",  type=float, required=True, help="Custo unitário de falso positivo.")
     parser.add_argument("--fn-cost",  type=float, required=True, help="Custo unitário de falso negativo.")
-    parser.add_argument("--type",     default="manual",
-                        choices=["monthly", "weekly", "manual", "backtest"],
+    parser.add_argument("--type",     default=EvaluationType.MANUAL,
+                        choices=[e.value for e in EvaluationType],
                         help="Tipo de avaliação.")
     parser.add_argument("--triggered-by", default="manual", help="Origem da execução.")
     parser.add_argument("--dry-run",  action="store_true", help="Simula sem gravar no banco.")
