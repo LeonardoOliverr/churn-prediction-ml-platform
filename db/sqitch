@@ -68,8 +68,11 @@ fi
 # Set HOME, since the user ID likely won't be the same as for the sqitch user.
 passopt+=(-e "HOME=${homedst}")
 
+# Aloca pseudo-TTY só quando stdin é um terminal (evita falha em CI/subprocess).
+[ -t 0 ] && TTY_FLAG="-t" || TTY_FLAG=""
+
 # Run the container with the current and home directories mounted.
-docker run -it --rm --network host \
+docker run -i $TTY_FLAG --rm --network host \
     --mount "type=bind,src=$(pwd),dst=/repo" \
     --mount "type=bind,src=$HOME,dst=$homedst" \
     "${passopt[@]}" "$SQITCH_IMAGE" "$@"

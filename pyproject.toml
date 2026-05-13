@@ -17,6 +17,7 @@ markers = [
     "smoke: testes de fumaça — fluxo mínimo end-to-end sem dependências externas",
     "schema: testes de estrutura — valida colunas, tipos e configuração de features",
     "api: testes de contrato da API — valida estrutura do JSON de resposta",
+    "integration: testes de integração — requerem PostgreSQL (churn_test) em execução",
 ]
 
 [tool.coverage.run]
