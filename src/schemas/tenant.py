@@ -3,20 +3,11 @@ Schemas dos endpoints de administração (tenants, projetos e API keys).
 """
 
 from datetime import datetime
-from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
-class Scope(str, Enum):
-    predict = "predict"
-    predictions_read = "predictions:read"
-
-
-class ModelRole(str, Enum):
-    champion = "champion"
-    challenger = "challenger"
+from domain.constants import ApiScope, ModelRole
 
 
 class TenantCreate(BaseModel):
@@ -87,8 +78,8 @@ class ApiKeyCreate(BaseModel):
         None,
         description="UUID do projeto. Se omitido, a key tem escopo de tenant e usa o nível 2 da cascade de modelo.",
     )
-    scopes: list[Scope] = Field(
-        [Scope.predict],
+    scopes: list[ApiScope] = Field(
+        [ApiScope.PREDICT],
         description=(
             "Escopos concedidos à key. Uma key pode ter um ou mais escopos simultaneamente.\n\n"
             "| Escopo | Endpoints liberados |\n"

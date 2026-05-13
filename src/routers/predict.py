@@ -18,6 +18,7 @@ from sqlalchemy.engine import Connection
 
 from ml.core.config import BOOL_FEATURES, CATEGORICAL_FEATURES, NUMERIC_FEATURES
 from ml.core.risk import classify_risk
+from domain.exceptions import BatchTooLargeError
 from src.config import Settings, get_settings
 from src.dependencies import _get_engine, get_current_api_key, get_db, require_scope
 from src.middleware.auth import ApiKeyRecord
@@ -213,14 +214,7 @@ def predict_batch(
     request.state.tenant_id = api_key.tenant_id
 
     if len(batch.customers) > settings.max_batch_size:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "error": "batch_too_large",
-                "message": f"Máximo de {settings.max_batch_size} clientes por requisição.",
-                "request_id": getattr(request.state, "request_id", "unknown"),
-            },
-        )
+        raise BatchTooLargeError(received=len(batch.customers), limit=settings.max_batch_size)
 
     if not batch.customers:
         raise HTTPException(

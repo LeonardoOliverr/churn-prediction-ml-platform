@@ -34,6 +34,7 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 from sqlalchemy import text
 
+from domain.constants import CostModel
 from ml.core.logger import get_logger
 from ml.data.preprocessing import _build_engine, _resolve_project_id, _resolve_tenant_id
 
@@ -92,13 +93,13 @@ def _compute_row_cost(
     Usa o modo configurado em cost_model_config quando disponível;
     cai para os valores flat do CLI como fallback.
     """
-    if config is None or config["cost_model"] == "flat":
+    if config is None or config["cost_model"] == CostModel.FLAT:
         return float(fp_cost_flat or 0), float(fn_cost_flat or 0)
 
     monthly = float(row.monthly_charges or 0)
     fp_cost  = monthly * float(config["fp_cost_months"]) * float(config["fp_cost_discount"])
 
-    if config["cost_model"] == "cltv":
+    if config["cost_model"] == CostModel.CLTV:
         fn_cost = float(row.cltv or 0) * float(config["fn_cost_cltv_multiplier"])
     else:  # monthly_charges
         fn_cost = monthly * float(config["fn_cost_months_multiplier"])
@@ -140,7 +141,7 @@ def _sweep(
     y_prob = np.array([float(r.churn_prob) for r in rows])
     y_true = np.array([bool(r.churned)     for r in rows], dtype=bool)
 
-    is_flat = config is None or config["cost_model"] == "flat"
+    is_flat = config is None or config["cost_model"] == CostModel.FLAT
 
     if not is_flat:
         costs = [_compute_row_cost(r, config, fp_cost_flat, fn_cost_flat) for r in rows]
@@ -190,22 +191,22 @@ def _format_sweep(
     best_f1   = max(rows, key=lambda r: r["f1"])
     n = rows[0]["tp"] + rows[0]["fp"] + rows[0]["fn"] + rows[0]["tn"]
 
-    cost_model = config["cost_model"] if config else "flat"
+    cost_model = config["cost_model"] if config else CostModel.FLAT
 
-    if cost_model == "flat":
+    if cost_model == CostModel.FLAT:
         fp_c = float(fp_cost_flat or 0)
         fn_c = float(fn_cost_flat or 0)
         bayes_str = f"Bayes ótimo: {_bayes_threshold(fp_c, fn_c):.3f}  |  " if fp_c + fn_c > 0 else ""
         cost_label = f"FP: R${fp_c:,.2f} (flat)  |  FN: R${fn_c:,.2f} (flat)  |  {bayes_str}"
-    elif cost_model == "cltv":
+    elif cost_model == CostModel.CLTV:
         cost_label = (
-            f"Modelo de custo: cltv  |  "
+            f"Modelo de custo: {CostModel.CLTV}  |  "
             f"FP = monthly_charges × {config['fp_cost_months']} × {config['fp_cost_discount']}  |  "
             f"FN = cltv × {config['fn_cost_cltv_multiplier']}  |  "
         )
     else:
         cost_label = (
-            f"Modelo de custo: monthly_charges  |  "
+            f"Modelo de custo: {CostModel.MONTHLY_CHARGES}  |  "
             f"FP = monthly_charges × {config['fp_cost_months']} × {config['fp_cost_discount']}  |  "
             f"FN = monthly_charges × {config['fn_cost_months_multiplier']}  |  "
         )
@@ -283,7 +284,7 @@ def optimize(
 
         config = dict(config_row) if config_row else None
 
-        if config is None or config["cost_model"] == "flat":
+        if config is None or config["cost_model"] == CostModel.FLAT:
             if fp_cost is None or fn_cost is None:
                 logger.error(
                     "cost_config_missing",

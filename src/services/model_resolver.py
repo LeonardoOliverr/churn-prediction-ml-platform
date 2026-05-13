@@ -14,8 +14,9 @@ from typing import Any, Optional
 
 import mlflow.sklearn
 import structlog
-from fastapi import HTTPException
 from sqlalchemy import text
+
+from domain.exceptions import ModelNotFoundError
 
 logger = structlog.get_logger()
 
@@ -89,18 +90,11 @@ _SQL_GLOBAL_MODEL = text("""
 """)
 
 
-def _model_not_found(tenant_id: str, project_id: Optional[str]) -> HTTPException:
-    """Cria erro padronizado quando não há modelo de produção configurado."""
-    return HTTPException(
-        status_code=404,
-        detail={
-            "error": "model_not_found",
-            "message": (
-                "Nenhum modelo aprovado em produção encontrado "
-                f"para tenant_id={tenant_id} e project_id={project_id}"
-            ),
-            "request_id": "unknown",
-        },
+def _model_not_found(tenant_id: str, project_id: Optional[str]) -> ModelNotFoundError:
+    """Cria erro de domínio quando não há modelo de produção configurado."""
+    return ModelNotFoundError(
+        f"Nenhum modelo aprovado em produção encontrado "
+        f"para tenant_id={tenant_id} e project_id={project_id}"
     )
 
 
