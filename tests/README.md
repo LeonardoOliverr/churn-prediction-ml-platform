@@ -15,7 +15,10 @@ tests/
 │   │   ├── test_predict_contract.py     # contrato JSON de POST /predict-churn
 │   │   ├── test_admin_model_config.py   # configuração de champion/challenger
 │   │   ├── test_model_resolver.py       # resolução de modelo ativo por tenant/projeto
-│   │   └── test_predict_champion_challenger.py  # roteamento de tráfego champion/challenger
+│   │   ├── test_predict_champion_challenger.py  # roteamento de tráfego champion/challenger
+│   │   ├── test_health_internals.py     # caminhos de erro de _check_database e _check_mlflow; 503
+│   │   ├── test_prediction_logger.py    # log_prediction_bg — insert e swallow de exceção
+│   │   └── test_common_schema.py        # ErrorResponse (src/schemas/common.py)
 │   ├── ml/
 │   │   ├── test_baseline.py             # DummyClassifier + Logistic Regression
 │   │   ├── test_config.py               # contrato de configuração de features
