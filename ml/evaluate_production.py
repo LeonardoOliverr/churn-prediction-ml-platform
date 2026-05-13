@@ -18,6 +18,7 @@ Uso:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 
@@ -42,21 +43,43 @@ logger = get_logger()
 
 _QUERY_EVAL = text("""
     SELECT
-        m.id        AS model_id,
-        m.name      AS model_name,
-        m.version   AS model_version,
+        m.id              AS model_id,
+        m.name            AS model_name,
+        m.version         AS model_version,
         p.churn_pred,
         p.churn_prob,
         p.threshold_used,
-        o.churned
+        o.churned,
+        c.cltv,
+        c.monthly_charges
     FROM churn.predictions p
-    JOIN churn.outcomes o ON o.prediction_id = p.id
-    JOIN churn.models   m ON m.id = p.model_id
+    JOIN churn.outcomes  o ON o.prediction_id = p.id
+    JOIN churn.models    m ON m.id = p.model_id
+    JOIN churn.customers c ON c.customer_id = p.customer_id
+                          AND c.project_id  = p.project_id
+                          AND c.tenant_id   = p.tenant_id
     WHERE p.tenant_id  = :tenant_id
       AND p.project_id = :project_id
       AND p.requested_at >= :period_start
       AND p.requested_at <  :period_end
     ORDER BY m.name, m.version, p.threshold_used
+""")
+
+_QUERY_COST_CONFIG = text("""
+    SELECT
+        cost_model,
+        fp_cost_flat,
+        fn_cost_flat,
+        fp_cost_months,
+        fp_cost_discount,
+        fn_cost_cltv_multiplier,
+        fn_cost_months_multiplier
+    FROM churn.cost_model_config
+    WHERE tenant_id  = :tenant_id
+      AND (project_id = :project_id OR project_id IS NULL)
+      AND is_active   = TRUE
+    ORDER BY project_id NULLS LAST
+    LIMIT 1
 """)
 
 _QUERY_MISSING_LABELS = text("""
@@ -190,6 +213,63 @@ def _compute_metrics(cm: dict[str, int]) -> dict[str, float]:
 def _compute_cost(cm: dict[str, int], fp_cost: float, fn_cost: float) -> float:
     """Calcula custo total: FP * custo_FP + FN * custo_FN."""
     return cm["fp"] * fp_cost + cm["fn"] * fn_cost
+
+
+def _compute_row_cost(
+    row: Any,
+    config: dict | None,
+    fp_cost_flat: float,
+    fn_cost_flat: float,
+) -> tuple[float, float]:
+    """Retorna (fp_unit_cost, fn_unit_cost) para um cliente específico.
+
+    Usa cost_model_config quando disponível; cai para os valores flat do CLI.
+    """
+    if config is None or config["cost_model"] == "flat":
+        return fp_cost_flat, fn_cost_flat
+
+    monthly = float(row.monthly_charges or 0)
+    fp_cost = monthly * float(config["fp_cost_months"]) * float(config["fp_cost_discount"])
+
+    if config["cost_model"] == "cltv":
+        fn_cost = float(row.cltv or 0) * float(config["fn_cost_cltv_multiplier"])
+    else:  # monthly_charges
+        fn_cost = monthly * float(config["fn_cost_months_multiplier"])
+
+    return fp_cost, fn_cost
+
+
+def _compute_cost_weighted(
+    rows: list[Any],
+    config: dict | None,
+    fp_cost_flat: float,
+    fn_cost_flat: float,
+) -> tuple[float, float, float]:
+    """Calcula custo total ponderado por cliente e custos médios efetivos de FP e FN.
+
+    Retorna (total_cost, avg_fp_cost, avg_fn_cost).
+    avg_fp_cost e avg_fn_cost são usados para persistir custos representativos no run.
+    """
+    total   = 0.0
+    fp_sum  = fn_sum = 0.0
+    fp_n    = fn_n   = 0
+
+    for row in rows:
+        fp_c, fn_c = _compute_row_cost(row, config, fp_cost_flat, fn_cost_flat)
+        pred   = bool(row.churn_pred)
+        actual = bool(row.churned)
+        if pred and not actual:
+            total  += fp_c
+            fp_sum += fp_c
+            fp_n   += 1
+        elif not pred and actual:
+            total  += fn_c
+            fn_sum += fn_c
+            fn_n   += 1
+
+    avg_fp = fp_sum / fp_n if fp_n > 0 else fp_cost_flat
+    avg_fn = fn_sum / fn_n if fn_n > 0 else fn_cost_flat
+    return total, avg_fp, avg_fn
 
 
 def _compute_roc_auc(rows: list[Any]) -> float | None:
@@ -381,6 +461,17 @@ def evaluate(
             )
             return []
 
+        cost_config_row = conn.execute(
+            _QUERY_COST_CONFIG,
+            {"tenant_id": tenant_id, "project_id": project_id},
+        ).mappings().first()
+        cost_config = dict(cost_config_row) if cost_config_row else None
+
+        if cost_config:
+            logger.info("cost_model_resolved", mode=cost_config["cost_model"], project=project_slug)
+        else:
+            logger.info("cost_model_resolved", mode="flat_cli", fp_cost=fp_cost, fn_cost=fn_cost)
+
         rows = conn.execute(
             _QUERY_EVAL,
             {"tenant_id": tenant_id, "project_id": project_id,
@@ -411,11 +502,11 @@ def evaluate(
             rows,
             key=lambda r: (r.model_id, r.model_name, r.model_version, r.threshold_used),
         ):
-            group   = list(group_rows)
-            cm      = _compute_confusion(group)
-            metrics = _compute_metrics(cm)
-            cost    = _compute_cost(cm, fp_cost, fn_cost)
-            roc_auc = _compute_roc_auc(group)
+            group              = list(group_rows)
+            cm                 = _compute_confusion(group)
+            metrics            = _compute_metrics(cm)
+            cost, avg_fp, avg_fn = _compute_cost_weighted(group, cost_config, fp_cost, fn_cost)
+            roc_auc            = _compute_roc_auc(group)
             derived = _compute_derived_rates(cm)
             risk    = _compute_risk_segmentation(group)
 
@@ -440,6 +531,9 @@ def evaluate(
                 "cm":                 cm,
                 "metrics":            metrics,
                 "cost":               cost,
+                "avg_fp_cost":        avg_fp,
+                "avg_fn_cost":        avg_fn,
+                "cost_model":         cost_config["cost_model"] if cost_config else "flat",
                 "roc_auc":            roc_auc,
                 "missing_labels":     missing_by_model.get(str(model_id), 0),
                 "cost_per_prediction": round(cost / total, 4) if total > 0 else None,
@@ -497,7 +591,7 @@ def evaluate(
                         "fp_cost":         fp_cost,
                         "fn_cost":         fn_cost,
                         "triggered_by":    triggered_by,
-                        "metadata":        None,
+                        "metadata":        json.dumps({"cost_model": cost_config["cost_model"] if cost_config else "flat"}),
                     },
                 ).scalar_one()
             )
@@ -523,8 +617,8 @@ def evaluate(
                         "recall":               r["metrics"]["recall"],
                         "f1":                   r["metrics"]["f1"],
                         "roc_auc":              r["roc_auc"],
-                        "fp_cost":              fp_cost,
-                        "fn_cost":              fn_cost,
+                        "fp_cost":              r["avg_fp_cost"],
+                        "fn_cost":              r["avg_fn_cost"],
                         "total_cost":           r["cost"],
                         "evaluated_predictions": r["total"],
                         "missing_actual_labels": r["missing_labels"],
