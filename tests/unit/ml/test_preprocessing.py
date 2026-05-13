@@ -211,3 +211,153 @@ def test_load_data_train_split_is_default():
                 load_data()
             except Exception as e:
                 assert "split deve ser" not in str(e)
+
+
+# ---------------------------------------------------------------------------
+# _resolve_tenant_id() e _resolve_project_id()
+# ---------------------------------------------------------------------------
+
+
+def test_build_engine_uses_env_vars():
+    """_build_engine() lê variáveis de ambiente e chama create_engine com a URL correta."""
+    from ml.data.preprocessing import _build_engine
+    from unittest.mock import patch, MagicMock
+    import os
+
+    env = {
+        "POSTGRES_USER": "churn_user",
+        "POSTGRES_PASSWORD": "churn_pass",
+        "POSTGRES_HOST": "localhost",
+        "POSTGRES_PORT": "5434",
+        "POSTGRES_DB": "churn_dev",
+    }
+    mock_engine = MagicMock()
+    with patch.dict(os.environ, env, clear=False), \
+         patch("ml.data.preprocessing.create_engine", return_value=mock_engine) as mock_ce:
+        engine = _build_engine()
+
+    assert engine is mock_engine
+    url = mock_ce.call_args[0][0]
+    assert "churn_user" in url
+    assert "churn_pass" in url
+    assert "churn_dev" in url
+    assert "5434" in url
+
+
+def test_resolve_tenant_id_with_slug_queries_by_slug():
+    """Com tenant_slug fornecido, executa query com parâmetro :s."""
+    from ml.data.preprocessing import _resolve_tenant_id
+    from unittest.mock import MagicMock
+
+    conn = MagicMock()
+    conn.execute.return_value.scalar_one.return_value = "tenant-uuid"
+
+    result = _resolve_tenant_id(conn, "ibm-telco")
+
+    assert result == "tenant-uuid"
+    call_params = conn.execute.call_args[0][1]
+    assert call_params["s"] == "ibm-telco"
+
+
+def test_resolve_tenant_id_without_slug_queries_first_tenant():
+    """Com tenant_slug=None, executa query sem filtro (LIMIT 1)."""
+    from ml.data.preprocessing import _resolve_tenant_id
+    from unittest.mock import MagicMock
+
+    conn = MagicMock()
+    conn.execute.return_value.scalar_one.return_value = "any-uuid"
+
+    result = _resolve_tenant_id(conn, None)
+
+    assert result == "any-uuid"
+    # chamada sem parâmetros extras (só o text SQL)
+    assert len(conn.execute.call_args[0]) == 1
+
+
+def test_resolve_project_id_queries_by_tenant_and_slug():
+    """_resolve_project_id passa tenant_id e slug na query."""
+    from ml.data.preprocessing import _resolve_project_id
+    from unittest.mock import MagicMock
+
+    conn = MagicMock()
+    conn.execute.return_value.scalar_one.return_value = "project-uuid"
+
+    result = _resolve_project_id(conn, "tenant-uuid", "telco-churn-2018")
+
+    assert result == "project-uuid"
+    call_params = conn.execute.call_args[0][1]
+    assert call_params["t"] == "tenant-uuid"
+    assert call_params["s"] == "telco-churn-2018"
+
+
+# ---------------------------------------------------------------------------
+# load_data() — branches com tenant_slug e project_slug
+# ---------------------------------------------------------------------------
+
+
+def _mock_load_engine(fake_df):
+    """Cria engine + conn mock prontos para load_data()."""
+    from unittest.mock import patch, MagicMock
+    mock_conn = MagicMock()
+    mock_conn.__enter__ = lambda s: s
+    mock_conn.__exit__ = MagicMock(return_value=False)
+    mock_conn.execute.return_value.scalar_one.return_value = "some-uuid"
+    return mock_conn
+
+
+def test_load_data_with_tenant_slug_only(fake_customers_df):
+    """tenant_slug sem project_slug usa branch intermediário (elif)."""
+    from ml.data.preprocessing import load_data
+    from unittest.mock import patch, MagicMock
+
+    mock_conn = _mock_load_engine(fake_customers_df)
+    with patch("ml.data.preprocessing._build_engine") as mock_engine_fn, \
+         patch("pandas.read_sql", return_value=fake_customers_df):
+        mock_engine_fn.return_value.connect.return_value = mock_conn
+        X, y = load_data(tenant_slug="ibm-telco", project_slug=None, split="train")
+
+    assert X is not None
+    assert len(y) > 0
+
+
+def test_load_data_with_tenant_and_project_slug(fake_customers_df):
+    """tenant_slug + project_slug usa branch completo (else)."""
+    from ml.data.preprocessing import load_data
+    from unittest.mock import patch, MagicMock
+
+    mock_conn = _mock_load_engine(fake_customers_df)
+    with patch("ml.data.preprocessing._build_engine") as mock_engine_fn, \
+         patch("pandas.read_sql", return_value=fake_customers_df):
+        mock_engine_fn.return_value.connect.return_value = mock_conn
+        X, y = load_data(tenant_slug="ibm-telco", project_slug="telco-churn-2018", split="train")
+
+    assert X is not None
+    assert len(y) > 0
+
+
+def test_load_data_with_tenant_slug_and_none_split(fake_customers_df):
+    """split=None com tenant_slug não filtra por split na query."""
+    from ml.data.preprocessing import load_data
+    from unittest.mock import patch, MagicMock
+
+    mock_conn = _mock_load_engine(fake_customers_df)
+    with patch("ml.data.preprocessing._build_engine") as mock_engine_fn, \
+         patch("pandas.read_sql", return_value=fake_customers_df):
+        mock_engine_fn.return_value.connect.return_value = mock_conn
+        X, y = load_data(tenant_slug="ibm-telco", project_slug=None, split=None)
+
+    assert X is not None
+
+
+def test_load_data_with_project_and_none_split(fake_customers_df):
+    """split=None com tenant+project não filtra por split na query."""
+    from ml.data.preprocessing import load_data
+    from unittest.mock import patch, MagicMock
+
+    mock_conn = _mock_load_engine(fake_customers_df)
+    with patch("ml.data.preprocessing._build_engine") as mock_engine_fn, \
+         patch("pandas.read_sql", return_value=fake_customers_df):
+        mock_engine_fn.return_value.connect.return_value = mock_conn
+        X, y = load_data(tenant_slug="ibm-telco", project_slug="telco-churn-2018", split=None)
+
+    assert X is not None
