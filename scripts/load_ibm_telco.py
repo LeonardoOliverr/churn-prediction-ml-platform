@@ -3,15 +3,15 @@ Baixa o dataset IBM Telco via kagglehub e faz bulk insert em churn.customers.
 Pré-requisito: sqitch deploy + psql -f db/seed/001_default_tenant.sql
 """
 
-import hashlib
 import os
 
 import kagglehub
 import pandas as pd
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 
 from core.logger import get_logger
+from ml.data.preprocessing import _build_engine
 
 load_dotenv()
 
@@ -71,19 +71,11 @@ def assign_split(customer_id: str, holdout_ratio: float = 0.3) -> str:
     Equivalente à expressão SQL na migration 14_holdout_evaluation:
         (('x' || md5(customer_id))::bit(32)::bigint + 2147483648)::numeric / 4294967296.0 < 0.3
     """
+    import hashlib
     digest = hashlib.md5(customer_id.encode()).hexdigest()
     val = int(digest[:8], 16)       # uint32: [0, 2^32-1]
     bucket = val / 4294967296.0     # [0.0, 1.0)
     return "holdout" if bucket < holdout_ratio else "train"
-
-
-def build_engine():
-    user     = os.environ["POSTGRES_USER"]
-    password = os.environ["POSTGRES_PASSWORD"]
-    host     = os.environ.get("POSTGRES_HOST", "localhost")
-    port     = os.environ.get("POSTGRES_PORT", "5432")
-    db       = os.environ["POSTGRES_DB"]
-    return create_engine(f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{db}")
 
 
 def fetch_dataset() -> pd.DataFrame:
@@ -147,7 +139,7 @@ def load(df: pd.DataFrame, engine, tenant_id: str, project_id: str):
 
 
 def main():
-    engine = build_engine()
+    engine = _build_engine()
     df_raw = fetch_dataset()
     df = transform(df_raw)
     tenant_id, project_id = resolve_ids(engine, TENANT_SLUG, PROJECT_SLUG)
