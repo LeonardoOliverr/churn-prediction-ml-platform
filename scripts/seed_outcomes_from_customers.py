@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from sqlalchemy import text
 
-from ml.core.logger import get_logger
+from core.logger import get_logger
 from ml.data.preprocessing import _build_engine, _resolve_project_id, _resolve_tenant_id
 
 logger = get_logger()

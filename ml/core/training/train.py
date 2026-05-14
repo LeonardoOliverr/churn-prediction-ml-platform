@@ -5,7 +5,7 @@ from __future__ import annotations
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 
-from ml.core.logger import get_logger
+from core.logger import get_logger
 from ml.core.model_spec import ModelSpec
 from ml.core.training.metrics import CV, SCORING, _compute_score, _cv_metrics
 from ml.data.preprocessing import build_preprocessor
