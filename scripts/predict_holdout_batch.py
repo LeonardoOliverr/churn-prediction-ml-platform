@@ -12,7 +12,7 @@ Uso:
 Pré-requisitos:
 - API em execução (docker compose up ou uvicorn)
 - Migration 14_holdout_evaluation aplicada (sqitch deploy)
-- Dataset carregado com split atribuído (python pipeline/load_ibm_telco.py)
+- Dataset carregado com split atribuído (python scripts/load_ibm_telco.py)
 """
 
 from __future__ import annotations

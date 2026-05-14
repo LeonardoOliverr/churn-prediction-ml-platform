@@ -113,7 +113,7 @@ O agente deve respeitar as seguintes regras:
 |---|---|
 | Infraestrutura (Docker + PostgreSQL + MLflow) | ✅ Completo |
 | Schema multi-tenant (Sqitch — migrations 00–18) | ✅ Completo |
-| Pipeline de ingestão (`pipeline/load_ibm_telco.py`) | ✅ Completo |
+| Pipeline de ingestão (`scripts/load_ibm_telco.py`) | ✅ Completo |
 | EDA (`notebooks/01_eda.ipynb`) | ✅ Completo |
 | Relatório de negócio (`notebooks/relatorio_negocio.md`) | ✅ Completo |
 | Treinamento baseline (`ml/`) — DummyClassifier + Logistic Regression | ✅ Completo |
@@ -134,7 +134,7 @@ O agente deve respeitar as seguintes regras:
 | `db/sqitch.conf` | Configuração do Sqitch (target: localhost:5434) |
 | `db/deploy/*.sql` | Migrations de schema (00–18) |
 | `db/seed/001_default_tenant.sql` | Seed de tenant e projeto padrão |
-| `pipeline/load_ibm_telco.py` | Carga do dataset IBM Telco |
+| `scripts/load_ibm_telco.py` | Carga do dataset IBM Telco |
 | `ml/evaluate_production.py` | Avalia predictions × outcomes, grava evaluation_run_results |
 | `scripts/seed_outcomes_from_customers.py` | Popula churn.outcomes com ground truth do holdout |
 | `scripts/predict_holdout_batch.py` | Envia clientes holdout para a API em lote |
