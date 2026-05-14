@@ -6,7 +6,6 @@ de Depends do FastAPI. Este módulo expõe apenas os tipos compartilhados.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 @dataclass
@@ -15,7 +14,7 @@ class ApiKeyRecord:
 
     id: str
     tenant_id: str
-    project_id: Optional[str]
+    project_id: str | None
     scopes: list[str]
     key_prefix: str
 

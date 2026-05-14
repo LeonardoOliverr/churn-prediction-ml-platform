@@ -16,14 +16,13 @@ import argparse
 import os
 import sys
 
-import numpy as np
 import pandas as pd
 
 # Raiz do projeto no path para imports absolutos
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from ml.config.settings import TARGET
 from core.logger import get_logger
+from ml.config.settings import TARGET
 from ml.data.preprocessing import build_preprocessor, load_data
 
 logger = get_logger()
@@ -51,16 +50,13 @@ def _get_feature_names(preprocessor) -> list[str]:
     if hasattr(preprocessor, "get_feature_names_out"):
         try:
             raw = preprocessor.get_feature_names_out()
-            return [
-                name.split("__", 1)[-1] if "__" in name else name
-                for name in raw.tolist()
-            ]
+            return [name.split("__", 1)[-1] if "__" in name else name for name in raw.tolist()]
         except Exception:
             pass
 
     names: list[str] = []
 
-    for name, transformer, cols in preprocessor.transformers_:
+    for _name, transformer, cols in preprocessor.transformers_:
         if transformer == "drop":
             continue
         if transformer == "passthrough":
@@ -99,7 +95,9 @@ def export(
     raw_df[TARGET] = y
     raw_path = os.path.join(output_dir, "features_raw.csv")
     raw_df.to_csv(raw_path, index=False)
-    logger.info("raw_csv_exported", path=raw_path, shape=list(raw_df.shape), columns=list(raw_df.columns))
+    logger.info(
+        "raw_csv_exported", path=raw_path, shape=list(raw_df.shape), columns=list(raw_df.columns)
+    )
 
     # ---- 2. Fit do preprocessor ----
     logger.info("preprocessor_fitting_started")
@@ -116,8 +114,8 @@ def export(
             f.write(f"{i:3d}  {name}\n")
 
     numeric_count = 3
-    bool_count    = 5
-    ohe_count     = len(feature_names) - numeric_count - bool_count
+    bool_count = 5
+    ohe_count = len(feature_names) - numeric_count - bool_count
     logger.info(
         "feature_names_exported",
         path=names_path,
@@ -128,8 +126,11 @@ def export(
     )
 
     # ---- 4. CSV transformado ----
-    cols = feature_names if len(feature_names) == X_transformed.shape[1] \
+    cols = (
+        feature_names
+        if len(feature_names) == X_transformed.shape[1]
         else [f"feat_{i}" for i in range(X_transformed.shape[1])]
+    )
 
     transformed_df = pd.DataFrame(X_transformed, columns=cols)
     transformed_df[TARGET] = y.values

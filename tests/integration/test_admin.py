@@ -10,7 +10,6 @@ Cobre:
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Tenants
 # ---------------------------------------------------------------------------
@@ -153,7 +152,9 @@ def test_configurar_champion(client, admin_headers, seed_tenant, seed_project, s
 
 
 @pytest.mark.integration
-def test_configurar_champion_modelo_inexistente_retorna_409(client, admin_headers, seed_tenant, seed_project):
+def test_configurar_champion_modelo_inexistente_retorna_409(
+    client, admin_headers, seed_tenant, seed_project
+):
     import uuid
 
     r = client.post(
@@ -174,10 +175,10 @@ def test_promover_challenger_a_champion(
     Configura um segundo modelo como challenger e o promove a champion.
     Verifica que o antigo champion foi desativado.
     """
-    from sqlalchemy import text
-
     # Cria segundo modelo aprovado para o challenger
     import uuid
+
+    from sqlalchemy import text
 
     model2_id = str(uuid.uuid4())
     db_conn.execute(

@@ -35,8 +35,12 @@ def test_resolve_model_without_challenger_serves_champion():
     champion = _record("champion-id", "champion")
     pipeline = object()
 
-    with patch("src.services.model_resolver._query_serving_candidates", return_value=(champion, None)), \
-         patch("src.services.model_resolver.mlflow.sklearn.load_model", return_value=pipeline):
+    with (
+        patch(
+            "src.services.model_resolver._query_serving_candidates", return_value=(champion, None)
+        ),
+        patch("src.services.model_resolver.mlflow.sklearn.load_model", return_value=pipeline),
+    ):
         resolved_pipeline, threshold, record = model_resolver.resolve_model(
             tenant_id="tenant-1",
             project_id="project-1",
@@ -56,9 +60,14 @@ def test_resolve_model_routes_to_challenger_when_bucket_is_inside_split():
     champion = _record("champion-id", "champion")
     challenger = _record("challenger-id", "challenger", split=0.2)
 
-    with patch("src.services.model_resolver._query_serving_candidates", return_value=(champion, challenger)), \
-         patch("src.services.model_resolver._traffic_bucket", return_value=0.1), \
-         patch("src.services.model_resolver.mlflow.sklearn.load_model", return_value=object()):
+    with (
+        patch(
+            "src.services.model_resolver._query_serving_candidates",
+            return_value=(champion, challenger),
+        ),
+        patch("src.services.model_resolver._traffic_bucket", return_value=0.1),
+        patch("src.services.model_resolver.mlflow.sklearn.load_model", return_value=object()),
+    ):
         _, _, record = model_resolver.resolve_model(
             tenant_id="tenant-1",
             project_id="project-1",
@@ -85,12 +94,23 @@ def test_cache_key_separates_champion_and_challenger():
     champion = _record("champion-id", "champion")
     challenger = _record("challenger-id", "challenger", split=0.2)
 
-    with patch("src.services.model_resolver._query_serving_candidates", return_value=(champion, challenger)), \
-         patch("src.services.model_resolver.mlflow.sklearn.load_model", return_value=object()) as mock_load:
+    with (
+        patch(
+            "src.services.model_resolver._query_serving_candidates",
+            return_value=(champion, challenger),
+        ),
+        patch(
+            "src.services.model_resolver.mlflow.sklearn.load_model", return_value=object()
+        ) as mock_load,
+    ):
         with patch("src.services.model_resolver._traffic_bucket", return_value=0.9):
-            model_resolver.resolve_model("tenant-1", "project-1", object(), settings, customer_id="A")
+            model_resolver.resolve_model(
+                "tenant-1", "project-1", object(), settings, customer_id="A"
+            )
         with patch("src.services.model_resolver._traffic_bucket", return_value=0.1):
-            model_resolver.resolve_model("tenant-1", "project-1", object(), settings, customer_id="B")
+            model_resolver.resolve_model(
+                "tenant-1", "project-1", object(), settings, customer_id="B"
+            )
 
     assert mock_load.call_count == 2
     assert ("tenant-1", "project-1", "champion", "champion-id") in model_resolver._cache
@@ -153,8 +173,14 @@ def test_cache_hit_within_ttl_skips_mlflow():
     champion = _record("champion-id", "champion")
     pipeline = object()
 
-    with patch("src.services.model_resolver._query_serving_candidates", return_value=(champion, None)), \
-         patch("src.services.model_resolver.mlflow.sklearn.load_model", return_value=pipeline) as mock_load:
+    with (
+        patch(
+            "src.services.model_resolver._query_serving_candidates", return_value=(champion, None)
+        ),
+        patch(
+            "src.services.model_resolver.mlflow.sklearn.load_model", return_value=pipeline
+        ) as mock_load,
+    ):
         model_resolver.resolve_model("tenant-1", "project-1", object(), settings)
         model_resolver.resolve_model("tenant-1", "project-1", object(), settings)
 
@@ -166,8 +192,14 @@ def test_cache_expired_reloads_from_mlflow():
     settings = SimpleNamespace(model_cache_ttl_seconds=0)
     champion = _record("champion-id", "champion")
 
-    with patch("src.services.model_resolver._query_serving_candidates", return_value=(champion, None)), \
-         patch("src.services.model_resolver.mlflow.sklearn.load_model", return_value=object()) as mock_load:
+    with (
+        patch(
+            "src.services.model_resolver._query_serving_candidates", return_value=(champion, None)
+        ),
+        patch(
+            "src.services.model_resolver.mlflow.sklearn.load_model", return_value=object()
+        ) as mock_load,
+    ):
         model_resolver.resolve_model("tenant-t", "project-p", object(), settings)
         model_resolver.resolve_model("tenant-t", "project-p", object(), settings)
 
@@ -211,8 +243,12 @@ def test_query_serving_candidates_uses_tenant_scope_when_no_project():
     def _tenant_by_role(tenant_id, role, db):
         return champion if role == "champion" else None
 
-    with patch("src.services.model_resolver._query_tenant_model_by_role", side_effect=_tenant_by_role) as mock_tenant, \
-         patch("src.services.model_resolver._query_project_model_by_role") as mock_project:
+    with (
+        patch(
+            "src.services.model_resolver._query_tenant_model_by_role", side_effect=_tenant_by_role
+        ) as mock_tenant,
+        patch("src.services.model_resolver._query_project_model_by_role") as mock_project,
+    ):
         champ, chal = model_resolver._query_serving_candidates("tenant-1", None, MagicMock())
 
     mock_tenant.assert_called()
@@ -225,8 +261,10 @@ def test_query_serving_candidates_falls_back_to_global_when_no_tenant_champion()
     """Quando champion de tenant não existe, usa _query_global_model como fallback."""
     global_champ = _record("global-id", "champion")
 
-    with patch("src.services.model_resolver._query_tenant_model_by_role", return_value=None), \
-         patch("src.services.model_resolver._query_global_model", return_value=global_champ):
+    with (
+        patch("src.services.model_resolver._query_tenant_model_by_role", return_value=None),
+        patch("src.services.model_resolver._query_global_model", return_value=global_champ),
+    ):
         champ, _ = model_resolver._query_serving_candidates("tenant-1", None, MagicMock())
 
     assert champ["id"] == "global-id"
@@ -270,7 +308,9 @@ def test_choose_for_customer_no_challenger_returns_champion_tuple():
     """Sem challenger carregado, retorna a tupla de champion."""
     champion_loaded = (object(), 0.5, _record("champion-id", "champion"))
 
-    result = model_resolver.choose_for_customer("tenant-1", "project-1", "CUST-1", champion_loaded, None)
+    result = model_resolver.choose_for_customer(
+        "tenant-1", "project-1", "CUST-1", champion_loaded, None
+    )
 
     assert result is champion_loaded
 
@@ -311,8 +351,15 @@ def test_resolve_batch_models_loads_both_champion_and_challenger():
     champion = _record("champion-id", "champion")
     challenger = _record("challenger-id", "challenger", split=0.2)
 
-    with patch("src.services.model_resolver._query_serving_candidates", return_value=(champion, challenger)), \
-         patch("src.services.model_resolver.mlflow.sklearn.load_model", return_value=object()) as mock_load:
+    with (
+        patch(
+            "src.services.model_resolver._query_serving_candidates",
+            return_value=(champion, challenger),
+        ),
+        patch(
+            "src.services.model_resolver.mlflow.sklearn.load_model", return_value=object()
+        ) as mock_load,
+    ):
         champ_t, chal_t = model_resolver.resolve_batch_models(
             "tenant-1", "project-1", object(), settings
         )
@@ -328,8 +375,12 @@ def test_resolve_batch_models_returns_none_challenger_when_absent():
     settings = SimpleNamespace(model_cache_ttl_seconds=300)
     champion = _record("champion-id", "champion")
 
-    with patch("src.services.model_resolver._query_serving_candidates", return_value=(champion, None)), \
-         patch("src.services.model_resolver.mlflow.sklearn.load_model", return_value=object()):
+    with (
+        patch(
+            "src.services.model_resolver._query_serving_candidates", return_value=(champion, None)
+        ),
+        patch("src.services.model_resolver.mlflow.sklearn.load_model", return_value=object()),
+    ):
         champ_t, chal_t = model_resolver.resolve_batch_models(
             "tenant-1", "project-1", object(), settings
         )
@@ -349,7 +400,10 @@ def test_cache_eviction_when_max_size_exceeded():
 
     for i in range(model_resolver._MAX_CACHE_SIZE):
         model_resolver._cache[(f"tenant-evict-{i}", None, "champion", f"m{i}")] = (
-            object(), 0.5, {}, time.time()
+            object(),
+            0.5,
+            {},
+            time.time(),
         )
 
     assert len(model_resolver._cache) == model_resolver._MAX_CACHE_SIZE
@@ -358,8 +412,13 @@ def test_cache_eviction_when_max_size_exceeded():
     new_champion["tenant_id"] = "tenant-new"
     new_champion["project_id"] = "project-new"
 
-    with patch("src.services.model_resolver._query_serving_candidates", return_value=(new_champion, None)), \
-         patch("src.services.model_resolver.mlflow.sklearn.load_model", return_value=object()):
+    with (
+        patch(
+            "src.services.model_resolver._query_serving_candidates",
+            return_value=(new_champion, None),
+        ),
+        patch("src.services.model_resolver.mlflow.sklearn.load_model", return_value=object()),
+    ):
         model_resolver.resolve_model("tenant-new", "project-new", object(), settings)
 
     assert len(model_resolver._cache) == model_resolver._MAX_CACHE_SIZE

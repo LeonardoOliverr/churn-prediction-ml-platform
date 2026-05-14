@@ -47,9 +47,7 @@ def compare_results(
     )
     best_candidate = candidates[best_index]
     secondary_candidates = [
-        candidate
-        for index, candidate in enumerate(candidates)
-        if index != best_index
+        candidate for index, candidate in enumerate(candidates) if index != best_index
     ]
     status_by_model = {
         candidate.spec.name: "approved" if index == best_index else "trained"

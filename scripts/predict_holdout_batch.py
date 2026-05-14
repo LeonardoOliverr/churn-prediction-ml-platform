@@ -73,26 +73,26 @@ _QUERY_HOLDOUT_WITHOUT_PREDICTIONS = text("""
 def _row_to_payload(row) -> dict:
     """Converte linha do banco em dict compatível com CustomerFeatures."""
     return {
-        "customer_id":      row.customer_id,
-        "tenure_months":    float(row.tenure_months or 0),
-        "monthly_charges":  float(row.monthly_charges or 0),
-        "total_charges":    float(row.total_charges or 0),
-        "senior_citizen":   int(bool(row.senior_citizen)),
-        "partner":          int(bool(row.partner)),
-        "dependents":       int(bool(row.dependents)),
-        "phone_service":    int(bool(row.phone_service)),
-        "paperless_billing":int(bool(row.paperless_billing)),
-        "gender":           row.gender or "Male",
-        "multiple_lines":   row.multiple_lines or "No",
+        "customer_id": row.customer_id,
+        "tenure_months": float(row.tenure_months or 0),
+        "monthly_charges": float(row.monthly_charges or 0),
+        "total_charges": float(row.total_charges or 0),
+        "senior_citizen": int(bool(row.senior_citizen)),
+        "partner": int(bool(row.partner)),
+        "dependents": int(bool(row.dependents)),
+        "phone_service": int(bool(row.phone_service)),
+        "paperless_billing": int(bool(row.paperless_billing)),
+        "gender": row.gender or "Male",
+        "multiple_lines": row.multiple_lines or "No",
         "internet_service": row.internet_service or "No",
-        "online_security":  row.online_security or "No",
-        "online_backup":    row.online_backup or "No",
-        "device_protection":row.device_protection or "No",
-        "tech_support":     row.tech_support or "No",
-        "streaming_tv":     row.streaming_tv or "No",
+        "online_security": row.online_security or "No",
+        "online_backup": row.online_backup or "No",
+        "device_protection": row.device_protection or "No",
+        "tech_support": row.tech_support or "No",
+        "streaming_tv": row.streaming_tv or "No",
         "streaming_movies": row.streaming_movies or "No",
-        "contract":         row.contract or "Month-to-month",
-        "payment_method":   row.payment_method or "Electronic check",
+        "contract": row.contract or "Month-to-month",
+        "payment_method": row.payment_method or "Electronic check",
     }
 
 
@@ -128,7 +128,7 @@ def predict_holdout_batch(
     engine = _build_engine()
 
     with engine.connect() as conn:
-        tenant_id  = _resolve_tenant_id(conn, tenant_slug)
+        tenant_id = _resolve_tenant_id(conn, tenant_slug)
         project_id = _resolve_project_id(conn, tenant_id, project_slug)
         rows = conn.execute(
             _QUERY_HOLDOUT_WITHOUT_PREDICTIONS,
@@ -152,7 +152,7 @@ def predict_holdout_batch(
             "predict_skipped",
             reason="dry_run",
             would_predict=total_candidates,
-            batches=-(- total_candidates // batch_size),
+            batches=-(-total_candidates // batch_size),
         )
         return total_candidates
 
@@ -198,12 +198,16 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Predições em lote para clientes holdout sem predição registrada."
     )
-    parser.add_argument("--tenant",     required=True,               help="Slug do tenant.")
-    parser.add_argument("--project",    required=True,               help="Slug do projeto.")
-    parser.add_argument("--api-key",    default=os.getenv("API_KEY"), help="API key com escopo 'predict'.")
-    parser.add_argument("--api-url",    default="http://localhost:8000", help="URL base da API.")
-    parser.add_argument("--batch-size", type=int, default=100,        help="Clientes por requisição (máx. 100).")
-    parser.add_argument("--dry-run",    action="store_true",          help="Simula sem enviar requests.")
+    parser.add_argument("--tenant", required=True, help="Slug do tenant.")
+    parser.add_argument("--project", required=True, help="Slug do projeto.")
+    parser.add_argument(
+        "--api-key", default=os.getenv("API_KEY"), help="API key com escopo 'predict'."
+    )
+    parser.add_argument("--api-url", default="http://localhost:8000", help="URL base da API.")
+    parser.add_argument(
+        "--batch-size", type=int, default=100, help="Clientes por requisição (máx. 100)."
+    )
+    parser.add_argument("--dry-run", action="store_true", help="Simula sem enviar requests.")
     return parser.parse_args()
 
 
@@ -211,7 +215,9 @@ def main() -> None:
     args = _parse_args()
 
     if not args.api_key:
-        logger.error("api_key_missing", hint="Use --api-key ou defina a variável de ambiente API_KEY.")
+        logger.error(
+            "api_key_missing", hint="Use --api-key ou defina a variável de ambiente API_KEY."
+        )
         sys.exit(1)
 
     if args.batch_size > 100:

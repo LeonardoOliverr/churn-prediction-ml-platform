@@ -26,23 +26,23 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 import mlflow
 
-from ml.config.settings import MLFLOW_TRACKING_URI
 from core.logger import get_logger
+from ml.config.settings import MLFLOW_TRACKING_URI
 
 logger = get_logger()
 
 
 METRICS = ["f1_mean", "roc_auc_mean", "recall_mean", "precision_mean"]
 METRIC_LABELS = {
-    "f1_mean":        "F1",
-    "roc_auc_mean":   "ROC-AUC",
-    "recall_mean":    "Recall",
+    "f1_mean": "F1",
+    "roc_auc_mean": "ROC-AUC",
+    "recall_mean": "Recall",
     "precision_mean": "Precision",
 }
 THRESHOLDS = {
-    "f1_mean":      0.68,
+    "f1_mean": 0.68,
     "roc_auc_mean": 0.88,
-    "recall_mean":  0.82,
+    "recall_mean": 0.82,
 }
 MODEL_ORDER = {
     "Dummy Stratified": 1,
@@ -59,10 +59,24 @@ MODEL_ORDER = {
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Compara modelos treinados no MLflow.")
     parser.add_argument("--tenant", required=True, help="Slug do tenant.")
-    parser.add_argument("--project", default=None, help="Slug do projeto. Omitir para ver todos os projetos do tenant.")
-    parser.add_argument("--output", default=None, help="Caminho para salvar o PNG principal. Se omitido, exibe na tela.")
-    parser.add_argument("--xy-output", default=None, help="Caminho para salvar o gráfico Precision x Recall.")
-    parser.add_argument("--decision-output", default=None, help="Caminho para salvar o mapa de decisão F1 x ROC-AUC.")
+    parser.add_argument(
+        "--project",
+        default=None,
+        help="Slug do projeto. Omitir para ver todos os projetos do tenant.",
+    )
+    parser.add_argument(
+        "--output",
+        default=None,
+        help="Caminho para salvar o PNG principal. Se omitido, exibe na tela.",
+    )
+    parser.add_argument(
+        "--xy-output", default=None, help="Caminho para salvar o gráfico Precision x Recall."
+    )
+    parser.add_argument(
+        "--decision-output",
+        default=None,
+        help="Caminho para salvar o mapa de decisão F1 x ROC-AUC.",
+    )
     return parser.parse_args()
 
 
@@ -98,26 +112,30 @@ def _load_best_runs(tenant: str, project: str | None) -> pd.DataFrame:
             model_name = _model_label(run, experiment.name)
             run_f1 = run.data.metrics.get("f1_mean", float("-inf"))
             current = best_by_model.get(model_name)
-            current_f1 = current.data.metrics.get("f1_mean", float("-inf")) if current else float("-inf")
+            current_f1 = (
+                current.data.metrics.get("f1_mean", float("-inf")) if current else float("-inf")
+            )
 
             if current is None or run_f1 > current_f1:
                 best_by_model[model_name] = run
 
         for model_name, run in best_by_model.items():
             metrics = run.data.metrics
-            rows.append({
-                "model":              model_name,
-                "order":              MODEL_ORDER.get(model_name, 99),
-                "experiment":         experiment.name,
-                "run_id":             run.info.run_id,
-                "f1_mean":            metrics.get("f1_mean", float("nan")),
-                "f1_std":             metrics.get("f1_std", 0.0),
-                "roc_auc_mean":       metrics.get("roc_auc_mean", float("nan")),
-                "recall_mean":        metrics.get("recall_mean", float("nan")),
-                "precision_mean":     metrics.get("precision_mean", float("nan")),
-                "train_f1_mean":      metrics.get("train_f1_mean", float("nan")),
-                "train_roc_auc_mean": metrics.get("train_roc_auc_mean", float("nan")),
-            })
+            rows.append(
+                {
+                    "model": model_name,
+                    "order": MODEL_ORDER.get(model_name, 99),
+                    "experiment": experiment.name,
+                    "run_id": run.info.run_id,
+                    "f1_mean": metrics.get("f1_mean", float("nan")),
+                    "f1_std": metrics.get("f1_std", 0.0),
+                    "roc_auc_mean": metrics.get("roc_auc_mean", float("nan")),
+                    "recall_mean": metrics.get("recall_mean", float("nan")),
+                    "precision_mean": metrics.get("precision_mean", float("nan")),
+                    "train_f1_mean": metrics.get("train_f1_mean", float("nan")),
+                    "train_roc_auc_mean": metrics.get("train_roc_auc_mean", float("nan")),
+                }
+            )
 
     return _line_df(pd.DataFrame(rows))
 
@@ -127,7 +145,9 @@ def _line_df(df: pd.DataFrame) -> pd.DataFrame:
     return df.sort_values(["order", "f1_mean"], ascending=[True, False]).reset_index(drop=True)
 
 
-def _derived_outputs(output: str | None, xy_output: str | None, decision_output: str | None) -> tuple[str | None, str | None]:
+def _derived_outputs(
+    output: str | None, xy_output: str | None, decision_output: str | None
+) -> tuple[str | None, str | None]:
     """Define os nomes dos gráficos extras a partir do PNG principal."""
     if not output:
         return xy_output, decision_output
@@ -168,10 +188,12 @@ def _plot(df: pd.DataFrame, output: str | None) -> None:
     offsets = [-1.5, -0.5, 0.5, 1.5]
     bar_colors = ["#4C72B0", "#55A868", "#C44E52", "#8172B2"]
 
-    for metric, offset, color in zip(METRICS, offsets, bar_colors):
+    for metric, offset, color in zip(METRICS, offsets, bar_colors, strict=False):
         values = df[metric].tolist()
-        bars = ax.bar(x + offset * width, values, width, label=METRIC_LABELS[metric], color=color, alpha=0.85)
-        for bar, value in zip(bars, values):
+        bars = ax.bar(
+            x + offset * width, values, width, label=METRIC_LABELS[metric], color=color, alpha=0.85
+        )
+        for bar, value in zip(bars, values, strict=False):
             if not np.isnan(value):
                 ax.text(
                     bar.get_x() + bar.get_width() / 2,
@@ -182,7 +204,11 @@ def _plot(df: pd.DataFrame, output: str | None) -> None:
                     fontsize=7,
                 )
 
-    for metric, color in [("f1_mean", "#4C72B0"), ("roc_auc_mean", "#55A868"), ("recall_mean", "#C44E52")]:
+    for metric, color in [
+        ("f1_mean", "#4C72B0"),
+        ("roc_auc_mean", "#55A868"),
+        ("recall_mean", "#C44E52"),
+    ]:
         ax.axhline(THRESHOLDS[metric], color=color, linestyle="--", linewidth=0.8, alpha=0.6)
 
     ax.set_xticks(x)
@@ -200,11 +226,19 @@ def _plot(df: pd.DataFrame, output: str | None) -> None:
     ax.bar(x - 0.2, train_f1, 0.4, label="Treino", color="#E8A838", alpha=0.85)
     ax.bar(x + 0.2, test_f1, 0.4, label="Teste", color="#4C72B0", alpha=0.85)
 
-    for index, (train_value, test_value) in enumerate(zip(train_f1, test_f1)):
+    for index, (train_value, test_value) in enumerate(zip(train_f1, test_f1, strict=False)):
         if not np.isnan(train_value) and not np.isnan(test_value):
             gap = train_value - test_value
             color = "#C44E52" if gap > 0.10 else "#55A868"
-            ax.text(index, max(train_value, test_value) + 0.015, f"gap={gap:+.2f}", ha="center", fontsize=8, color=color, fontweight="bold")
+            ax.text(
+                index,
+                max(train_value, test_value) + 0.015,
+                f"gap={gap:+.2f}",
+                ha="center",
+                fontsize=8,
+                color=color,
+                fontweight="bold",
+            )
 
     ax.axhline(0.10, color="gray", linestyle=":", linewidth=0.8, alpha=0.5)
     ax.set_xticks(x)
@@ -228,13 +262,15 @@ def _plot(df: pd.DataFrame, output: str | None) -> None:
             and (not np.isnan(roc_auc) and roc_auc > THRESHOLDS["roc_auc_mean"])
             and (not np.isnan(recall) and recall > THRESHOLDS["recall_mean"])
         )
-        table_data.append([
-            row["model"],
-            f"{f1:.4f}" if not np.isnan(f1) else "—",
-            f"{roc_auc:.4f}" if not np.isnan(roc_auc) else "—",
-            f"{recall:.4f}" if not np.isnan(recall) else "—",
-            "✅ Sim" if approved else "❌ Não",
-        ])
+        table_data.append(
+            [
+                row["model"],
+                f"{f1:.4f}" if not np.isnan(f1) else "—",
+                f"{roc_auc:.4f}" if not np.isnan(roc_auc) else "—",
+                f"{recall:.4f}" if not np.isnan(recall) else "—",
+                "✅ Sim" if approved else "❌ Não",
+            ]
+        )
 
     table = ax.table(
         cellText=table_data,
@@ -287,7 +323,9 @@ def _plot_precision_recall(df: pd.DataFrame, output: str | None) -> None:
             fontsize=8,
         )
 
-    ax.axvline(THRESHOLDS["recall_mean"], color="#C44E52", linestyle="--", linewidth=1.0, alpha=0.75)
+    ax.axvline(
+        THRESHOLDS["recall_mean"], color="#C44E52", linestyle="--", linewidth=1.0, alpha=0.75
+    )
     ax.set_title("Tradeoff Precision x Recall")
     ax.set_xlabel("Recall")
     ax.set_ylabel("Precision")
@@ -311,7 +349,9 @@ def _plot_decision_map(df: pd.DataFrame, output: str | None) -> None:
     y = plot_df["f1_mean"].to_numpy()
     recall = plot_df["recall_mean"].to_numpy()
 
-    ax.axvline(THRESHOLDS["roc_auc_mean"], color="#55A868", linestyle="--", linewidth=1.0, alpha=0.8)
+    ax.axvline(
+        THRESHOLDS["roc_auc_mean"], color="#55A868", linestyle="--", linewidth=1.0, alpha=0.8
+    )
     ax.axhline(THRESHOLDS["f1_mean"], color="#4C72B0", linestyle="--", linewidth=1.0, alpha=0.8)
     ax.fill_between(
         [THRESHOLDS["roc_auc_mean"], 1],
@@ -369,7 +409,9 @@ def main() -> None:
     logger.info(
         "models_found",
         count=len(df),
-        report=df[["model", "f1_mean", "roc_auc_mean", "recall_mean", "precision_mean", "train_f1_mean"]].to_string(index=False),
+        report=df[
+            ["model", "f1_mean", "roc_auc_mean", "recall_mean", "precision_mean", "train_f1_mean"]
+        ].to_string(index=False),
     )
 
     _plot(df, args.output)

@@ -26,14 +26,14 @@ from src.schemas.tenant import (
     ApiKeyCreate,
     ApiKeyRecord,
     ApiKeyResponse,
-    ChampionModelConfigure,
     ChallengerModelConfigure,
+    ChampionModelConfigure,
     ModelDeactivationRequest,
     ModelPromotionRequest,
+    ProjectCreate,
     ProjectModelConfigListResponse,
     ProjectModelConfigRecord,
     ProjectModelConfigResponse,
-    ProjectCreate,
     ProjectResponse,
     TenantCreate,
     TenantResponse,
@@ -59,7 +59,11 @@ def _generate_api_key() -> tuple[str, str]:
 _ADMIN_RESPONSES = {
     401: {
         "description": "JWT ausente, expirado ou com assinatura inválida.",
-        "content": {"application/json": {"example": {"error": "unauthorized", "message": "Token inválido ou expirado."}}},
+        "content": {
+            "application/json": {
+                "example": {"error": "unauthorized", "message": "Token inválido ou expirado."}
+            }
+        },
     },
 }
 
@@ -76,14 +80,18 @@ def _conflict(message: str) -> HTTPException:
 
 def _get_project(db: Connection, project_id: str) -> dict:
     """Busca projeto e tenant para validar escopo de configuração."""
-    row = db.execute(
-        text("""
+    row = (
+        db.execute(
+            text("""
             SELECT p.id, p.tenant_id, p.name, p.slug
             FROM churn.projects p
             WHERE p.id = :project_id
         """),
-        {"project_id": project_id},
-    ).mappings().first()
+            {"project_id": project_id},
+        )
+        .mappings()
+        .first()
+    )
     if not row:
         raise ProjectNotFoundError(project_id)
     return dict(row)
@@ -91,14 +99,18 @@ def _get_project(db: Connection, project_id: str) -> dict:
 
 def _get_tenant(db: Connection, tenant_id: str) -> dict:
     """Busca tenant para validar escopo de configuração."""
-    row = db.execute(
-        text("""
+    row = (
+        db.execute(
+            text("""
             SELECT id, name, slug
             FROM churn.tenants
             WHERE id = :tenant_id
         """),
-        {"tenant_id": tenant_id},
-    ).mappings().first()
+            {"tenant_id": tenant_id},
+        )
+        .mappings()
+        .first()
+    )
     if not row:
         raise TenantNotFoundError(tenant_id)
     return dict(row)
@@ -106,14 +118,18 @@ def _get_tenant(db: Connection, tenant_id: str) -> dict:
 
 def _get_model(db: Connection, model_id: str) -> dict:
     """Busca modelo no catálogo técnico."""
-    row = db.execute(
-        text("""
+    row = (
+        db.execute(
+            text("""
             SELECT id, tenant_id, project_id, name, version, scope, status
             FROM churn.models
             WHERE id = :model_id
         """),
-        {"model_id": model_id},
-    ).mappings().first()
+            {"model_id": model_id},
+        )
+        .mappings()
+        .first()
+    )
     if not row:
         raise ModelNotFoundError(f"Modelo não encontrado: {model_id!r}")
     return dict(row)
@@ -136,7 +152,11 @@ def _validate_model_for_scope(
         return model
     if scope == "tenant" and str(model["tenant_id"]) == str(tenant_id):
         return model
-    if project_id is not None and scope == "project" and str(model["project_id"]) == str(project_id):
+    if (
+        project_id is not None
+        and scope == "project"
+        and str(model["project_id"]) == str(project_id)
+    ):
         return model
 
     raise _conflict("Modelo não é compatível com o tenant/projeto informado.")
@@ -174,8 +194,9 @@ def _record_from_row(row) -> ProjectModelConfigRecord:
 
 def _select_config(db: Connection, config_id: str) -> ProjectModelConfigRecord:
     """Busca uma configuração pelo ID para resposta da API."""
-    row = db.execute(
-        text("""
+    row = (
+        db.execute(
+            text("""
             SELECT
                 pmc.id, pmc.tenant_id, pmc.project_id, pmc.model_id,
                 pmc.threshold, pmc.is_active, pmc.configured_at,
@@ -187,8 +208,11 @@ def _select_config(db: Connection, config_id: str) -> ProjectModelConfigRecord:
             JOIN churn.models m ON m.id = pmc.model_id
             WHERE pmc.id = :config_id
         """),
-        {"config_id": config_id},
-    ).mappings().first()
+            {"config_id": config_id},
+        )
+        .mappings()
+        .first()
+    )
     if not row:
         raise _not_found("Configuração de modelo não encontrada.")
     return _record_from_row(row)
@@ -196,8 +220,9 @@ def _select_config(db: Connection, config_id: str) -> ProjectModelConfigRecord:
 
 def _active_config_by_role(db: Connection, tenant_id: str, project_id: str | None, role: str):
     """Busca configuração ativa por papel operacional."""
-    return db.execute(
-        text("""
+    return (
+        db.execute(
+            text("""
             SELECT id, model_id, role
             FROM churn.project_model_config
             WHERE tenant_id = :tenant_id
@@ -208,14 +233,18 @@ def _active_config_by_role(db: Connection, tenant_id: str, project_id: str | Non
             ORDER BY configured_at DESC, id DESC
             LIMIT 1
         """),
-        {"tenant_id": tenant_id, "project_id": project_id, "role": role},
-    ).mappings().first()
+            {"tenant_id": tenant_id, "project_id": project_id, "role": role},
+        )
+        .mappings()
+        .first()
+    )
 
 
 def _active_config_by_model(db: Connection, tenant_id: str, project_id: str | None, model_id: str):
     """Busca configuração ativa de um modelo no projeto."""
-    return db.execute(
-        text("""
+    return (
+        db.execute(
+            text("""
             SELECT id, model_id, role
             FROM churn.project_model_config
             WHERE tenant_id = :tenant_id
@@ -226,8 +255,11 @@ def _active_config_by_model(db: Connection, tenant_id: str, project_id: str | No
             ORDER BY configured_at DESC, id DESC
             LIMIT 1
         """),
-        {"tenant_id": tenant_id, "project_id": project_id, "model_id": model_id},
-    ).mappings().first()
+            {"tenant_id": tenant_id, "project_id": project_id, "model_id": model_id},
+        )
+        .mappings()
+        .first()
+    )
 
 
 def _deactivate_role(db: Connection, tenant_id: str, project_id: str | None, role: str) -> None:
@@ -288,8 +320,9 @@ def _upsert_model_config(
     description: str | None,
 ) -> ProjectModelConfigRecord:
     """Cria ou reativa a configuração operacional de um modelo."""
-    row = db.execute(
-        text("""
+    row = (
+        db.execute(
+            text("""
             INSERT INTO churn.project_model_config
                 (tenant_id, project_id, model_id, threshold, is_active,
                  configured_at, configured_by, description, activation_reason,
@@ -315,18 +348,21 @@ def _upsert_model_config(
                 updated_at = NOW()
             RETURNING id
         """),
-        {
-            "tenant_id": tenant_id,
-            "project_id": project_id,
-            "model_id": model_id,
-            "threshold": threshold,
-            "configured_by": configured_by,
-            "description": description,
-            "activation_reason": activation_reason,
-            "role": role,
-            "traffic_split": traffic_split,
-        },
-    ).mappings().first()
+            {
+                "tenant_id": tenant_id,
+                "project_id": project_id,
+                "model_id": model_id,
+                "threshold": threshold,
+                "configured_by": configured_by,
+                "description": description,
+                "activation_reason": activation_reason,
+                "role": role,
+                "traffic_split": traffic_split,
+            },
+        )
+        .mappings()
+        .first()
+    )
     return _select_config(db, str(row["id"]))
 
 
@@ -336,8 +372,9 @@ def _list_model_config(
     project_id: str | None,
 ) -> ProjectModelConfigListResponse:
     """Lista champion, challenger e histórico recente de um escopo."""
-    rows = db.execute(
-        text("""
+    rows = (
+        db.execute(
+            text("""
             SELECT
                 pmc.id, pmc.tenant_id, pmc.project_id, pmc.model_id,
                 pmc.threshold, pmc.is_active, pmc.configured_at,
@@ -353,12 +390,19 @@ def _list_model_config(
             ORDER BY pmc.is_active DESC, pmc.configured_at DESC, pmc.id DESC
             LIMIT 20
         """),
-        {"tenant_id": tenant_id, "project_id": project_id},
-    ).mappings().all()
+            {"tenant_id": tenant_id, "project_id": project_id},
+        )
+        .mappings()
+        .all()
+    )
 
     records = [_record_from_row(row) for row in rows]
-    champion = next((record for record in records if record.is_active and record.role == "champion"), None)
-    challenger = next((record for record in records if record.is_active and record.role == "challenger"), None)
+    champion = next(
+        (record for record in records if record.is_active and record.role == "champion"), None
+    )
+    challenger = next(
+        (record for record in records if record.is_active and record.role == "challenger"), None
+    )
     return ProjectModelConfigListResponse(champion=champion, challenger=challenger, history=records)
 
 
@@ -401,7 +445,9 @@ def _configure_challenger_for_scope(
 
     active = _active_config_by_model(db, tenant_id, project_id, payload.model_id)
     if active and active["role"] == "champion":
-        raise _conflict("O champion ativo nÃ£o pode ser configurado simultaneamente como challenger.")
+        raise _conflict(
+            "O champion ativo nÃ£o pode ser configurado simultaneamente como challenger."
+        )
 
     _deactivate_role(db, tenant_id, project_id, "challenger")
     config = _upsert_model_config(
@@ -435,8 +481,9 @@ def _promote_challenger_for_scope(
         raise _conflict("O modelo informado nÃ£o Ã© o challenger ativo deste escopo.")
 
     _deactivate_role(db, tenant_id, project_id, "champion")
-    row = db.execute(
-        text("""
+    row = (
+        db.execute(
+            text("""
             UPDATE churn.project_model_config
             SET
                 role = 'champion',
@@ -448,8 +495,15 @@ def _promote_challenger_for_scope(
             WHERE id = :config_id
             RETURNING id
         """),
-        {"config_id": str(challenger["id"]), "reason": payload.activation_reason, "configured_by": admin.sub},
-    ).mappings().first()
+            {
+                "config_id": str(challenger["id"]),
+                "reason": payload.activation_reason,
+                "configured_by": admin.sub,
+            },
+        )
+        .mappings()
+        .first()
+    )
 
     config = _select_config(db, str(row["id"]))
     db.commit()
@@ -483,7 +537,9 @@ def _deactivate_model_for_scope(
     if payload.replacement_model_id == model_id:
         raise _conflict("replacement_model_id deve ser diferente do champion atual.")
 
-    replacement_model = _validate_model_for_scope(db, tenant_id, project_id, payload.replacement_model_id)
+    replacement_model = _validate_model_for_scope(
+        db, tenant_id, project_id, payload.replacement_model_id
+    )
     current_config = _select_config(db, str(active["id"]))
     _deactivate_model_config(db, tenant_id, project_id, model_id, payload.reason)
     replacement = _upsert_model_config(
@@ -503,7 +559,9 @@ def _deactivate_model_for_scope(
     return ProjectModelConfigResponse(config=replacement)
 
 
-def _resolve_admin_model_scope(db: Connection, tenant_id: str, project_id: str | None) -> tuple[str, str | None]:
+def _resolve_admin_model_scope(
+    db: Connection, tenant_id: str, project_id: str | None
+) -> tuple[str, str | None]:
     """Valida tenant e, se informado, projeto pertencente ao tenant."""
     _get_tenant(db, tenant_id)
     if project_id is None:
@@ -526,7 +584,11 @@ def _resolve_admin_model_scope(db: Connection, tenant_id: str, project_id: str |
         **_ADMIN_RESPONSES,
         409: {
             "description": "Slug já existe.",
-            "content": {"application/json": {"example": {"error": "conflict", "message": "Slug 'ibm-telco' já existe."}}},
+            "content": {
+                "application/json": {
+                    "example": {"error": "conflict", "message": "Slug 'ibm-telco' já existe."}
+                }
+            },
         },
     },
 )
@@ -536,18 +598,25 @@ def create_tenant(
     admin: AdminClaims = Depends(get_current_admin),
 ) -> TenantResponse:
     """Cria um novo tenant. Requer JWT de admin."""
-    row = db.execute(
-        text("""
+    row = (
+        db.execute(
+            text("""
             INSERT INTO churn.tenants (name, slug)
             VALUES (:name, :slug)
             ON CONFLICT (slug) DO NOTHING
             RETURNING id, name, slug
         """),
-        {"name": payload.name, "slug": payload.slug},
-    ).mappings().first()
+            {"name": payload.name, "slug": payload.slug},
+        )
+        .mappings()
+        .first()
+    )
 
     if not row:
-        raise HTTPException(status_code=409, detail={"error": "conflict", "message": f"Slug '{payload.slug}' já existe."})
+        raise HTTPException(
+            status_code=409,
+            detail={"error": "conflict", "message": f"Slug '{payload.slug}' já existe."},
+        )
 
     db.commit()
     logger.info("tenant_created", slug=payload.slug, by=admin.sub)
@@ -568,7 +637,10 @@ def create_tenant(
             "description": "Slug já existe neste tenant.",
             "content": {
                 "application/json": {
-                    "example": {"error": "conflict", "message": "Slug 'telco-churn-2018' já existe neste tenant."}
+                    "example": {
+                        "error": "conflict",
+                        "message": "Slug 'telco-churn-2018' já existe neste tenant.",
+                    }
                 }
             },
         },
@@ -580,22 +652,34 @@ def create_project(
     admin: AdminClaims = Depends(get_current_admin),
 ) -> ProjectResponse:
     """Cria um novo projeto dentro de um tenant. Requer JWT de admin."""
-    row = db.execute(
-        text("""
+    row = (
+        db.execute(
+            text("""
             INSERT INTO churn.projects (tenant_id, name, slug)
             VALUES (:tenant_id, :name, :slug)
             ON CONFLICT (tenant_id, slug) DO NOTHING
             RETURNING id, tenant_id, name, slug
         """),
-        {"tenant_id": payload.tenant_id, "name": payload.name, "slug": payload.slug},
-    ).mappings().first()
+            {"tenant_id": payload.tenant_id, "name": payload.name, "slug": payload.slug},
+        )
+        .mappings()
+        .first()
+    )
 
     if not row:
-        raise HTTPException(status_code=409, detail={"error": "conflict", "message": f"Slug '{payload.slug}' já existe neste tenant."})
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "conflict",
+                "message": f"Slug '{payload.slug}' já existe neste tenant.",
+            },
+        )
 
     db.commit()
     logger.info("project_created", slug=payload.slug, tenant_id=payload.tenant_id, by=admin.sub)
-    return ProjectResponse(id=str(row["id"]), tenant_id=str(row["tenant_id"]), name=row["name"], slug=row["slug"])
+    return ProjectResponse(
+        id=str(row["id"]), tenant_id=str(row["tenant_id"]), name=row["name"], slug=row["slug"]
+    )
 
 
 @router.post(
@@ -623,24 +707,30 @@ def create_api_key(
 ) -> ApiKeyResponse:
     """Gera uma nova API key. O secret é retornado apenas nesta resposta."""
     full_key, prefix = _generate_api_key()
-    key_hash = bcrypt.hashpw(full_key.encode(), bcrypt.gensalt(rounds=settings.bcrypt_rounds)).decode()
+    key_hash = bcrypt.hashpw(
+        full_key.encode(), bcrypt.gensalt(rounds=settings.bcrypt_rounds)
+    ).decode()
 
-    row = db.execute(
-        text("""
+    row = (
+        db.execute(
+            text("""
             INSERT INTO churn.api_keys (tenant_id, project_id, key_prefix, key_hash, scopes, description, expires_at)
             VALUES (:tenant_id, :project_id, :key_prefix, :key_hash, :scopes, :description, :expires_at)
             RETURNING id, tenant_id, project_id, key_prefix, scopes, expires_at
         """),
-        {
-            "tenant_id":   payload.tenant_id,
-            "project_id":  payload.project_id,
-            "key_prefix":  prefix,
-            "key_hash":    key_hash,
-            "scopes":      payload.scopes,
-            "description": payload.description,
-            "expires_at":  payload.expires_at,
-        },
-    ).mappings().first()
+            {
+                "tenant_id": payload.tenant_id,
+                "project_id": payload.project_id,
+                "key_prefix": prefix,
+                "key_hash": key_hash,
+                "scopes": payload.scopes,
+                "description": payload.description,
+                "expires_at": payload.expires_at,
+            },
+        )
+        .mappings()
+        .first()
+    )
 
     db.commit()
     logger.info("api_key_created", prefix=prefix, tenant_id=payload.tenant_id, by=admin.sub)
@@ -666,7 +756,11 @@ def create_api_key(
         **_ADMIN_RESPONSES,
         404: {
             "description": "API key não encontrada.",
-            "content": {"application/json": {"example": {"error": "not_found", "message": "API key não encontrada."}}},
+            "content": {
+                "application/json": {
+                    "example": {"error": "not_found", "message": "API key não encontrada."}
+                }
+            },
         },
     },
 )
@@ -676,13 +770,19 @@ def revoke_api_key(
     admin: AdminClaims = Depends(get_current_admin),
 ):
     """Desativa uma API key pelo ID. Requer JWT de admin."""
-    result = db.execute(
-        text("UPDATE churn.api_keys SET is_active = FALSE WHERE id = :id RETURNING id"),
-        {"id": key_id},
-    ).mappings().first()
+    result = (
+        db.execute(
+            text("UPDATE churn.api_keys SET is_active = FALSE WHERE id = :id RETURNING id"),
+            {"id": key_id},
+        )
+        .mappings()
+        .first()
+    )
 
     if not result:
-        raise HTTPException(status_code=404, detail={"error": "not_found", "message": "API key não encontrada."})
+        raise HTTPException(
+            status_code=404, detail={"error": "not_found", "message": "API key não encontrada."}
+        )
 
     db.commit()
     logger.info("api_key_revoked", key_id=key_id, by=admin.sub)
@@ -705,15 +805,19 @@ def list_api_keys(
     admin: AdminClaims = Depends(get_current_admin),
 ) -> list[ApiKeyRecord]:
     """Lista todas as API keys de um tenant. Requer JWT de admin."""
-    rows = db.execute(
-        text("""
+    rows = (
+        db.execute(
+            text("""
             SELECT id, key_prefix, tenant_id, project_id, scopes, is_active, created_at, expires_at, last_used_at
             FROM churn.api_keys
             WHERE tenant_id = :tenant_id
             ORDER BY created_at DESC
         """),
-        {"tenant_id": tenant_id},
-    ).mappings().all()
+            {"tenant_id": tenant_id},
+        )
+        .mappings()
+        .all()
+    )
 
     return [
         ApiKeyRecord(
@@ -748,7 +852,9 @@ def list_tenant_model_config(
 ) -> ProjectModelConfigListResponse:
     """Lista champion, challenger e historico recente do tenant ou projeto."""
     tenant_id, project_id = _resolve_admin_model_scope(db, tenant_id, project_id)
-    logger.info("tenant_model_config_listed", tenant_id=tenant_id, project_id=project_id, by=admin.sub)
+    logger.info(
+        "tenant_model_config_listed", tenant_id=tenant_id, project_id=project_id, by=admin.sub
+    )
     return _list_model_config(db, tenant_id, project_id)
 
 
@@ -770,7 +876,13 @@ def configure_tenant_champion(
 ) -> ProjectModelConfigResponse:
     """Ativa um modelo aprovado como champion do tenant ou projeto."""
     tenant_id, project_id = _resolve_admin_model_scope(db, tenant_id, project_id)
-    logger.info("tenant_champion_configured", tenant_id=tenant_id, project_id=project_id, model_id=payload.model_id, by=admin.sub)
+    logger.info(
+        "tenant_champion_configured",
+        tenant_id=tenant_id,
+        project_id=project_id,
+        model_id=payload.model_id,
+        by=admin.sub,
+    )
     return _configure_champion_for_scope(db, admin, tenant_id, project_id, payload)
 
 
@@ -822,7 +934,13 @@ def promote_tenant_challenger(
 ) -> ProjectModelConfigResponse:
     """Promove o challenger ativo do tenant ou projeto para champion."""
     tenant_id, project_id = _resolve_admin_model_scope(db, tenant_id, project_id)
-    logger.info("tenant_challenger_promoted", tenant_id=tenant_id, project_id=project_id, model_id=model_id, by=admin.sub)
+    logger.info(
+        "tenant_challenger_promoted",
+        tenant_id=tenant_id,
+        project_id=project_id,
+        model_id=model_id,
+        by=admin.sub,
+    )
     return _promote_challenger_for_scope(db, admin, tenant_id, project_id, model_id, payload)
 
 
@@ -845,7 +963,13 @@ def deactivate_tenant_model_config(
 ) -> ProjectModelConfigResponse:
     """Desativa challenger ou substitui champion do tenant ou projeto."""
     tenant_id, project_id = _resolve_admin_model_scope(db, tenant_id, project_id)
-    logger.info("tenant_model_config_deactivated", tenant_id=tenant_id, project_id=project_id, model_id=model_id, by=admin.sub)
+    logger.info(
+        "tenant_model_config_deactivated",
+        tenant_id=tenant_id,
+        project_id=project_id,
+        model_id=model_id,
+        by=admin.sub,
+    )
     return _deactivate_model_for_scope(db, admin, tenant_id, project_id, model_id, payload)
 
 
@@ -865,8 +989,9 @@ def list_project_model_config(
     project = _get_project(db, project_id)
     logger.info("project_model_config_listed", project_id=project_id, by=admin.sub)
     return _list_model_config(db, str(project["tenant_id"]), project_id)
-    rows = db.execute(
-        text("""
+    rows = (
+        db.execute(
+            text("""
             SELECT
                 pmc.id, pmc.tenant_id, pmc.project_id, pmc.model_id,
                 pmc.threshold, pmc.is_active, pmc.configured_at,
@@ -881,12 +1006,19 @@ def list_project_model_config(
             ORDER BY pmc.is_active DESC, pmc.configured_at DESC, pmc.id DESC
             LIMIT 20
         """),
-        {"project_id": project_id},
-    ).mappings().all()
+            {"project_id": project_id},
+        )
+        .mappings()
+        .all()
+    )
 
     records = [_record_from_row(row) for row in rows]
-    champion = next((record for record in records if record.is_active and record.role == "champion"), None)
-    challenger = next((record for record in records if record.is_active and record.role == "challenger"), None)
+    champion = next(
+        (record for record in records if record.is_active and record.role == "champion"), None
+    )
+    challenger = next(
+        (record for record in records if record.is_active and record.role == "challenger"), None
+    )
     logger.info("project_model_config_listed", project_id=project_id, by=admin.sub)
     return ProjectModelConfigListResponse(champion=champion, challenger=challenger, history=records)
 
@@ -906,7 +1038,9 @@ def configure_champion(
 ) -> ProjectModelConfigResponse:
     """Ativa um modelo aprovado como champion do projeto."""
     project = _get_project(db, project_id)
-    logger.info("champion_configured", project_id=project_id, model_id=payload.model_id, by=admin.sub)
+    logger.info(
+        "champion_configured", project_id=project_id, model_id=payload.model_id, by=admin.sub
+    )
     return _configure_champion_for_scope(db, admin, str(project["tenant_id"]), project_id, payload)
 
     _validate_model_for_project(db, project, payload.model_id)
@@ -925,7 +1059,9 @@ def configure_champion(
     )
     db.commit()
     invalidate_model_cache(str(project["tenant_id"]), project_id)
-    logger.info("champion_configured", project_id=project_id, model_id=payload.model_id, by=admin.sub)
+    logger.info(
+        "champion_configured", project_id=project_id, model_id=payload.model_id, by=admin.sub
+    )
     return ProjectModelConfigResponse(config=config)
 
 
@@ -951,13 +1087,17 @@ def configure_challenger(
         traffic_split=payload.traffic_split,
         by=admin.sub,
     )
-    return _configure_challenger_for_scope(db, admin, str(project["tenant_id"]), project_id, payload)
+    return _configure_challenger_for_scope(
+        db, admin, str(project["tenant_id"]), project_id, payload
+    )
 
     _validate_model_for_project(db, project, payload.model_id)
 
     active = _active_config_by_model(db, project_id, payload.model_id)
     if active and active["role"] == "champion":
-        raise _conflict("O champion ativo não pode ser configurado simultaneamente como challenger.")
+        raise _conflict(
+            "O champion ativo não pode ser configurado simultaneamente como challenger."
+        )
 
     _deactivate_role(db, project_id, "challenger")
     config = _upsert_model_config(
@@ -1000,15 +1140,18 @@ def promote_challenger(
     """Promove o challenger ativo para champion."""
     project = _get_project(db, project_id)
     logger.info("challenger_promoted", project_id=project_id, model_id=model_id, by=admin.sub)
-    return _promote_challenger_for_scope(db, admin, str(project["tenant_id"]), project_id, model_id, payload)
+    return _promote_challenger_for_scope(
+        db, admin, str(project["tenant_id"]), project_id, model_id, payload
+    )
 
     challenger = _active_config_by_model(db, project_id, model_id)
     if not challenger or challenger["role"] != "challenger":
         raise _conflict("O modelo informado não é o challenger ativo do projeto.")
 
     _deactivate_role(db, project_id, "champion")
-    row = db.execute(
-        text("""
+    row = (
+        db.execute(
+            text("""
             UPDATE churn.project_model_config
             SET
                 role = 'champion',
@@ -1020,8 +1163,15 @@ def promote_challenger(
             WHERE id = :config_id
             RETURNING id
         """),
-        {"config_id": str(challenger["id"]), "reason": payload.activation_reason, "configured_by": admin.sub},
-    ).mappings().first()
+            {
+                "config_id": str(challenger["id"]),
+                "reason": payload.activation_reason,
+                "configured_by": admin.sub,
+            },
+        )
+        .mappings()
+        .first()
+    )
 
     config = _select_config(db, str(row["id"]))
     db.commit()
@@ -1047,7 +1197,9 @@ def deactivate_model_config(
     """Desativa challenger ou substitui champion por outro modelo aprovado."""
     project = _get_project(db, project_id)
     logger.info("model_config_deactivated", project_id=project_id, model_id=model_id, by=admin.sub)
-    return _deactivate_model_for_scope(db, admin, str(project["tenant_id"]), project_id, model_id, payload)
+    return _deactivate_model_for_scope(
+        db, admin, str(project["tenant_id"]), project_id, model_id, payload
+    )
 
     active = _active_config_by_model(db, project_id, model_id)
     if not active:
@@ -1058,7 +1210,9 @@ def deactivate_model_config(
         config = _select_config(db, str(active["id"]))
         db.commit()
         invalidate_model_cache(str(project["tenant_id"]), project_id)
-        logger.info("challenger_deactivated", project_id=project_id, model_id=model_id, by=admin.sub)
+        logger.info(
+            "challenger_deactivated", project_id=project_id, model_id=model_id, by=admin.sub
+        )
         return ProjectModelConfigResponse(config=config)
 
     if payload.replacement_model_id is None:

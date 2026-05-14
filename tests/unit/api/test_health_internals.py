@@ -9,12 +9,10 @@ Cobre os ramos `except` que os testes de integração não alcançam:
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 from fastapi.testclient import TestClient
 
 from src.routers.health import _check_database, _check_mlflow
 from src.schemas.health import CheckResult
-
 
 # ---------------------------------------------------------------------------
 # _check_database
@@ -78,8 +76,8 @@ def test_check_mlflow_strips_trailing_slash():
 
 def test_health_ready_returns_503_when_all_checks_fail():
     """503 é retornado e status é 'degraded' quando banco e MLflow falham."""
-    from src.main import app
     from src.dependencies import get_db
+    from src.main import app
 
     error_check = CheckResult(status="error", latency_ms=None)
 
@@ -88,8 +86,10 @@ def test_health_ready_returns_503_when_all_checks_fail():
 
     app.dependency_overrides[get_db] = _fake_db
     try:
-        with patch("src.routers.health._check_database", return_value=error_check), \
-             patch("src.routers.health._check_mlflow", return_value=error_check):
+        with (
+            patch("src.routers.health._check_database", return_value=error_check),
+            patch("src.routers.health._check_mlflow", return_value=error_check),
+        ):
             with TestClient(app, raise_server_exceptions=False) as client:
                 r = client.get("/health/ready")
     finally:
@@ -104,8 +104,8 @@ def test_health_ready_returns_503_when_all_checks_fail():
 
 def test_health_ready_degraded_checks_have_null_latency():
     """Checks com erro reportam latency_ms nulo."""
-    from src.main import app
     from src.dependencies import get_db
+    from src.main import app
 
     error_check = CheckResult(status="error", latency_ms=None)
 
@@ -114,8 +114,10 @@ def test_health_ready_degraded_checks_have_null_latency():
 
     app.dependency_overrides[get_db] = _fake_db
     try:
-        with patch("src.routers.health._check_database", return_value=error_check), \
-             patch("src.routers.health._check_mlflow", return_value=error_check):
+        with (
+            patch("src.routers.health._check_database", return_value=error_check),
+            patch("src.routers.health._check_mlflow", return_value=error_check),
+        ):
             with TestClient(app, raise_server_exceptions=False) as client:
                 r = client.get("/health/ready")
     finally:
@@ -128,8 +130,8 @@ def test_health_ready_degraded_checks_have_null_latency():
 
 def test_health_ready_returns_200_when_all_checks_ok():
     """200 é retornado quando todos os checks passam."""
-    from src.main import app
     from src.dependencies import get_db
+    from src.main import app
 
     ok_check = CheckResult(status="ok", latency_ms=5)
 
@@ -138,8 +140,10 @@ def test_health_ready_returns_200_when_all_checks_ok():
 
     app.dependency_overrides[get_db] = _fake_db
     try:
-        with patch("src.routers.health._check_database", return_value=ok_check), \
-             patch("src.routers.health._check_mlflow", return_value=ok_check):
+        with (
+            patch("src.routers.health._check_database", return_value=ok_check),
+            patch("src.routers.health._check_mlflow", return_value=ok_check),
+        ):
             with TestClient(app, raise_server_exceptions=False) as client:
                 r = client.get("/health/ready")
     finally:

@@ -20,7 +20,6 @@ import pytest
 
 from domain.constants import RiskLevel
 
-
 # ---------------------------------------------------------------------------
 # Definição do contrato
 # ---------------------------------------------------------------------------
@@ -45,9 +44,7 @@ def _validate_predict_response(response: dict) -> None:
     valores permitidos para risk_level e prediction.
     """
     for field, expected_type in PREDICT_RESPONSE_CONTRACT.items():
-        assert field in response, (
-            f"Campo obrigatório ausente na resposta: '{field}'"
-        )
+        assert field in response, f"Campo obrigatório ausente na resposta: '{field}'"
         assert isinstance(response[field], expected_type), (
             f"Campo '{field}': esperado {expected_type.__name__}, "
             f"recebido {type(response[field]).__name__}"
@@ -57,12 +54,10 @@ def _validate_predict_response(response: dict) -> None:
         f"churn_probability fora do intervalo [0, 1]: {response['churn_probability']}"
     )
     assert response["risk_level"] in VALID_RISK_LEVELS, (
-        f"risk_level inválido: '{response['risk_level']}'. "
-        f"Esperado: {VALID_RISK_LEVELS}"
+        f"risk_level inválido: '{response['risk_level']}'. Esperado: {VALID_RISK_LEVELS}"
     )
     assert response["prediction"] in VALID_PREDICTIONS, (
-        f"prediction inválida: '{response['prediction']}'. "
-        f"Esperado: {VALID_PREDICTIONS}"
+        f"prediction inválida: '{response['prediction']}'. Esperado: {VALID_PREDICTIONS}"
     )
 
 

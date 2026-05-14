@@ -4,8 +4,9 @@ Define o contrato declarativo de um modelo de ML para uso no pipeline unificado 
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from sklearn.base import BaseEstimator

@@ -41,11 +41,22 @@ Retorna o histórico **paginado** de predições realizadas pelo tenant/projeto 
     responses={
         401: {
             "description": "API key ausente, inválida ou revogada.",
-            "content": {"application/json": {"example": {"error": "unauthorized", "message": "API key inválida ou revogada."}}},
+            "content": {
+                "application/json": {
+                    "example": {"error": "unauthorized", "message": "API key inválida ou revogada."}
+                }
+            },
         },
         403: {
             "description": "Escopo insuficiente.",
-            "content": {"application/json": {"example": {"error": "forbidden", "message": "Escopo 'predictions:read' requerido."}}},
+            "content": {
+                "application/json": {
+                    "example": {
+                        "error": "forbidden",
+                        "message": "Escopo 'predictions:read' requerido.",
+                    }
+                }
+            },
         },
     },
 )
@@ -64,8 +75,9 @@ def list_predictions(
         project_filter = "AND project_id = :project_id"
         filters["project_id"] = api_key.project_id
 
-    rows = db.execute(
-        text(f"""
+    rows = (
+        db.execute(
+            text(f"""
             SELECT id, customer_id, churn_prob AS churn_probability, churn_pred,
                    threshold_used, latency_ms, requested_at, model_id
             FROM churn.predictions
@@ -74,18 +86,25 @@ def list_predictions(
             ORDER BY requested_at DESC
             LIMIT :limit OFFSET :offset
         """),
-        {**filters, "limit": page_size, "offset": offset},
-    ).mappings().all()
+            {**filters, "limit": page_size, "offset": offset},
+        )
+        .mappings()
+        .all()
+    )
 
-    total_row = db.execute(
-        text(f"""
+    total_row = (
+        db.execute(
+            text(f"""
             SELECT COUNT(*) AS total
             FROM churn.predictions
             WHERE tenant_id = :tenant_id
             {project_filter}
         """),
-        filters,
-    ).mappings().first()
+            filters,
+        )
+        .mappings()
+        .first()
+    )
 
     items = [
         PredictionRecord(

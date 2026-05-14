@@ -11,20 +11,25 @@ Inclui:
 
 import argparse
 import sys
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import MagicMock, patch
 
 from ml.config.settings import TARGET
 
-
 _FAKE_METRICS = {
-    "f1_mean": 0.71, "f1_std": 0.0,
-    "roc_auc_mean": 0.90, "roc_auc_std": 0.0,
-    "recall_mean": 0.83, "recall_std": 0.0,
-    "precision_mean": 0.63, "precision_std": 0.0,
-    "train_f1_mean": 0.98, "train_roc_auc_mean": 0.99,
-    "train_recall_mean": 0.97, "train_precision_mean": 0.98,
+    "f1_mean": 0.71,
+    "f1_std": 0.0,
+    "roc_auc_mean": 0.90,
+    "roc_auc_std": 0.0,
+    "recall_mean": 0.83,
+    "recall_std": 0.0,
+    "precision_mean": 0.63,
+    "precision_std": 0.0,
+    "train_f1_mean": 0.98,
+    "train_roc_auc_mean": 0.99,
+    "train_recall_mean": 0.97,
+    "train_precision_mean": 0.98,
 }
 
 
@@ -215,16 +220,19 @@ def test_derive_scope_project():
 
 def test_db_name_global_baseline():
     from ml.train import _db_name
+
     assert _db_name("logistic_regression") == "logistic-regression"
 
 
 def test_db_name_global_rf():
     from ml.train import _db_name
+
     assert _db_name("random_forest") == "random-forest"
 
 
 def test_db_name_project_rf():
     from ml.train import _db_name
+
     assert _db_name("random_forest") == "random-forest"
 
 
@@ -316,17 +324,27 @@ def test_main_dry_run_does_not_call_log_to_mlflow(fake_customers_df):
     from ml.train import main
 
     fake_args = argparse.Namespace(
-        model="random_forest", tenant=None, project=None, dry_run=True,
-        holdout_size=0.2, n_estimators=500, max_depth=None,
+        model="random_forest",
+        tenant=None,
+        project=None,
+        dry_run=True,
+        holdout_size=0.2,
+        n_estimators=500,
+        max_depth=None,
     )
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
 
-    with patch("ml.train._parse_args", return_value=fake_args), \
-         patch("ml.train.load_data", return_value=(X, y)), \
-         patch("ml.train.train_with_cv", return_value={"pipeline": MagicMock(), "metrics": _FAKE_METRICS}), \
-         patch("ml.train.log_to_mlflow") as mock_log, \
-         patch("ml.train.register_in_db"):
+    with (
+        patch("ml.train._parse_args", return_value=fake_args),
+        patch("ml.train.load_data", return_value=(X, y)),
+        patch(
+            "ml.train.train_with_cv",
+            return_value={"pipeline": MagicMock(), "metrics": _FAKE_METRICS},
+        ),
+        patch("ml.train.log_to_mlflow") as mock_log,
+        patch("ml.train.register_in_db"),
+    ):
         main()
 
     mock_log.assert_not_called()
@@ -337,19 +355,29 @@ def test_main_not_dry_run_calls_log_to_mlflow(fake_customers_df):
     from ml.train import main
 
     fake_args = argparse.Namespace(
-        model="random_forest", tenant=None, project=None, dry_run=False,
-        holdout_size=0.2, n_estimators=500, max_depth=None,
+        model="random_forest",
+        tenant=None,
+        project=None,
+        dry_run=False,
+        holdout_size=0.2,
+        n_estimators=500,
+        max_depth=None,
     )
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
 
-    with patch("ml.train._parse_args", return_value=fake_args), \
-         patch("ml.train.load_data", return_value=(X, y)), \
-         patch("ml.train.train_with_cv", return_value={"pipeline": MagicMock(), "metrics": _FAKE_METRICS}), \
-         patch("ml.train.log_to_mlflow", return_value="run-id") as mock_log, \
-         patch("ml.train.register_in_db"), \
-         patch("ml.train.mlflow.set_tracking_uri"), \
-         patch("ml.train.mlflow.set_experiment"):
+    with (
+        patch("ml.train._parse_args", return_value=fake_args),
+        patch("ml.train.load_data", return_value=(X, y)),
+        patch(
+            "ml.train.train_with_cv",
+            return_value={"pipeline": MagicMock(), "metrics": _FAKE_METRICS},
+        ),
+        patch("ml.train.log_to_mlflow", return_value="run-id") as mock_log,
+        patch("ml.train.register_in_db"),
+        patch("ml.train.mlflow.set_tracking_uri"),
+        patch("ml.train.mlflow.set_experiment"),
+    ):
         main()
 
     mock_log.assert_called_once()
@@ -365,19 +393,29 @@ def test_main_calls_comparison_report_and_registration(fake_customers_df):
     from ml.train import main
 
     fake_args = argparse.Namespace(
-        model="baseline", tenant=None, project=None, dry_run=True,
-        holdout_size=0.2, n_estimators=500, max_depth=None,
+        model="baseline",
+        tenant=None,
+        project=None,
+        dry_run=True,
+        holdout_size=0.2,
+        n_estimators=500,
+        max_depth=None,
     )
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
     fake_comparison = MagicMock()
 
-    with patch("ml.train._parse_args", return_value=fake_args), \
-         patch("ml.train.load_data", return_value=(X, y)), \
-         patch("ml.train.train_with_cv", return_value={"pipeline": MagicMock(), "metrics": _FAKE_METRICS}), \
-         patch("ml.train.compare_results", return_value=fake_comparison) as mock_compare, \
-         patch("ml.train.build_run_report", return_value="report") as mock_report, \
-         patch("ml.train._register_comparison") as mock_register:
+    with (
+        patch("ml.train._parse_args", return_value=fake_args),
+        patch("ml.train.load_data", return_value=(X, y)),
+        patch(
+            "ml.train.train_with_cv",
+            return_value={"pipeline": MagicMock(), "metrics": _FAKE_METRICS},
+        ),
+        patch("ml.train.compare_results", return_value=fake_comparison) as mock_compare,
+        patch("ml.train.build_run_report", return_value="report") as mock_report,
+        patch("ml.train._register_comparison") as mock_register,
+    ):
         main()
 
     mock_compare.assert_called_once()
@@ -392,20 +430,34 @@ def test_main_passes_holdout_size_to_train_with_cv(fake_customers_df):
     from ml.train import main
 
     fake_args = argparse.Namespace(
-        model="baseline", tenant=None, project=None, dry_run=True,
-        holdout_size=0.3, n_estimators=500, max_depth=None,
+        model="baseline",
+        tenant=None,
+        project=None,
+        dry_run=True,
+        holdout_size=0.3,
+        n_estimators=500,
+        max_depth=None,
     )
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
 
-    with patch("ml.train._parse_args", return_value=fake_args), \
-         patch("ml.train.load_data", return_value=(X, y)), \
-         patch("ml.train.train_with_cv", return_value={"pipeline": MagicMock(), "metrics": _FAKE_METRICS}) as mock_train, \
-         patch("ml.train.register_in_db"):
+    with (
+        patch("ml.train._parse_args", return_value=fake_args),
+        patch("ml.train.load_data", return_value=(X, y)),
+        patch(
+            "ml.train.train_with_cv",
+            return_value={"pipeline": MagicMock(), "metrics": _FAKE_METRICS},
+        ) as mock_train,
+        patch("ml.train.register_in_db"),
+    ):
         main()
 
     for call in mock_train.call_args_list:
-        assert call.kwargs.get("holdout_size") == 0.3 or call.args[3] == 0.3 or call.kwargs.get("holdout_size") == 0.3
+        assert (
+            call.kwargs.get("holdout_size") == 0.3
+            or call.args[3] == 0.3
+            or call.kwargs.get("holdout_size") == 0.3
+        )
 
 
 def test_main_dry_run_does_not_configure_mlflow(fake_customers_df):
@@ -413,18 +465,28 @@ def test_main_dry_run_does_not_configure_mlflow(fake_customers_df):
     from ml.train import main
 
     fake_args = argparse.Namespace(
-        model="random_forest", tenant=None, project=None, dry_run=True,
-        holdout_size=0.2, n_estimators=500, max_depth=None,
+        model="random_forest",
+        tenant=None,
+        project=None,
+        dry_run=True,
+        holdout_size=0.2,
+        n_estimators=500,
+        max_depth=None,
     )
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
 
-    with patch("ml.train._parse_args", return_value=fake_args), \
-         patch("ml.train.load_data", return_value=(X, y)), \
-         patch("ml.train.train_with_cv", return_value={"pipeline": MagicMock(), "metrics": _FAKE_METRICS}), \
-         patch("ml.train.register_in_db"), \
-         patch("ml.train.mlflow.set_tracking_uri") as mock_uri, \
-         patch("ml.train.mlflow.set_experiment") as mock_exp:
+    with (
+        patch("ml.train._parse_args", return_value=fake_args),
+        patch("ml.train.load_data", return_value=(X, y)),
+        patch(
+            "ml.train.train_with_cv",
+            return_value={"pipeline": MagicMock(), "metrics": _FAKE_METRICS},
+        ),
+        patch("ml.train.register_in_db"),
+        patch("ml.train.mlflow.set_tracking_uri") as mock_uri,
+        patch("ml.train.mlflow.set_experiment") as mock_exp,
+    ):
         main()
 
     mock_uri.assert_not_called()
@@ -436,19 +498,29 @@ def test_main_not_dry_run_configures_mlflow_for_baseline(fake_customers_df):
     from ml.train import main
 
     fake_args = argparse.Namespace(
-        model="baseline", tenant="ibm-telco", project=None, dry_run=False,
-        holdout_size=0.2, n_estimators=500, max_depth=None,
+        model="baseline",
+        tenant="ibm-telco",
+        project=None,
+        dry_run=False,
+        holdout_size=0.2,
+        n_estimators=500,
+        max_depth=None,
     )
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
 
-    with patch("ml.train._parse_args", return_value=fake_args), \
-         patch("ml.train.load_data", return_value=(X, y)), \
-         patch("ml.train.train_with_cv", return_value={"pipeline": MagicMock(), "metrics": _FAKE_METRICS}), \
-         patch("ml.train.log_to_mlflow", return_value="run-id"), \
-         patch("ml.train.register_in_db"), \
-         patch("ml.train.mlflow.set_tracking_uri"), \
-         patch("ml.train.mlflow.set_experiment") as mock_exp:
+    with (
+        patch("ml.train._parse_args", return_value=fake_args),
+        patch("ml.train.load_data", return_value=(X, y)),
+        patch(
+            "ml.train.train_with_cv",
+            return_value={"pipeline": MagicMock(), "metrics": _FAKE_METRICS},
+        ),
+        patch("ml.train.log_to_mlflow", return_value="run-id"),
+        patch("ml.train.register_in_db"),
+        patch("ml.train.mlflow.set_tracking_uri"),
+        patch("ml.train.mlflow.set_experiment") as mock_exp,
+    ):
         main()
 
     mock_exp.assert_called_once_with("ibm-telco/baseline")

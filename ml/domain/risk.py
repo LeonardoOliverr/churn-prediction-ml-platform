@@ -10,9 +10,7 @@ def classify_risk(
 ) -> RiskLevel:
     """Classify churn risk as low, medium, or high."""
     if not (0.0 <= probability <= 1.0):
-        raise ValueError(
-            f"Probabilidade deve estar entre 0.0 e 1.0. Recebido: {probability}"
-        )
+        raise ValueError(f"Probabilidade deve estar entre 0.0 e 1.0. Recebido: {probability}")
     if probability >= threshold_high:
         return RiskLevel.HIGH
     if probability >= threshold_low:

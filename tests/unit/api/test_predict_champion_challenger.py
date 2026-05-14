@@ -38,20 +38,39 @@ def test_predict_batch_preserves_order_with_different_models(fake_customers_df):
     batch = BatchPredictRequest(customers=[first, second])
     request = MagicMock()
     request.state = SimpleNamespace()
-    api_key = ApiKeyRecord(id="key-1", tenant_id="tenant-1", project_id="project-1", scopes=["predict"], key_prefix="prefix")
+    api_key = ApiKeyRecord(
+        id="key-1",
+        tenant_id="tenant-1",
+        project_id="project-1",
+        scopes=["predict"],
+        key_prefix="prefix",
+    )
     settings = SimpleNamespace(max_batch_size=100)
 
-    champion_loaded = (_Pipeline(0.1), 0.5, {"id": "champion-id", "version": "v1", "name": "champion", "project_id": "project-1"})
-    challenger_loaded = (_Pipeline(0.9), 0.5, {"id": "challenger-id", "version": "v1", "name": "challenger", "project_id": "project-1"})
+    champion_loaded = (
+        _Pipeline(0.1),
+        0.5,
+        {"id": "champion-id", "version": "v1", "name": "champion", "project_id": "project-1"},
+    )
+    challenger_loaded = (
+        _Pipeline(0.9),
+        0.5,
+        {"id": "challenger-id", "version": "v1", "name": "challenger", "project_id": "project-1"},
+    )
 
     def _choose_for_customer(**kwargs):
         if kwargs["customer_id"] == "CUST-A":
             return champion_loaded
         return challenger_loaded
 
-    with patch("src.routers.predict.resolve_batch_models", return_value=(champion_loaded, challenger_loaded)), \
-         patch("src.routers.predict.choose_for_customer", side_effect=_choose_for_customer), \
-         patch("src.routers.predict._get_engine", return_value=object()):
+    with (
+        patch(
+            "src.routers.predict.resolve_batch_models",
+            return_value=(champion_loaded, challenger_loaded),
+        ),
+        patch("src.routers.predict.choose_for_customer", side_effect=_choose_for_customer),
+        patch("src.routers.predict._get_engine", return_value=object()),
+    ):
         response = inspect.unwrap(predict_batch)(
             request=request,
             batch=batch,

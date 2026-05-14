@@ -29,11 +29,10 @@ from itertools import groupby
 from typing import Any
 
 from sklearn.metrics import roc_auc_score
-
 from sqlalchemy import text
 
-from domain.constants import CostModel, EvaluationType
 from core.logger import get_logger
+from domain.constants import CostModel, EvaluationType
 from ml.data.preprocessing import _build_engine, _resolve_project_id, _resolve_tenant_id
 
 logger = get_logger()
@@ -185,7 +184,7 @@ def _compute_confusion(rows: list[Any]) -> dict[str, int]:
     """Calcula matriz de confusão a partir de linhas com (churn_pred, churned)."""
     tp = fp = fn = tn = 0
     for row in rows:
-        pred   = bool(row.churn_pred)
+        pred = bool(row.churn_pred)
         actual = bool(row.churned)
         if pred and actual:
             tp += 1
@@ -202,12 +201,12 @@ def _compute_metrics(cm: dict[str, int]) -> dict[str, float]:
     """Calcula precision, recall e F1 com guard contra divisão por zero."""
     tp, fp, fn = cm["tp"], cm["fp"], cm["fn"]
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-    recall    = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
     f1 = (2 * precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
     return {
         "precision": round(precision, 4),
-        "recall":    round(recall,    4),
-        "f1":        round(f1,        4),
+        "recall": round(recall, 4),
+        "f1": round(f1, 4),
     }
 
 
@@ -251,22 +250,22 @@ def _compute_cost_weighted(
     Retorna (total_cost, avg_fp_cost, avg_fn_cost).
     avg_fp_cost e avg_fn_cost são usados para persistir custos representativos no run.
     """
-    total   = 0.0
-    fp_sum  = fn_sum = 0.0
-    fp_n    = fn_n   = 0
+    total = 0.0
+    fp_sum = fn_sum = 0.0
+    fp_n = fn_n = 0
 
     for row in rows:
         fp_c, fn_c = _compute_row_cost(row, config, fp_cost_flat, fn_cost_flat)
-        pred   = bool(row.churn_pred)
+        pred = bool(row.churn_pred)
         actual = bool(row.churned)
         if pred and not actual:
-            total  += fp_c
+            total += fp_c
             fp_sum += fp_c
-            fp_n   += 1
+            fp_n += 1
         elif not pred and actual:
-            total  += fn_c
+            total += fn_c
             fn_sum += fn_c
-            fn_n   += 1
+            fn_n += 1
 
     avg_fp = fp_sum / fp_n if fp_n > 0 else fp_cost_flat
     avg_fn = fn_sum / fn_n if fn_n > 0 else fn_cost_flat
@@ -278,7 +277,7 @@ def _compute_roc_auc(rows: list[Any]) -> float | None:
 
     Retorna None quando há apenas uma classe nos outcomes (AUC indefinido).
     """
-    y_true  = [int(bool(row.churned))     for row in rows]
+    y_true = [int(bool(row.churned)) for row in rows]
     y_score = [float(row.churn_prob) for row in rows]
     if len(set(y_true)) < 2:
         return None
@@ -288,13 +287,13 @@ def _compute_roc_auc(rows: list[Any]) -> float | None:
 def _compute_derived_rates(cm: dict[str, int]) -> dict[str, float | None]:
     """Calcula taxas derivadas: FPR, FNR e especificidade."""
     fp, tn, fn, tp = cm["fp"], cm["tn"], cm["fn"], cm["tp"]
-    fpr  = fp / (fp + tn) if (fp + tn) > 0 else None
-    fnr  = fn / (fn + tp) if (fn + tp) > 0 else None
+    fpr = fp / (fp + tn) if (fp + tn) > 0 else None
+    fnr = fn / (fn + tp) if (fn + tp) > 0 else None
     spec = tn / (tn + fp) if (tn + fp) > 0 else None
     return {
-        "false_positive_rate": round(fpr,  4) if fpr  is not None else None,
-        "false_negative_rate": round(fnr,  4) if fnr  is not None else None,
-        "specificity":         round(spec, 4) if spec is not None else None,
+        "false_positive_rate": round(fpr, 4) if fpr is not None else None,
+        "false_negative_rate": round(fnr, 4) if fnr is not None else None,
+        "specificity": round(spec, 4) if spec is not None else None,
     }
 
 
@@ -326,14 +325,20 @@ def _compute_promotion_recommendation(
     Custo comparado por predição para eliminar viés de volume entre splits de tráfego.
     """
     if role == "champion":
-        return {"promotion_candidate": False, "recommendation_reason": "Modelo ativo em produção — referência de comparação."}
+        return {
+            "promotion_candidate": False,
+            "recommendation_reason": "Modelo ativo em produção — referência de comparação.",
+        }
     if champion_metrics is None or champion_total is None:
-        return {"promotion_candidate": False, "recommendation_reason": "Sem modelo champion disponível para comparação."}
+        return {
+            "promotion_candidate": False,
+            "recommendation_reason": "Sem modelo champion disponível para comparação.",
+        }
 
-    cost_per_pred          = cost / total          if total          > 0 else float("inf")
+    cost_per_pred = cost / total if total > 0 else float("inf")
     champion_cost_per_pred = champion_cost / champion_total if champion_total > 0 else float("inf")
 
-    better_f1   = metrics["f1"] > (champion_metrics["f1"] or 0.0)
+    better_f1 = metrics["f1"] > (champion_metrics["f1"] or 0.0)
     better_cost = cost_per_pred < champion_cost_per_pred
 
     if better_f1 and better_cost:
@@ -393,14 +398,19 @@ def _build_report(
         _HEADER,
     ]
 
-    best_f1     = max(model_results, key=lambda r: r["metrics"]["f1"])
-    best_cost   = min(model_results, key=lambda r: r["cost"])
+    best_f1 = max(model_results, key=lambda r: r["metrics"]["f1"])
+    best_cost = min(model_results, key=lambda r: r["cost"])
 
     for r in model_results:
         lines.append(
             _format_row(
-                r["model_name"], r["model_role"], r["model_version"],
-                r["total"], r["cm"], r["metrics"], r["cost"],
+                r["model_name"],
+                r["model_role"],
+                r["model_version"],
+                r["total"],
+                r["cm"],
+                r["metrics"],
+                r["cost"],
             )
         )
 
@@ -434,22 +444,22 @@ def evaluate(
     Retorna lista de resultados por modelo.
     """
     engine = _build_engine()
-    _now         = datetime.now(tz=timezone.utc)
-    period_end   = _now.replace(hour=23, minute=59, second=59, microsecond=0)
+    _now = datetime.now(tz=timezone.utc)
+    period_end = _now.replace(hour=23, minute=59, second=59, microsecond=0)
     period_start = (_now - timedelta(days=days)).replace(hour=0, minute=0, second=0, microsecond=0)
 
     with engine.connect() as conn:
-        tenant_id  = _resolve_tenant_id(conn, tenant_slug)
+        tenant_id = _resolve_tenant_id(conn, tenant_slug)
         project_id = _resolve_project_id(conn, tenant_id, project_slug)
 
         # Verificar run existente (idempotência)
         existing = conn.execute(
             _QUERY_EXISTING_RUN,
             {
-                "tenant_id":       tenant_id,
-                "project_id":      project_id,
-                "period_start":    period_start,
-                "period_end":      period_end,
+                "tenant_id": tenant_id,
+                "project_id": project_id,
+                "period_start": period_start,
+                "period_end": period_end,
                 "evaluation_type": evaluation_type,
             },
         ).fetchone()
@@ -462,10 +472,14 @@ def evaluate(
             )
             return []
 
-        cost_config_row = conn.execute(
-            _QUERY_COST_CONFIG,
-            {"tenant_id": tenant_id, "project_id": project_id},
-        ).mappings().first()
+        cost_config_row = (
+            conn.execute(
+                _QUERY_COST_CONFIG,
+                {"tenant_id": tenant_id, "project_id": project_id},
+            )
+            .mappings()
+            .first()
+        )
         cost_config = dict(cost_config_row) if cost_config_row else None
 
         if cost_config:
@@ -475,23 +489,33 @@ def evaluate(
 
         rows = conn.execute(
             _QUERY_EVAL,
-            {"tenant_id": tenant_id, "project_id": project_id,
-             "period_start": period_start, "period_end": period_end},
+            {
+                "tenant_id": tenant_id,
+                "project_id": project_id,
+                "period_start": period_start,
+                "period_end": period_end,
+            },
         ).fetchall()
 
         missing_by_model: dict[str, int] = {
             str(r.model_id): int(r.missing)
             for r in conn.execute(
                 _QUERY_MISSING_LABELS,
-                {"tenant_id": tenant_id, "project_id": project_id,
-                 "period_start": period_start, "period_end": period_end},
+                {
+                    "tenant_id": tenant_id,
+                    "project_id": project_id,
+                    "period_start": period_start,
+                    "period_end": period_end,
+                },
             ).fetchall()
         }
 
     if not rows:
         logger.warning(
             "no_outcomes_found",
-            tenant=tenant_slug, project=project_slug, days=days,
+            tenant=tenant_slug,
+            project=project_slug,
+            days=days,
         )
         return []
 
@@ -503,50 +527,53 @@ def evaluate(
             rows,
             key=lambda r: (r.model_id, r.model_name, r.model_version, r.threshold_used),
         ):
-            group              = list(group_rows)
-            cm                 = _compute_confusion(group)
-            metrics            = _compute_metrics(cm)
+            group = list(group_rows)
+            cm = _compute_confusion(group)
+            metrics = _compute_metrics(cm)
             cost, avg_fp, avg_fn = _compute_cost_weighted(group, cost_config, fp_cost, fn_cost)
-            roc_auc            = _compute_roc_auc(group)
+            roc_auc = _compute_roc_auc(group)
             derived = _compute_derived_rates(cm)
-            risk    = _compute_risk_segmentation(group)
+            risk = _compute_risk_segmentation(group)
 
             # Snapshot do papel operacional no momento da avaliação
             role_row = conn.execute(
                 _QUERY_ROLE_SNAPSHOT,
-                {"tenant_id": tenant_id, "project_id": project_id,
-                 "model_id": str(model_id)},
+                {"tenant_id": tenant_id, "project_id": project_id, "model_id": str(model_id)},
             ).fetchone()
-            model_role    = role_row.role          if role_row else "unknown"
-            traffic_split = float(role_row.traffic_split) if role_row and role_row.traffic_split else None
-            total         = len(group)
+            model_role = role_row.role if role_row else "unknown"
+            traffic_split = (
+                float(role_row.traffic_split) if role_row and role_row.traffic_split else None
+            )
+            total = len(group)
 
-            model_results.append({
-                "model_id":           str(model_id),
-                "model_name":         model_name,
-                "model_version":      str(model_version),
-                "model_role":         model_role,
-                "traffic_split":      traffic_split,
-                "threshold":          float(threshold),
-                "total":              total,
-                "cm":                 cm,
-                "metrics":            metrics,
-                "cost":               cost,
-                "avg_fp_cost":        avg_fp,
-                "avg_fn_cost":        avg_fn,
-                "cost_model":         cost_config["cost_model"] if cost_config else "flat",
-                "roc_auc":            roc_auc,
-                "missing_labels":     missing_by_model.get(str(model_id), 0),
-                "cost_per_prediction": round(cost / total, 4) if total > 0 else None,
-                "traffic_split_pct":  round(traffic_split * 100, 2) if traffic_split is not None else None,
-                **derived,
-                **risk,
-            })
+            model_results.append(
+                {
+                    "model_id": str(model_id),
+                    "model_name": model_name,
+                    "model_version": str(model_version),
+                    "model_role": model_role,
+                    "traffic_split": traffic_split,
+                    "threshold": float(threshold),
+                    "total": total,
+                    "cm": cm,
+                    "metrics": metrics,
+                    "cost": cost,
+                    "avg_fp_cost": avg_fp,
+                    "avg_fn_cost": avg_fn,
+                    "cost_model": cost_config["cost_model"] if cost_config else "flat",
+                    "roc_auc": roc_auc,
+                    "missing_labels": missing_by_model.get(str(model_id), 0),
+                    "cost_per_prediction": round(cost / total, 4) if total > 0 else None,
+                    "traffic_split_pct": round(traffic_split * 100, 2)
+                    if traffic_split is not None
+                    else None,
+                    **derived,
+                    **risk,
+                }
+            )
 
     # 2º passe: recomendação de promoção (requer champion do 1º passe)
-    champion_result = next(
-        (r for r in model_results if r["model_role"] == "champion"), None
-    )
+    champion_result = next((r for r in model_results if r["model_role"] == "champion"), None)
     for r in model_results:
         promotion = _compute_promotion_recommendation(
             metrics=r["metrics"],
@@ -554,13 +581,17 @@ def evaluate(
             total=r["total"],
             role=r["model_role"],
             champion_metrics=champion_result["metrics"] if champion_result else None,
-            champion_cost=champion_result["cost"]       if champion_result else None,
-            champion_total=champion_result["total"]     if champion_result else None,
+            champion_cost=champion_result["cost"] if champion_result else None,
+            champion_total=champion_result["total"] if champion_result else None,
         )
         r.update(promotion)
 
     report = _build_report(
-        model_results, project_slug, f"{days}d", fp_cost, fn_cost,
+        model_results,
+        project_slug,
+        f"{days}d",
+        fp_cost,
+        fn_cost,
         run_id=None,
     )
     logger.info("evaluation_report", report=report)
@@ -577,22 +608,28 @@ def evaluate(
     run_id: str | None = None
     try:
         with engine.begin() as conn:
-            tenant_id  = _resolve_tenant_id(conn, tenant_slug)
+            tenant_id = _resolve_tenant_id(conn, tenant_slug)
             project_id = _resolve_project_id(conn, tenant_id, project_slug)
 
             run_id = str(
                 conn.execute(
                     _INSERT_RUN,
                     {
-                        "tenant_id":       tenant_id,
-                        "project_id":      project_id,
-                        "period_start":    period_start,
-                        "period_end":      period_end,
+                        "tenant_id": tenant_id,
+                        "project_id": project_id,
+                        "period_start": period_start,
+                        "period_end": period_end,
                         "evaluation_type": evaluation_type,
-                        "fp_cost":         fp_cost,
-                        "fn_cost":         fn_cost,
-                        "triggered_by":    triggered_by,
-                        "metadata":        json.dumps({"cost_model": cost_config["cost_model"] if cost_config else CostModel.FLAT}),
+                        "fp_cost": fp_cost,
+                        "fn_cost": fn_cost,
+                        "triggered_by": triggered_by,
+                        "metadata": json.dumps(
+                            {
+                                "cost_model": cost_config["cost_model"]
+                                if cost_config
+                                else CostModel.FLAT
+                            }
+                        ),
                     },
                 ).scalar_one()
             )
@@ -601,38 +638,38 @@ def evaluate(
                 conn.execute(
                     _INSERT_RESULT,
                     {
-                        "run_id":               run_id,
-                        "tenant_id":            tenant_id,
-                        "project_id":           project_id,
-                        "model_id":             r["model_id"],
-                        "model_name":           r["model_name"],
-                        "model_version":        r["model_version"],
-                        "model_role":           r["model_role"],
-                        "traffic_split":        r["traffic_split"],
-                        "threshold_used":       r["threshold"],
-                        "tp":                   r["cm"]["tp"],
-                        "fp":                   r["cm"]["fp"],
-                        "fn":                   r["cm"]["fn"],
-                        "tn":                   r["cm"]["tn"],
-                        "precision":            r["metrics"]["precision"],
-                        "recall":               r["metrics"]["recall"],
-                        "f1":                   r["metrics"]["f1"],
-                        "roc_auc":              r["roc_auc"],
-                        "fp_cost":              r["avg_fp_cost"],
-                        "fn_cost":              r["avg_fn_cost"],
-                        "total_cost":           r["cost"],
+                        "run_id": run_id,
+                        "tenant_id": tenant_id,
+                        "project_id": project_id,
+                        "model_id": r["model_id"],
+                        "model_name": r["model_name"],
+                        "model_version": r["model_version"],
+                        "model_role": r["model_role"],
+                        "traffic_split": r["traffic_split"],
+                        "threshold_used": r["threshold"],
+                        "tp": r["cm"]["tp"],
+                        "fp": r["cm"]["fp"],
+                        "fn": r["cm"]["fn"],
+                        "tn": r["cm"]["tn"],
+                        "precision": r["metrics"]["precision"],
+                        "recall": r["metrics"]["recall"],
+                        "f1": r["metrics"]["f1"],
+                        "roc_auc": r["roc_auc"],
+                        "fp_cost": r["avg_fp_cost"],
+                        "fn_cost": r["avg_fn_cost"],
+                        "total_cost": r["cost"],
                         "evaluated_predictions": r["total"],
                         "missing_actual_labels": r["missing_labels"],
-                        "false_positive_rate":  r["false_positive_rate"],
-                        "false_negative_rate":  r["false_negative_rate"],
-                        "specificity":          r["specificity"],
-                        "high_risk_count":      r["high_risk_count"],
-                        "medium_risk_count":    r["medium_risk_count"],
-                        "low_risk_count":       r["low_risk_count"],
-                        "promotion_candidate":  r["promotion_candidate"],
+                        "false_positive_rate": r["false_positive_rate"],
+                        "false_negative_rate": r["false_negative_rate"],
+                        "specificity": r["specificity"],
+                        "high_risk_count": r["high_risk_count"],
+                        "medium_risk_count": r["medium_risk_count"],
+                        "low_risk_count": r["low_risk_count"],
+                        "promotion_candidate": r["promotion_candidate"],
                         "recommendation_reason": r["recommendation_reason"],
-                        "cost_per_prediction":  r["cost_per_prediction"],
-                        "traffic_split_pct":    r["traffic_split_pct"],
+                        "cost_per_prediction": r["cost_per_prediction"],
+                        "traffic_split_pct": r["traffic_split_pct"],
                     },
                 )
 
@@ -665,16 +702,23 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Avalia modelos via holdout e grava em evaluation_runs."
     )
-    parser.add_argument("--tenant",   default=None,    help="Slug do tenant.")
-    parser.add_argument("--project",  required=True,   help="Slug do projeto.")
-    parser.add_argument("--since",    default="90d",   help="Janela de avaliação (ex: 90d).")
-    parser.add_argument("--fp-cost",  type=float, required=True, help="Custo unitário de falso positivo.")
-    parser.add_argument("--fn-cost",  type=float, required=True, help="Custo unitário de falso negativo.")
-    parser.add_argument("--type",     default=EvaluationType.MANUAL,
-                        choices=[e.value for e in EvaluationType],
-                        help="Tipo de avaliação.")
+    parser.add_argument("--tenant", default=None, help="Slug do tenant.")
+    parser.add_argument("--project", required=True, help="Slug do projeto.")
+    parser.add_argument("--since", default="90d", help="Janela de avaliação (ex: 90d).")
+    parser.add_argument(
+        "--fp-cost", type=float, required=True, help="Custo unitário de falso positivo."
+    )
+    parser.add_argument(
+        "--fn-cost", type=float, required=True, help="Custo unitário de falso negativo."
+    )
+    parser.add_argument(
+        "--type",
+        default=EvaluationType.MANUAL,
+        choices=[e.value for e in EvaluationType],
+        help="Tipo de avaliação.",
+    )
     parser.add_argument("--triggered-by", default="manual", help="Origem da execução.")
-    parser.add_argument("--dry-run",  action="store_true", help="Simula sem gravar no banco.")
+    parser.add_argument("--dry-run", action="store_true", help="Simula sem gravar no banco.")
     return parser.parse_args()
 
 

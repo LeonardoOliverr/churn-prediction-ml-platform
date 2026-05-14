@@ -18,10 +18,12 @@ def _candidate(name: str, f1: float) -> CandidateResult:
 
 
 def test_build_run_report_includes_best_model_and_metrics():
-    comparison = compare_results([
-        _candidate("dummy", 0.2),
-        _candidate("logistic_regression", 0.7),
-    ])
+    comparison = compare_results(
+        [
+            _candidate("dummy", 0.2),
+            _candidate("logistic_regression", 0.7),
+        ]
+    )
 
     report = build_run_report(
         comparison=comparison,

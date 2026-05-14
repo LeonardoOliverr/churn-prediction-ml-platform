@@ -6,11 +6,11 @@ sem banco de dados real, usando fake_customers_df e tmp_path.
 """
 
 import sys
+from unittest.mock import MagicMock, patch
+
 import numpy as np
 import pandas as pd
 import pytest
-from unittest.mock import MagicMock, patch
-
 
 # ---------------------------------------------------------------------------
 # _parse_args
@@ -20,6 +20,7 @@ from unittest.mock import MagicMock, patch
 def test_parse_args_defaults():
     """Sem argumentos, retorna tenant=None, project=None, output_dir='data'."""
     from ml.tools.export_dataset import _parse_args
+
     with patch.object(sys, "argv", ["export_dataset.py"]):
         args = _parse_args()
     assert args.tenant is None
@@ -29,11 +30,20 @@ def test_parse_args_defaults():
 
 def test_parse_args_com_tenant_e_project():
     from ml.tools.export_dataset import _parse_args
-    with patch.object(sys, "argv", [
-        "export_dataset.py", "--tenant", "ibm-telco",
-        "--project", "telco-churn-2018",
-        "--output-dir", "exports/",
-    ]):
+
+    with patch.object(
+        sys,
+        "argv",
+        [
+            "export_dataset.py",
+            "--tenant",
+            "ibm-telco",
+            "--project",
+            "telco-churn-2018",
+            "--output-dir",
+            "exports/",
+        ],
+    ):
         args = _parse_args()
     assert args.tenant == "ibm-telco"
     assert args.project == "telco-churn-2018"
@@ -43,8 +53,11 @@ def test_parse_args_com_tenant_e_project():
 def test_parse_args_project_sem_tenant_sai_com_erro():
     """--project sem --tenant deve levantar SystemExit."""
     from ml.tools.export_dataset import _parse_args
-    with patch.object(sys, "argv", ["export_dataset.py", "--project", "my-project"]), \
-         pytest.raises(SystemExit):
+
+    with (
+        patch.object(sys, "argv", ["export_dataset.py", "--project", "my-project"]),
+        pytest.raises(SystemExit),
+    ):
         _parse_args()
 
 
@@ -55,9 +68,9 @@ def test_parse_args_project_sem_tenant_sai_com_erro():
 
 def test_get_feature_names_retorna_lista_de_strings(fake_customers_df):
     """Preprocessor real fitado retorna lista de nomes sem prefixo de transformer."""
-    from ml.tools.export_dataset import _get_feature_names
-    from ml.data.preprocessing import build_preprocessor
     from ml.config.settings import TARGET
+    from ml.data.preprocessing import build_preprocessor
+    from ml.tools.export_dataset import _get_feature_names
 
     X = fake_customers_df.drop(columns=[TARGET])
     preprocessor = build_preprocessor()
@@ -71,9 +84,9 @@ def test_get_feature_names_retorna_lista_de_strings(fake_customers_df):
 
 def test_get_feature_names_remove_prefixo_do_transformer(fake_customers_df):
     """Nenhum nome deve conter prefixo 'numeric__', 'bool__' ou 'categorical__'."""
-    from ml.tools.export_dataset import _get_feature_names
-    from ml.data.preprocessing import build_preprocessor
     from ml.config.settings import TARGET
+    from ml.data.preprocessing import build_preprocessor
+    from ml.tools.export_dataset import _get_feature_names
 
     X = fake_customers_df.drop(columns=[TARGET])
     preprocessor = build_preprocessor()
@@ -216,8 +229,8 @@ def test_get_feature_names_branch_else_sem_metodos():
 
 def test_export_cria_tres_arquivos(fake_customers_df, tmp_path):
     """export() deve gerar features_raw.csv, features_transformed.csv e feature_names.txt."""
-    from ml.tools.export_dataset import export
     from ml.config.settings import TARGET
+    from ml.tools.export_dataset import export
 
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
@@ -231,8 +244,8 @@ def test_export_cria_tres_arquivos(fake_customers_df, tmp_path):
 
 
 def test_export_raw_csv_tem_coluna_target(fake_customers_df, tmp_path):
-    from ml.tools.export_dataset import export
     from ml.config.settings import TARGET
+    from ml.tools.export_dataset import export
 
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
@@ -245,8 +258,8 @@ def test_export_raw_csv_tem_coluna_target(fake_customers_df, tmp_path):
 
 
 def test_export_transformed_csv_tem_mesma_quantidade_de_linhas(fake_customers_df, tmp_path):
-    from ml.tools.export_dataset import export
     from ml.config.settings import TARGET
+    from ml.tools.export_dataset import export
 
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
@@ -259,8 +272,8 @@ def test_export_transformed_csv_tem_mesma_quantidade_de_linhas(fake_customers_df
 
 
 def test_export_feature_names_txt_nao_vazio(fake_customers_df, tmp_path):
-    from ml.tools.export_dataset import export
     from ml.config.settings import TARGET
+    from ml.tools.export_dataset import export
 
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
@@ -279,9 +292,21 @@ def test_export_feature_names_txt_nao_vazio(fake_customers_df, tmp_path):
 
 def test_main_chama_export_com_args_corretos():
     from ml.tools.export_dataset import main
-    with patch.object(sys, "argv", [
-        "export_dataset.py", "--tenant", "ibm-telco", "--output-dir", "out/",
-    ]), patch("ml.tools.export_dataset.export") as mock_export:
+
+    with (
+        patch.object(
+            sys,
+            "argv",
+            [
+                "export_dataset.py",
+                "--tenant",
+                "ibm-telco",
+                "--output-dir",
+                "out/",
+            ],
+        ),
+        patch("ml.tools.export_dataset.export") as mock_export,
+    ):
         main()
 
     mock_export.assert_called_once_with(

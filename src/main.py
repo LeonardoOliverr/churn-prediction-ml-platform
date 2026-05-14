@@ -143,22 +143,34 @@ def create_app() -> FastAPI:
     @app.exception_handler(TenantNotFoundError)
     async def tenant_not_found_handler(request: Request, exc: TenantNotFoundError):
         request_id = getattr(request.state, "request_id", "unknown")
-        return JSONResponse(status_code=404, content={"error": "not_found", "message": str(exc), "request_id": request_id})
+        return JSONResponse(
+            status_code=404,
+            content={"error": "not_found", "message": str(exc), "request_id": request_id},
+        )
 
     @app.exception_handler(ProjectNotFoundError)
     async def project_not_found_handler(request: Request, exc: ProjectNotFoundError):
         request_id = getattr(request.state, "request_id", "unknown")
-        return JSONResponse(status_code=404, content={"error": "not_found", "message": str(exc), "request_id": request_id})
+        return JSONResponse(
+            status_code=404,
+            content={"error": "not_found", "message": str(exc), "request_id": request_id},
+        )
 
     @app.exception_handler(ModelNotFoundError)
     async def model_not_found_handler(request: Request, exc: ModelNotFoundError):
         request_id = getattr(request.state, "request_id", "unknown")
-        return JSONResponse(status_code=404, content={"error": "model_not_found", "message": str(exc), "request_id": request_id})
+        return JSONResponse(
+            status_code=404,
+            content={"error": "model_not_found", "message": str(exc), "request_id": request_id},
+        )
 
     @app.exception_handler(BatchTooLargeError)
     async def batch_too_large_handler(request: Request, exc: BatchTooLargeError):
         request_id = getattr(request.state, "request_id", "unknown")
-        return JSONResponse(status_code=422, content={"error": "batch_too_large", "message": str(exc), "request_id": request_id})
+        return JSONResponse(
+            status_code=422,
+            content={"error": "batch_too_large", "message": str(exc), "request_id": request_id},
+        )
 
     # Rate limiting
     app.state.limiter = key_limiter
@@ -180,7 +192,11 @@ def create_app() -> FastAPI:
         logger.error("unhandled_exception", request_id=request_id, error=str(exc), exc_info=True)
         return JSONResponse(
             status_code=500,
-            content={"error": "internal_error", "message": "Erro interno do servidor.", "request_id": request_id},
+            content={
+                "error": "internal_error",
+                "message": "Erro interno do servidor.",
+                "request_id": request_id,
+            },
         )
 
     return app

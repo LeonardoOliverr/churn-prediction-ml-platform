@@ -11,8 +11,8 @@ from __future__ import annotations
 import argparse
 from typing import TYPE_CHECKING, Any
 
-from ml.config.settings import MLFLOW_TRACKING_URI
 from core.logger import get_logger
+from ml.config.settings import MLFLOW_TRACKING_URI
 from ml.core.training.metrics import CV
 from ml.evaluation import CandidateResult, build_run_report, compare_results
 

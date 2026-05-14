@@ -10,7 +10,7 @@ import hashlib
 import time
 from collections import OrderedDict
 from threading import Lock
-from typing import Any, Optional
+from typing import Any
 
 import mlflow.sklearn
 import structlog
@@ -90,7 +90,7 @@ _SQL_GLOBAL_MODEL = text("""
 """)
 
 
-def _model_not_found(tenant_id: str, project_id: Optional[str]) -> ModelNotFoundError:
+def _model_not_found(tenant_id: str, project_id: str | None) -> ModelNotFoundError:
     """Cria erro de domínio quando não há modelo de produção configurado."""
     return ModelNotFoundError(
         f"Nenhum modelo aprovado em produção encontrado "
@@ -98,28 +98,38 @@ def _model_not_found(tenant_id: str, project_id: Optional[str]) -> ModelNotFound
     )
 
 
-def _query_project_model_by_role(tenant_id: str, project_id: str, role: str, db) -> Optional[dict]:
+def _query_project_model_by_role(tenant_id: str, project_id: str, role: str, db) -> dict | None:
     """Busca champion ou challenger ativo do projeto."""
-    row = db.execute(
-        _SQL_PROJECT_MODEL_BY_ROLE,
-        {"tenant_id": tenant_id, "project_id": project_id, "role": role},
-    ).mappings().first()
+    row = (
+        db.execute(
+            _SQL_PROJECT_MODEL_BY_ROLE,
+            {"tenant_id": tenant_id, "project_id": project_id, "role": role},
+        )
+        .mappings()
+        .first()
+    )
     return dict(row) if row else None
 
 
-def _query_tenant_model_by_role(tenant_id: str, role: str, db) -> Optional[dict]:
+def _query_tenant_model_by_role(tenant_id: str, role: str, db) -> dict | None:
     """Busca champion ou challenger ativo em escopo de tenant."""
-    row = db.execute(_SQL_TENANT_MODEL_BY_ROLE, {"tenant_id": tenant_id, "role": role}).mappings().first()
+    row = (
+        db.execute(_SQL_TENANT_MODEL_BY_ROLE, {"tenant_id": tenant_id, "role": role})
+        .mappings()
+        .first()
+    )
     return dict(row) if row else None
 
 
-def _query_global_model(db) -> Optional[dict]:
+def _query_global_model(db) -> dict | None:
     """Busca modelo global aprovado para fallback universal."""
     row = db.execute(_SQL_GLOBAL_MODEL).mappings().first()
     return dict(row) if row else None
 
 
-def _query_serving_candidates(tenant_id: str, project_id: Optional[str], db) -> tuple[dict, Optional[dict]]:
+def _query_serving_candidates(
+    tenant_id: str, project_id: str | None, db
+) -> tuple[dict, dict | None]:
     """Retorna (champion, challenger) respeitando fallback global para champion."""
     challenger = None
     champion = None
@@ -140,19 +150,19 @@ def _query_serving_candidates(tenant_id: str, project_id: Optional[str], db) -> 
     return champion, challenger
 
 
-def _traffic_bucket(tenant_id: str, project_id: Optional[str], customer_id: str) -> float:
+def _traffic_bucket(tenant_id: str, project_id: str | None, customer_id: str) -> float:
     """Calcula bucket determinístico entre 0 e 1 para roteamento de tráfego."""
-    key = f"{tenant_id}:{project_id or ''}:{customer_id}".encode("utf-8")
+    key = f"{tenant_id}:{project_id or ''}:{customer_id}".encode()
     digest = hashlib.sha256(key).hexdigest()
     return int(digest[:16], 16) / float(2**64)
 
 
 def _choose_record(
     tenant_id: str,
-    project_id: Optional[str],
-    customer_id: Optional[str],
+    project_id: str | None,
+    customer_id: str | None,
     champion: dict,
-    challenger: Optional[dict],
+    challenger: dict | None,
 ) -> dict:
     """Escolhe champion ou challenger conforme split determinístico."""
     if challenger is None or customer_id is None:
@@ -200,10 +210,10 @@ def _load_pipeline(record: dict, cache_key: tuple, ttl: int) -> tuple[Any, float
 
 def resolve_model(
     tenant_id: str,
-    project_id: Optional[str],
+    project_id: str | None,
     db: Any,
     settings: Any,
-    customer_id: Optional[str] = None,
+    customer_id: str | None = None,
 ) -> tuple[Any, float, dict]:
     """Retorna (pipeline sklearn, threshold, model_record) para a predição."""
     champion, challenger = _query_serving_candidates(tenant_id, project_id, db)
@@ -214,31 +224,35 @@ def resolve_model(
 
 def resolve_batch_models(
     tenant_id: str,
-    project_id: Optional[str],
+    project_id: str | None,
     db: Any,
     settings: Any,
-) -> tuple[tuple[Any, float, dict], Optional[tuple[Any, float, dict]]]:
+) -> tuple[tuple[Any, float, dict], tuple[Any, float, dict] | None]:
     """Carrega champion e challenger uma única vez para inferência em lote."""
     champion_record, challenger_record = _query_serving_candidates(tenant_id, project_id, db)
 
     champion_key = (tenant_id, project_id, "champion", str(champion_record["id"]))
-    champion_loaded = _load_pipeline(champion_record, champion_key, settings.model_cache_ttl_seconds)
+    champion_loaded = _load_pipeline(
+        champion_record, champion_key, settings.model_cache_ttl_seconds
+    )
 
     if challenger_record is None:
         return champion_loaded, None
 
     challenger_key = (tenant_id, project_id, "challenger", str(challenger_record["id"]))
-    challenger_loaded = _load_pipeline(challenger_record, challenger_key, settings.model_cache_ttl_seconds)
+    challenger_loaded = _load_pipeline(
+        challenger_record, challenger_key, settings.model_cache_ttl_seconds
+    )
 
     return champion_loaded, challenger_loaded
 
 
 def choose_for_customer(
     tenant_id: str,
-    project_id: Optional[str],
-    customer_id: Optional[str],
+    project_id: str | None,
+    customer_id: str | None,
     champion_loaded: tuple[Any, float, dict],
-    challenger_loaded: Optional[tuple[Any, float, dict]],
+    challenger_loaded: tuple[Any, float, dict] | None,
 ) -> tuple[Any, float, dict]:
     """Seleciona champion ou challenger para um cliente, sem consultar o banco."""
     if challenger_loaded is None or customer_id is None:
@@ -255,11 +269,12 @@ def choose_for_customer(
     return champion_loaded
 
 
-def invalidate_model_cache(tenant_id: str, project_id: Optional[str] = None) -> None:
+def invalidate_model_cache(tenant_id: str, project_id: str | None = None) -> None:
     """Remove entradas do cache para forçar recarga na próxima requisição."""
     with _cache_lock:
         keys_to_remove = [
-            key for key in _cache
+            key
+            for key in _cache
             if key[0] == tenant_id and (project_id is None or key[1] == project_id)
         ]
         for key in keys_to_remove:

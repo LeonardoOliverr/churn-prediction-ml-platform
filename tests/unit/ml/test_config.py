@@ -63,7 +63,9 @@ def test_no_overlap_between_feature_groups():
     categorical = set(CATEGORICAL_FEATURES)
 
     assert numeric & bool_ == set(), f"Sobreposição NUMERIC∩BOOL: {numeric & bool_}"
-    assert numeric & categorical == set(), f"Sobreposição NUMERIC∩CATEGORICAL: {numeric & categorical}"
+    assert numeric & categorical == set(), (
+        f"Sobreposição NUMERIC∩CATEGORICAL: {numeric & categorical}"
+    )
     assert bool_ & categorical == set(), f"Sobreposição BOOL∩CATEGORICAL: {bool_ & categorical}"
 
 
@@ -78,9 +80,7 @@ def test_drop_cols_dont_overlap_features():
 @pytest.mark.schema
 def test_drop_cols_exclude_target():
     """[SCHEMA TEST] TARGET não deve estar em DROP_COLS."""
-    assert TARGET not in DROP_COLS, (
-        f"'{TARGET}' não deve ser descartado — é a variável resposta."
-    )
+    assert TARGET not in DROP_COLS, f"'{TARGET}' não deve ser descartado — é a variável resposta."
 
 
 @pytest.mark.schema

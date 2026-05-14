@@ -3,7 +3,6 @@ Schemas dos endpoints de administração (tenants, projetos e API keys).
 """
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -13,17 +12,27 @@ from domain.constants import ApiScope, ModelRole
 class TenantCreate(BaseModel):
     """Payload para criação de tenant."""
 
-    model_config = ConfigDict(json_schema_extra={"example": {"name": "IBM Telco", "slug": "ibm-telco"}})
+    model_config = ConfigDict(
+        json_schema_extra={"example": {"name": "IBM Telco", "slug": "ibm-telco"}}
+    )
 
     name: str = Field(..., description="Nome de exibição do tenant.")
-    slug: str = Field(..., description="Identificador único em lowercase-kebab. Imutável após criação.")
+    slug: str = Field(
+        ..., description="Identificador único em lowercase-kebab. Imutável após criação."
+    )
 
 
 class TenantResponse(BaseModel):
     """Resposta após criação de tenant."""
 
     model_config = ConfigDict(
-        json_schema_extra={"example": {"id": "3fa85f64-5717-4562-b3fc-2c963f66afa6", "name": "IBM Telco", "slug": "ibm-telco"}}
+        json_schema_extra={
+            "example": {
+                "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "name": "IBM Telco",
+                "slug": "ibm-telco",
+            }
+        }
     )
 
     id: str = Field(..., description="UUID do tenant.")
@@ -74,7 +83,7 @@ class ApiKeyCreate(BaseModel):
     )
 
     tenant_id: str = Field(..., description="UUID do tenant proprietário desta key.")
-    project_id: Optional[str] = Field(
+    project_id: str | None = Field(
         None,
         description="UUID do projeto. Se omitido, a key tem escopo de tenant e usa o nível 2 da cascade de modelo.",
     )
@@ -88,8 +97,8 @@ class ApiKeyCreate(BaseModel):
             "| `predictions:read` | `GET /predictions` |"
         ),
     )
-    description: Optional[str] = Field(None, description="Descrição livre para identificação da key.")
-    expires_at: Optional[datetime] = Field(
+    description: str | None = Field(None, description="Descrição livre para identificação da key.")
+    expires_at: datetime | None = Field(
         None,
         description="Data/hora de expiração da key (ISO 8601). `null` = sem expiração.",
     )
@@ -113,12 +122,18 @@ class ApiKeyResponse(BaseModel):
     )
 
     id: str = Field(..., description="UUID da API key.")
-    key_prefix: str = Field(..., description="Prefixo público da key (usado para identificação em logs).")
-    secret: str = Field(..., description="Key completa — **retornada apenas uma vez**. Não é possível recuperá-la.")
+    key_prefix: str = Field(
+        ..., description="Prefixo público da key (usado para identificação em logs)."
+    )
+    secret: str = Field(
+        ..., description="Key completa — **retornada apenas uma vez**. Não é possível recuperá-la."
+    )
     tenant_id: str
-    project_id: Optional[str]
+    project_id: str | None
     scopes: list[str]
-    expires_at: Optional[datetime] = Field(None, description="Data/hora de expiração. `null` = sem expiração.")
+    expires_at: datetime | None = Field(
+        None, description="Data/hora de expiração. `null` = sem expiração."
+    )
 
 
 class ApiKeyRecord(BaseModel):
@@ -127,12 +142,16 @@ class ApiKeyRecord(BaseModel):
     id: str = Field(..., description="UUID da API key.")
     key_prefix: str = Field(..., description="Prefixo público da key.")
     tenant_id: str
-    project_id: Optional[str]
+    project_id: str | None
     scopes: list[str]
     is_active: bool = Field(..., description="`false` indica que a key foi revogada.")
     created_at: str
-    expires_at: Optional[str] = Field(None, description="Data/hora de expiração. `null` = sem expiração.")
-    last_used_at: Optional[str] = Field(None, description="Última vez que a key foi utilizada. `null` se nunca usada.")
+    expires_at: str | None = Field(
+        None, description="Data/hora de expiração. `null` = sem expiração."
+    )
+    last_used_at: str | None = Field(
+        None, description="Última vez que a key foi utilizada. `null` se nunca usada."
+    )
 
 
 class ChampionModelConfigure(BaseModel):
@@ -151,8 +170,10 @@ class ChampionModelConfigure(BaseModel):
 
     model_id: str = Field(..., description="UUID do modelo em churn.models.")
     threshold: float = Field(0.5, ge=0, le=1, description="Threshold operacional do modelo.")
-    activation_reason: Optional[str] = Field(None, description="Motivo para ativar esta configuracao.")
-    description: Optional[str] = Field(None, description="Descricao livre da configuracao operacional.")
+    activation_reason: str | None = Field(None, description="Motivo para ativar esta configuracao.")
+    description: str | None = Field(
+        None, description="Descricao livre da configuracao operacional."
+    )
 
 
 class ChallengerModelConfigure(ChampionModelConfigure):
@@ -170,20 +191,24 @@ class ChallengerModelConfigure(ChampionModelConfigure):
         }
     )
 
-    traffic_split: float = Field(..., gt=0, le=0.5, description="Fracao do trafego enviada ao challenger.")
+    traffic_split: float = Field(
+        ..., gt=0, le=0.5, description="Fracao do trafego enviada ao challenger."
+    )
 
 
 class ModelPromotionRequest(BaseModel):
     """Payload para promover um challenger a champion."""
 
-    activation_reason: Optional[str] = Field(None, description="Motivo da promocao do challenger.")
+    activation_reason: str | None = Field(None, description="Motivo da promocao do challenger.")
 
 
 class ModelDeactivationRequest(BaseModel):
     """Payload para desligar uma configuracao de producao."""
 
     reason: str = Field(..., description="Motivo operacional do desligamento.")
-    replacement_model_id: Optional[str] = Field(None, description="Modelo substituto quando o desligamento for do champion.")
+    replacement_model_id: str | None = Field(
+        None, description="Modelo substituto quando o desligamento for do champion."
+    )
 
 
 class ProjectModelConfigRecord(BaseModel):
@@ -191,7 +216,7 @@ class ProjectModelConfigRecord(BaseModel):
 
     id: str
     tenant_id: str
-    project_id: Optional[str]
+    project_id: str | None
     model_id: str
     model_name: str
     model_version: str
@@ -201,11 +226,11 @@ class ProjectModelConfigRecord(BaseModel):
     traffic_split: float
     is_active: bool
     environment: str
-    configured_by: Optional[str] = None
-    description: Optional[str] = None
-    activation_reason: Optional[str] = None
+    configured_by: str | None = None
+    description: str | None = None
+    activation_reason: str | None = None
     configured_at: str
-    deactivated_at: Optional[str] = None
+    deactivated_at: str | None = None
     created_at: str
     updated_at: str
 
@@ -219,6 +244,6 @@ class ProjectModelConfigResponse(BaseModel):
 class ProjectModelConfigListResponse(BaseModel):
     """Listagem de configuracoes champion/challenger de um tenant ou projeto."""
 
-    champion: Optional[ProjectModelConfigRecord]
-    challenger: Optional[ProjectModelConfigRecord]
+    champion: ProjectModelConfigRecord | None
+    challenger: ProjectModelConfigRecord | None
     history: list[ProjectModelConfigRecord]

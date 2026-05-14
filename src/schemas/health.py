@@ -2,7 +2,7 @@
 Schemas dos endpoints de health check.
 """
 
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -13,7 +13,10 @@ class CheckResult(BaseModel):
     model_config = ConfigDict(json_schema_extra={"example": {"status": "ok", "latency_ms": 4}})
 
     status: Literal["ok", "error"]
-    latency_ms: Optional[int] = Field(None, description="Latência da verificação em milissegundos. `null` se o check falhou antes de completar.")
+    latency_ms: int | None = Field(
+        None,
+        description="Latência da verificação em milissegundos. `null` se o check falhou antes de completar.",
+    )
 
 
 class LivenessResponse(BaseModel):
@@ -33,7 +36,9 @@ class LivenessResponse(BaseModel):
     status: Literal["ok"]
     version: str = Field(..., description="Versão da API.")
     timestamp: str = Field(..., description="Timestamp UTC do momento da resposta (ISO 8601).")
-    latency_ms: int = Field(..., description="Latência de processamento do próprio endpoint em milissegundos.")
+    latency_ms: int = Field(
+        ..., description="Latência de processamento do próprio endpoint em milissegundos."
+    )
 
 
 class ReadinessResponse(BaseModel):
@@ -54,7 +59,9 @@ class ReadinessResponse(BaseModel):
 
     status: Literal["ready", "degraded"] = Field(
         ...,
-        description='`ready` — todas as dependências operacionais. `degraded` — uma ou mais dependências com falha.',
+        description="`ready` — todas as dependências operacionais. `degraded` — uma ou mais dependências com falha.",
     )
     timestamp: str = Field(..., description="Timestamp UTC do momento da verificação (ISO 8601).")
-    checks: dict[str, CheckResult] = Field(..., description="Resultado individual de cada dependência verificada.")
+    checks: dict[str, CheckResult] = Field(
+        ..., description="Resultado individual de cada dependência verificada."
+    )
