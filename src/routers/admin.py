@@ -121,7 +121,7 @@ def _get_model(db: Connection, model_id: str) -> dict:
     row = (
         db.execute(
             text("""
-            SELECT id, tenant_id, project_id, name, version, scope, status
+            SELECT id, tenant_id, project_id, name, version, status
             FROM churn.models
             WHERE id = :model_id
         """),
@@ -141,25 +141,19 @@ def _validate_model_for_scope(
     project_id: str | None,
     model_id: str,
 ) -> dict:
-    """Valida elegibilidade técnica e compatibilidade multi-tenant do modelo."""
+    """Valida que o modelo pertence ao tenant+projeto e está aprovado."""
     model = _get_model(db, model_id)
 
     if model["status"] != "approved":
         raise _conflict("Modelo precisa estar com status='approved' para uso em produção.")
 
-    scope = model["scope"]
-    if scope == "global":
-        return model
-    if scope == "tenant" and str(model["tenant_id"]) == str(tenant_id):
-        return model
-    if (
-        project_id is not None
-        and scope == "project"
-        and str(model["project_id"]) == str(project_id)
-    ):
-        return model
+    if str(model["tenant_id"]) != str(tenant_id):
+        raise _conflict("Modelo não é compatível com o tenant/projeto informado.")
 
-    raise _conflict("Modelo não é compatível com o tenant/projeto informado.")
+    if project_id is not None and str(model["project_id"]) != str(project_id):
+        raise _conflict("Modelo não é compatível com o tenant/projeto informado.")
+
+    return model
 
 
 def _validate_model_for_project(db: Connection, project: dict, model_id: str) -> dict:
@@ -693,8 +687,8 @@ Gera uma nova API key para autenticação nos endpoints de inferência e histór
 > (ex.: AWS Secrets Manager, HashiCorp Vault). Não é possível recuperá-lo posteriormente.
 
 **Escopo de dados determinado pela key:**
-- Com `project_id`: a key acessa dados e o modelo do projeto específico (nível 1 da cascade)
-- Sem `project_id`: a key tem escopo de tenant (nível 2 da cascade — config ativa do tenant)
+- Com `project_id`: a key acessa dados e o modelo do projeto específico
+- Sem `project_id`: a key tem acesso a todos os projetos do tenant (útil para keys de admin e CI/CD)
 """,
     response_description="Dados da key gerada, incluindo o `secret` completo (retornado apenas uma vez).",
     responses=_ADMIN_RESPONSES,
@@ -1042,27 +1036,6 @@ def configure_champion(
         "champion_configured", project_id=project_id, model_id=payload.model_id, by=admin.sub
     )
     return _configure_champion_for_scope(db, admin, str(project["tenant_id"]), project_id, payload)
-
-    _validate_model_for_project(db, project, payload.model_id)
-
-    _deactivate_role(db, project_id, "champion")
-    config = _upsert_model_config(
-        db=db,
-        project=project,
-        model_id=payload.model_id,
-        role="champion",
-        threshold=payload.threshold,
-        traffic_split=0.0,
-        configured_by=admin.sub,
-        activation_reason=payload.activation_reason,
-        description=payload.description,
-    )
-    db.commit()
-    invalidate_model_cache(str(project["tenant_id"]), project_id)
-    logger.info(
-        "champion_configured", project_id=project_id, model_id=payload.model_id, by=admin.sub
-    )
-    return ProjectModelConfigResponse(config=config)
 
 
 @router.post(

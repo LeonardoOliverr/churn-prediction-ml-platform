@@ -85,7 +85,7 @@ class ApiKeyCreate(BaseModel):
     tenant_id: str = Field(..., description="UUID do tenant proprietário desta key.")
     project_id: str | None = Field(
         None,
-        description="UUID do projeto. Se omitido, a key tem escopo de tenant e usa o nível 2 da cascade de modelo.",
+        description="UUID do projeto ao qual a key está vinculada. Se omitido, a key tem acesso a todos os projetos do tenant.",
     )
     scopes: list[ApiScope] = Field(
         [ApiScope.PREDICT],

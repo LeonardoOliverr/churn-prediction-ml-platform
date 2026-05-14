@@ -56,16 +56,11 @@ O token é gerado externamente com a chave `APP_SECRET_KEY` (HS256, expiração 
 
 ## Resolução de Modelo (Champion-Challenger)
 
-A API seleciona automaticamente o modelo operacional seguindo três níveis de especificidade:
-
-| Nível | Fonte | Condição |
-|---|---|---|
-| 1 | `project_model_config` | Champion/challenger do projeto da API key |
-| 2 | `project_model_config` | Champion ativo do tenant (API key sem `project_id`) |
-| 3 | `churn.models` | Modelo global aprovado (`scope = 'global'`) |
+A API seleciona o modelo operacional a partir de `project_model_config` do projeto associado à API key.
+Champion e challenger são configurados por projeto — sem fallback para tenant ou escopo global.
 
 Quando existe challenger ativo, o tráfego é dividido por hash determinístico de `customer_id`, respeitando `traffic_split`.
-Se nenhum nível retornar resultado, a API responde `404 model_not_found`.
+Se o projeto não tiver champion configurado, a API responde `404 model_not_found`.
 
 ---
 
