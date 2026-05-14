@@ -23,7 +23,7 @@ import pandas as pd
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from ml.config.settings import TARGET
-from ml.core.logger import get_logger
+from core.logger import get_logger
 from ml.data.preprocessing import build_preprocessor, load_data
 
 logger = get_logger()

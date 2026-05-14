@@ -30,7 +30,9 @@ tests/
 │   │   ├── test_evaluation_comparison.py
 │   │   ├── test_evaluation_reports.py
 │   │   ├── test_mlp.py                  # MLP PyTorch
-│   │   └── test_registry.py             # registro no MLflow + DB
+│   │   ├── test_registry.py             # registro no MLflow + DB
+│   │   ├── test_compare_models.py       # ml/tools/compare_models.py — plots, MLflow mock, _load_best_runs
+│   │   └── test_export_dataset.py       # ml/tools/export_dataset.py — _get_feature_names (7 branches), export()
 │   ├── pipeline/
 │   │   └── test_pipeline.py             # transform() e load() sem banco
 │   └── scripts/
@@ -132,7 +134,7 @@ start htmlcov/index.html       # Windows
 
 ## Isolamento — o que cada camada usa
 
-| | Banco | MLflow | API HTTP |
-|---|---|---|---|
-| `unit/` | Não — dados via `fake_customers_df` ou mocks | Mockado com `unittest.mock` | Não |
-| `integration/` | Sim — `churn_test` (PostgreSQL 5434) | Mockado (`mlflow.sklearn.load_model`) | Sim — `TestClient` FastAPI |
+| | Banco | MLflow | API HTTP | Cobertura |
+|---|---|---|---|---|
+| `unit/` | Não — dados via `fake_customers_df` ou mocks | Mockado com `unittest.mock` | Não | 85% |
+| `integration/` | Sim — `churn_test` (PostgreSQL 5434) | Mockado (`mlflow.sklearn.load_model`) | Sim — `TestClient` FastAPI | 43% |

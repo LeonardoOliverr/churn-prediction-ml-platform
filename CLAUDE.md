@@ -118,7 +118,7 @@ O agente deve respeitar as seguintes regras:
 | Relatório de negócio (`notebooks/relatorio_negocio.md`) | ✅ Completo |
 | Treinamento baseline (`ml/`) — DummyClassifier + Logistic Regression | ✅ Completo |
 | Random Forest (`ml/models/random_forest/`) | ✅ Completo |
-| Testes automatizados (`tests/`) — unit, smoke, schema, api | ✅ Completo |
+| Testes automatizados (`tests/`) — unit 85%, integração 43% (isolados) | ✅ Completo |
 | API de inferência (`src/`) | ✅ Completo |
 | Avaliação em produção (`ml/evaluate_production.py`) | ✅ Completo |
 | Scripts operacionais (`scripts/`) | ✅ Completo |

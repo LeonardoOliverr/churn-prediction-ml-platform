@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 import mlflow
 
 from ml.config.settings import MLFLOW_TRACKING_URI
-from ml.core.logger import get_logger
+from core.logger import get_logger
 
 logger = get_logger()
 
