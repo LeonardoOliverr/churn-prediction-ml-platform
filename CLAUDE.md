@@ -89,7 +89,7 @@ psql -U churn_user -d churn_dev -h localhost -p 5434
 - Evitar abreviações ambíguas
 - PKs sempre UUID com `DEFAULT gen_random_uuid()`
 - Variáveis de ambiente via `python-dotenv` — nunca hardcoded
-- Scripts Python ficam em `pipeline/` (ingestão) e `ml/` (treinamento)
+- Scripts Python ficam em `scripts/` (ingestão e operacional) e `ml/` (treinamento)
 - Notebooks ficam em `notebooks/` — só para EDA, nunca para produção
 - Modelos treinados são registrados no MLflow Model Registry e na tabela `churn.models`
 
@@ -112,7 +112,7 @@ O agente deve respeitar as seguintes regras:
 | Módulo | Status |
 |---|---|
 | Infraestrutura (Docker + PostgreSQL + MLflow) | ✅ Completo |
-| Schema multi-tenant (Sqitch — migrations 00–18) | ✅ Completo |
+| Schema multi-tenant (Sqitch — migrations 00–25) | ✅ Completo |
 | Pipeline de ingestão (`scripts/load_ibm_telco.py`) | ✅ Completo |
 | EDA (`notebooks/01_eda.ipynb`) | ✅ Completo |
 | Relatório de negócio (`notebooks/relatorio_negocio.md`) | ✅ Completo |
@@ -132,7 +132,7 @@ O agente deve respeitar as seguintes regras:
 |---|---|
 | `docker-compose.yml` | Orquestra PostgreSQL e MLflow |
 | `db/sqitch.conf` | Configuração do Sqitch (target: localhost:5434) |
-| `db/deploy/*.sql` | Migrations de schema (00–18) |
+| `db/deploy/*.sql` | Migrations de schema (00–25) |
 | `db/seed/001_default_tenant.sql` | Seed de tenant e projeto padrão |
 | `scripts/load_ibm_telco.py` | Carga do dataset IBM Telco |
 | `ml/evaluate_production.py` | Avalia predictions × outcomes, grava evaluation_run_results |

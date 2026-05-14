@@ -78,7 +78,7 @@ pytest tests/unit/
 # por subdomínio
 pytest tests/unit/ml/
 pytest tests/unit/api/
-pytest tests/unit/pipeline/
+pytest tests/unit/scripts/
 
 # por marker
 pytest -m "smoke or schema or api"

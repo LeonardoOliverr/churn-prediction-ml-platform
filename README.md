@@ -37,10 +37,8 @@ Plataforma de machine learning end-to-end para previsão de churn de clientes em
 [5] INFERÊNCIA
     FastAPI  POST /predict  |  POST /predict/batch
     ├── autentica via churn.api_keys (x-api-key)
-    ├── resolve modelo com cascade e split determinístico por customer_id:
-    │     1º champion/challenger do projeto   (API key com project_id)
-    │     2º champion do tenant               (API key sem project_id)
-    │     3º churn.models scope=global        (modelo global aprovado)
+    ├── resolve modelo com split determinístico por customer_id:
+    │     champion/challenger do projeto (404 explícito se não configurado)
     ├── carrega artefato do MLflow
     └── churn.predictions   → log de cada predição
                 │
@@ -154,20 +152,12 @@ API Key com project_id
         │
         ▼
 1º  project_model_config champion/challenger WHERE project_id = :project_id AND is_active = TRUE
-        │ não encontrou
-        ▼
-2º  project_model_config champion WHERE tenant_id = :tenant_id AND is_active = TRUE
-    (fallback legado para API key sem project_id)
-        │ não encontrou
-        ▼
-3º  churn.models WHERE scope = 'global' AND status = 'approved'
-    (modelo global aprovado mais recente)
-        │ não encontrou
+        │ não encontrado
         ▼
     404 model_not_found
 ```
 
-Quando há challenger ativo, a API usa `customer_id` para aplicar split determinístico. O mesmo cliente tende a permanecer no mesmo grupo durante o teste. O nível 3 consulta `churn.models` diretamente — é o único caso em que a API não passa por `project_model_config`. O threshold aplicado nesse caso é o padrão (`0.5`).
+Quando há challenger ativo, a API usa `customer_id` para aplicar split determinístico — o mesmo cliente permanece no mesmo grupo durante o teste. Projeto sem champion configurado retorna 404 explícito; não há fallback para tenant nem para modelo global.
 
 ### Fluxo de promoção de modelo
 
@@ -417,9 +407,6 @@ churn-prediction-ml-platform/
 │   ├── seed_outcomes_from_customers.py  # popula churn.outcomes com ground truth do holdout
 │   ├── predict_holdout_batch.py         # envia clientes holdout para a API em lote
 │   └── optimize_threshold.py            # varre thresholds → ponto ótimo de custo por modelo
-│
-├── pipeline/
-│   └── load_ibm_telco.py           # download via kagglehub + bulk insert em churn.customers
 │
 └── db/
     ├── sqitch                      # wrapper Docker do Sqitch (sem instalação local)

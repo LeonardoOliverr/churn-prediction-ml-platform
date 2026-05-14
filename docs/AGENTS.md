@@ -19,8 +19,9 @@ Plataforma de machine learning end-to-end para previsão de churn de clientes em
 | Experiment tracking | MLflow (porta 5000) |
 | Ingestão | kagglehub + pandas + SQLAlchemy |
 | EDA | Jupyter + matplotlib + seaborn |
-| Treinamento | scikit-learn + PyTorch (a implementar) |
-| API | FastAPI (a implementar) |
+| Treinamento | scikit-learn (baseline + Random Forest) |
+| Avaliação | `ml/evaluate_production.py` + `scripts/optimize_threshold.py` |
+| API | FastAPI |
 
 ---
 
@@ -54,11 +55,22 @@ cp .env.example .env
 ```
 churn.tenants
 churn.projects
-churn.customers        ← dataset IBM Telco (~7k registros)
-churn.models
+churn.customers              ← dataset IBM Telco (~7k registros, split train/holdout)
+churn.models                 ← tenant_id + project_id obrigatórios (sem escopo global/tenant)
 churn.project_model_config
+churn.api_keys               ← autenticação de inferência
 churn.predictions
-churn.cost_analysis
+churn.outcomes               ← ground truth de churn real
+churn.evaluation_runs        ← runs de avaliação (período, custos)
+churn.evaluation_run_results ← métricas por modelo por run
+churn.cost_model_config      ← configuração de custo operacional por projeto
+```
+
+Views analíticas:
+
+```
+churn.model_performance      ← consolidação de evaluation_run_results + runs
+churn.evaluation_comparison  ← delta vs champion por run (F1, recall, custo)
 ```
 
 ### Comandos úteis
@@ -78,7 +90,7 @@ psql -U churn_user -d churn_dev -h localhost -p 5434
 - Evitar abreviações ambíguas
 - PKs sempre UUID com `DEFAULT gen_random_uuid()`
 - Variáveis de ambiente via `python-dotenv` — nunca hardcoded
-- Scripts Python ficam em `pipeline/` (ingestão) e `ml/` (treinamento)
+- Scripts Python ficam em `scripts/` (ingestão e operacional) e `ml/` (treinamento)
 - Notebooks ficam em `notebooks/` — só para EDA, nunca para produção
 - Modelos treinados são registrados no MLflow Model Registry e na tabela `churn.models`
 
@@ -101,13 +113,17 @@ O agente deve respeitar as seguintes regras:
 | Módulo | Status |
 |---|---|
 | Infraestrutura (Docker + PostgreSQL + MLflow) | ✅ Completo |
-| Schema multi-tenant (Sqitch) | ✅ Completo |
+| Schema multi-tenant (Sqitch — migrations 00–25) | ✅ Completo |
 | Pipeline de ingestão (`scripts/load_ibm_telco.py`) | ✅ Completo |
 | EDA (`notebooks/01_eda.ipynb`) | ✅ Completo |
 | Relatório de negócio (`notebooks/relatorio_negocio.md`) | ✅ Completo |
 | Treinamento baseline (`ml/`) — DummyClassifier + Logistic Regression | ✅ Completo |
-| Testes automatizados (`tests/`) — unit, smoke, schema, api | ✅ Completo |
+| Random Forest (`ml/models/random_forest/`) | ✅ Completo |
+| Testes automatizados (`tests/`) — unit 85%, integração 43% (isolados) | ✅ Completo |
 | API de inferência (`src/`) | ✅ Completo |
+| Avaliação em produção (`ml/evaluate_production.py`) | ✅ Completo |
+| Scripts operacionais (`scripts/`) | ✅ Completo |
+| Próximos experimentos (`ml/`) — XGBoost, MLP | 🔲 Pendente |
 
 ---
 
@@ -115,10 +131,16 @@ O agente deve respeitar as seguintes regras:
 
 | Arquivo | Função |
 |---|---|
-| `docker-compose.yml` | Orquestra PostgreSQL e MLflow |
+| `docker-compose.yml` | Orquestra PostgreSQL, MLflow, API e Grafana |
+| `Makefile` | Atalhos para lint, test, run, build, logs |
 | `db/sqitch.conf` | Configuração do Sqitch (target: localhost:5434) |
-| `db/deploy/*.sql` | Migrations de schema |
+| `db/deploy/*.sql` | Migrations de schema (00–25) |
 | `db/seed/001_default_tenant.sql` | Seed de tenant e projeto padrão |
 | `scripts/load_ibm_telco.py` | Carga do dataset IBM Telco |
+| `ml/evaluate_production.py` | Avalia predictions × outcomes, grava evaluation_run_results |
+| `scripts/seed_outcomes_from_customers.py` | Popula churn.outcomes com ground truth do holdout |
+| `scripts/predict_holdout_batch.py` | Envia clientes holdout para a API em lote |
+| `scripts/optimize_threshold.py` | Varre thresholds para encontrar ponto ótimo de custo |
+| `src/` | API de inferência FastAPI |
 | `requirements.txt` | Dependências Python |
 | `.env` | Variáveis de ambiente (não versionado) |
