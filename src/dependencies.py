@@ -9,8 +9,8 @@ Inclui:
   - Factory de verificação de escopos (require_scope)
 """
 
+from collections.abc import Generator
 from datetime import datetime, timezone
-from typing import Generator, Optional
 
 import bcrypt
 import structlog
@@ -30,10 +30,10 @@ logger = structlog.get_logger()
 # Tamanho máximo 2048 entradas; TTL definido dinamicamente pela Settings
 _api_key_cache: TTLCache = TTLCache(maxsize=2048, ttl=60)
 
-_engine: Optional[Engine] = None
+_engine: Engine | None = None
 
 
-def _get_engine(settings: Optional[Settings] = None) -> Engine:
+def _get_engine(settings: Settings | None = None) -> Engine:
     """Retorna engine SQLAlchemy singleton. Cria com pool_pre_ping na primeira chamada."""
     global _engine
     if _engine is None:
@@ -52,18 +52,22 @@ def get_db(settings: Settings = Depends(get_settings)) -> Generator[Connection, 
         yield conn
 
 
-def _lookup_api_key(key: str, db: Connection) -> Optional[ApiKeyRecord]:
+def _lookup_api_key(key: str, db: Connection) -> ApiKeyRecord | None:
     """Busca, valida hash bcrypt e retorna ApiKeyRecord. Retorna None em qualquer falha."""
     prefix = key[:20]
-    row = db.execute(
-        text("""
+    row = (
+        db.execute(
+            text("""
             SELECT id, tenant_id, project_id, key_hash, scopes, is_active, expires_at, key_prefix
             FROM churn.api_keys
             WHERE key_prefix = :prefix
               AND is_active   = TRUE
         """),
-        {"prefix": prefix},
-    ).mappings().first()
+            {"prefix": prefix},
+        )
+        .mappings()
+        .first()
+    )
 
     if not row:
         return None
@@ -107,7 +111,7 @@ def _update_last_used(key_id: str, engine: Engine) -> None:
 
 
 def get_current_api_key(
-    x_api_key: Optional[str] = Header(default=None, alias="x-api-key"),
+    x_api_key: str | None = Header(default=None, alias="x-api-key"),
     db: Connection = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> ApiKeyRecord:
@@ -116,7 +120,11 @@ def get_current_api_key(
 
     unauthorized = HTTPException(
         status_code=401,
-        detail={"error": "invalid_api_key", "message": "API key inválida ou revogada.", "request_id": "unknown"},
+        detail={
+            "error": "invalid_api_key",
+            "message": "API key inválida ou revogada.",
+            "request_id": "unknown",
+        },
     )
 
     if not x_api_key:
@@ -145,13 +153,17 @@ def get_current_api_key(
 
 
 def get_current_admin(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
     settings: Settings = Depends(get_settings),
 ) -> AdminClaims:
     """Valida JWT Bearer via HTTPBearer scheme (compatível com Swagger UI)."""
     unauthorized = HTTPException(
         status_code=401,
-        detail={"error": "invalid_token", "message": "Token JWT inválido ou expirado.", "request_id": "unknown"},
+        detail={
+            "error": "invalid_token",
+            "message": "Token JWT inválido ou expirado.",
+            "request_id": "unknown",
+        },
     )
 
     if not credentials:
@@ -160,18 +172,23 @@ def get_current_admin(
     try:
         payload = jwt.decode(credentials.credentials, settings.app_secret_key, algorithms=["HS256"])
     except JWTError:
-        raise unauthorized
+        raise unauthorized from None
 
     sub = payload.get("sub")
     exp = payload.get("exp")
     if not sub or not exp:
         raise unauthorized
 
-    return AdminClaims(sub=str(sub), exp=int(exp), extra={k: v for k, v in payload.items() if k not in ("sub", "exp")})
+    return AdminClaims(
+        sub=str(sub),
+        exp=int(exp),
+        extra={k: v for k, v in payload.items() if k not in ("sub", "exp")},
+    )
 
 
 def require_scope(scope: str):
     """Factory que retorna uma dependência verificando se a API key possui o escopo necessário."""
+
     def _check(api_key: ApiKeyRecord = Depends(get_current_api_key)) -> ApiKeyRecord:
         if scope not in api_key.scopes:
             raise HTTPException(
@@ -183,4 +200,5 @@ def require_scope(scope: str):
                 },
             )
         return api_key
+
     return _check

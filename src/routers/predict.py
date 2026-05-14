@@ -16,11 +16,11 @@ import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from sqlalchemy.engine import Connection
 
+from domain.exceptions import BatchTooLargeError
 from ml.config.settings import BOOL_FEATURES, CATEGORICAL_FEATURES, NUMERIC_FEATURES
 from ml.domain.risk import classify_risk
-from domain.exceptions import BatchTooLargeError
 from src.config import Settings, get_settings
-from src.dependencies import _get_engine, get_current_api_key, get_db, require_scope
+from src.dependencies import _get_engine, get_db, require_scope
 from src.middleware.auth import ApiKeyRecord
 from src.middleware.rate_limit import key_limiter, tenant_limiter
 from src.schemas.predict import (
@@ -70,17 +70,28 @@ def _make_response(
 _COMMON_RESPONSES = {
     401: {
         "description": "API key ausente, inválida ou revogada.",
-        "content": {"application/json": {"example": {"error": "unauthorized", "message": "API key inválida ou revogada."}}},
+        "content": {
+            "application/json": {
+                "example": {"error": "unauthorized", "message": "API key inválida ou revogada."}
+            }
+        },
     },
     403: {
         "description": "Escopo insuficiente para o endpoint.",
-        "content": {"application/json": {"example": {"error": "forbidden", "message": "Escopo 'predict' requerido."}}},
+        "content": {
+            "application/json": {
+                "example": {"error": "forbidden", "message": "Escopo 'predict' requerido."}
+            }
+        },
     },
     404: {
         "description": "Nenhum modelo ativo encontrado para o tenant/projeto.",
         "content": {
             "application/json": {
-                "example": {"error": "model_not_found", "message": "Nenhum modelo ativo encontrado para este tenant/projeto."}
+                "example": {
+                    "error": "model_not_found",
+                    "message": "Nenhum modelo ativo encontrado para este tenant/projeto.",
+                }
             }
         },
     },
@@ -89,7 +100,14 @@ _COMMON_RESPONSES = {
     },
     429: {
         "description": "Limite de requisições atingido (60/min por key ou 1.000/h por tenant).",
-        "content": {"application/json": {"example": {"error": "rate_limit_exceeded", "message": "Rate limit exceeded: 60 per 1 minute"}}},
+        "content": {
+            "application/json": {
+                "example": {
+                    "error": "rate_limit_exceeded",
+                    "message": "Rate limit exceeded: 60 per 1 minute",
+                }
+            }
+        },
     },
 }
 
@@ -188,11 +206,17 @@ Realiza predições de churn para **múltiplos clientes** em uma única requisi�
                     "examples": {
                         "batch_too_large": {
                             "summary": "Lote acima do limite",
-                            "value": {"error": "batch_too_large", "message": "Máximo de 100 clientes por requisição."},
+                            "value": {
+                                "error": "batch_too_large",
+                                "message": "Máximo de 100 clientes por requisição.",
+                            },
                         },
                         "empty_batch": {
                             "summary": "Lote vazio",
-                            "value": {"error": "empty_batch", "message": "Lista de clientes não pode ser vazia."},
+                            "value": {
+                                "error": "empty_batch",
+                                "message": "Lista de clientes não pode ser vazia.",
+                            },
                         },
                     }
                 }
@@ -219,7 +243,11 @@ def predict_batch(
     if not batch.customers:
         raise HTTPException(
             status_code=422,
-            detail={"error": "empty_batch", "message": "Lista de clientes não pode ser vazia.", "request_id": "unknown"},
+            detail={
+                "error": "empty_batch",
+                "message": "Lista de clientes não pode ser vazia.",
+                "request_id": "unknown",
+            },
         )
 
     start_ms = time.perf_counter()
@@ -258,7 +286,7 @@ def predict_batch(
         threshold = group["threshold"]
         model_record = group["model_record"]
 
-        for (index, customer), prob in zip(group["items"], probs):
+        for (index, customer), prob in zip(group["items"], probs, strict=False):
             prob = float(prob)
             latency_ms = round((time.perf_counter() - start_ms) * 1000)
             prediction_id = str(uuid.uuid4())
@@ -278,5 +306,9 @@ def predict_batch(
             )
 
     latency_ms = round((time.perf_counter() - start_ms) * 1000)
-    logger.info("batch_predict", count=len(results), latency_ms=latency_ms, tenant_id=api_key.tenant_id)
-    return BatchPredictResponse(results=[result for result in results if result is not None], total=len(results))
+    logger.info(
+        "batch_predict", count=len(results), latency_ms=latency_ms, tenant_id=api_key.tenant_id
+    )
+    return BatchPredictResponse(
+        results=[result for result in results if result is not None], total=len(results)
+    )

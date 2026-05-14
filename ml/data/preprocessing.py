@@ -32,9 +32,7 @@ def _build_engine():
 
 def _resolve_tenant_id(conn, tenant_slug: str | None) -> str:
     if tenant_slug is None:
-        return str(
-            conn.execute(text("SELECT id FROM churn.tenants LIMIT 1")).scalar_one()
-        )
+        return str(conn.execute(text("SELECT id FROM churn.tenants LIMIT 1")).scalar_one())
     return str(
         conn.execute(
             text("SELECT id FROM churn.tenants WHERE slug = :s"),
@@ -99,7 +97,7 @@ def load_data(
 
     for col in BOOL_FEATURES:
         df[col] = pd.to_numeric(
-            df[col].map({True: 1, False: 0, 1: 1, 0: 0}),
+            df[col].map({True: 1, False: 0}),
             errors="coerce",
         )
 

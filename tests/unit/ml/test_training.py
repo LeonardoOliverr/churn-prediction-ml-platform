@@ -6,20 +6,18 @@ Inclui:
 - train_with_cv(): comportamento com e sem holdout
 """
 
+from unittest.mock import patch
+
 import numpy as np
-import pytest
 from sklearn.dummy import DummyClassifier
-from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
-from unittest.mock import MagicMock, patch
 
 from ml.config.settings import TARGET
+from ml.core.training import SCORING
 from ml.data.preprocessing import build_preprocessor
-from ml.core.training import CV, SCORING
-
 
 _FAKE_CV_RESULTS = {
-    **{f"test_{m}":  np.array([0.5, 0.6, 0.55, 0.58, 0.52]) for m in SCORING},
+    **{f"test_{m}": np.array([0.5, 0.6, 0.55, 0.58, 0.52]) for m in SCORING},
     **{f"train_{m}": np.array([0.8, 0.82, 0.81, 0.80, 0.79]) for m in SCORING},
 }
 
@@ -36,18 +34,19 @@ def test_cv_metrics_returns_expected_keys(fake_customers_df):
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
 
-    pipeline = Pipeline([
-        ("preprocessor", build_preprocessor()),
-        ("classifier", DummyClassifier(strategy="stratified", random_state=42)),
-    ])
+    pipeline = Pipeline(
+        [
+            ("preprocessor", build_preprocessor()),
+            ("classifier", DummyClassifier(strategy="stratified", random_state=42)),
+        ]
+    )
 
     with patch("ml.core.training.metrics.cross_validate", return_value=_FAKE_CV_RESULTS):
         metrics = _cv_metrics(pipeline, X, y)
 
-    expected_keys = (
-        [f"{m}_{stat}" for m in SCORING for stat in ("mean", "std")]
-        + [f"train_{m}_mean" for m in SCORING]
-    )
+    expected_keys = [f"{m}_{stat}" for m in SCORING for stat in ("mean", "std")] + [
+        f"train_{m}_mean" for m in SCORING
+    ]
     for key in expected_keys:
         assert key in metrics, f"Chave ausente em metrics: '{key}'"
 
@@ -59,10 +58,12 @@ def test_cv_metrics_values_are_floats(fake_customers_df):
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
 
-    pipeline = Pipeline([
-        ("preprocessor", build_preprocessor()),
-        ("classifier", DummyClassifier(strategy="stratified", random_state=42)),
-    ])
+    pipeline = Pipeline(
+        [
+            ("preprocessor", build_preprocessor()),
+            ("classifier", DummyClassifier(strategy="stratified", random_state=42)),
+        ]
+    )
 
     with patch("ml.core.training.metrics.cross_validate", return_value=_FAKE_CV_RESULTS):
         metrics = _cv_metrics(pipeline, X, y)
@@ -198,8 +199,6 @@ def test_train_with_cv_holdout_separates_approx_20_percent(fake_customers_df):
     fake_cv.update({f"train_{m}_mean": 0.5 for m in SCORING})
 
     captured_X_train = {}
-
-    original_cv_metrics = __import__("ml.core.training", fromlist=["_cv_metrics"])._cv_metrics
 
     def mock_cv(pipeline, X, y):
         captured_X_train["n"] = len(X)

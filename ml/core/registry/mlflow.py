@@ -43,7 +43,7 @@ def log_to_mlflow(
             importances = pipeline.named_steps["classifier"].feature_importances_
             importance_map = dict(
                 sorted(
-                    zip(feature_names, importances.tolist()),
+                    zip(feature_names, importances.tolist(), strict=False),
                     key=lambda x: x[1],
                     reverse=True,
                 )
