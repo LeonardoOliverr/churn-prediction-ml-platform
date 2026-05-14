@@ -30,7 +30,6 @@ _MODEL_SELECT_FIELDS = """
     m.mlflow_run_id,
     m.version,
     m.name,
-    m.scope,
     m.tenant_id AS model_tenant_id,
     m.project_id AS model_project_id,
     pmc.tenant_id,
@@ -54,43 +53,8 @@ _SQL_PROJECT_MODEL_BY_ROLE = text(f"""
     LIMIT 1
 """)
 
-_SQL_TENANT_MODEL_BY_ROLE = text(f"""
-    SELECT {_MODEL_SELECT_FIELDS}
-    FROM churn.project_model_config pmc
-    JOIN churn.models m ON m.id = pmc.model_id
-    WHERE pmc.tenant_id    = :tenant_id
-      AND pmc.project_id   IS NULL
-      AND pmc.environment  = 'production'
-      AND pmc.is_active    = TRUE
-      AND pmc.role         = :role
-      AND m.status         = 'approved'
-    ORDER BY pmc.configured_at DESC, pmc.id DESC
-    LIMIT 1
-""")
 
-_SQL_GLOBAL_MODEL = text("""
-    SELECT
-        m.id,
-        m.mlflow_run_id,
-        m.version,
-        m.name,
-        m.scope,
-        m.tenant_id AS model_tenant_id,
-        m.project_id AS model_project_id,
-        NULL AS tenant_id,
-        NULL AS project_id,
-        'champion' AS role,
-        0.5 AS threshold,
-        0.0 AS traffic_split
-    FROM churn.models m
-    WHERE m.scope  = 'global'
-      AND m.status = 'approved'
-    ORDER BY m.trained_at DESC
-    LIMIT 1
-""")
-
-
-def _model_not_found(tenant_id: str, project_id: str | None) -> ModelNotFoundError:
+def _model_not_found(tenant_id: str, project_id: str) -> ModelNotFoundError:
     """Cria erro de domínio quando não há modelo de produção configurado."""
     return ModelNotFoundError(
         f"Nenhum modelo aprovado em produção encontrado "
@@ -111,38 +75,14 @@ def _query_project_model_by_role(tenant_id: str, project_id: str, role: str, db)
     return dict(row) if row else None
 
 
-def _query_tenant_model_by_role(tenant_id: str, role: str, db) -> dict | None:
-    """Busca champion ou challenger ativo em escopo de tenant."""
-    row = (
-        db.execute(_SQL_TENANT_MODEL_BY_ROLE, {"tenant_id": tenant_id, "role": role})
-        .mappings()
-        .first()
-    )
-    return dict(row) if row else None
-
-
-def _query_global_model(db) -> dict | None:
-    """Busca modelo global aprovado para fallback universal."""
-    row = db.execute(_SQL_GLOBAL_MODEL).mappings().first()
-    return dict(row) if row else None
-
-
 def _query_serving_candidates(
-    tenant_id: str, project_id: str | None, db
+    tenant_id: str,
+    project_id: str,
+    db,
 ) -> tuple[dict, dict | None]:
-    """Retorna (champion, challenger) respeitando fallback global para champion."""
-    challenger = None
-    champion = None
-
-    if project_id is not None:
-        champion = _query_project_model_by_role(tenant_id, project_id, "champion", db)
-        challenger = _query_project_model_by_role(tenant_id, project_id, "challenger", db)
-    else:
-        champion = _query_tenant_model_by_role(tenant_id, "champion", db)
-        challenger = _query_tenant_model_by_role(tenant_id, "challenger", db)
-
-    if champion is None:
-        champion = _query_global_model(db)
+    """Retorna (champion, challenger) do projeto. Erro 404 explícito se não configurado."""
+    champion = _query_project_model_by_role(tenant_id, project_id, "champion", db)
+    challenger = _query_project_model_by_role(tenant_id, project_id, "challenger", db)
 
     if champion is None:
         raise _model_not_found(tenant_id, project_id)
@@ -150,16 +90,16 @@ def _query_serving_candidates(
     return champion, challenger
 
 
-def _traffic_bucket(tenant_id: str, project_id: str | None, customer_id: str) -> float:
+def _traffic_bucket(tenant_id: str, project_id: str, customer_id: str) -> float:
     """Calcula bucket determinístico entre 0 e 1 para roteamento de tráfego."""
-    key = f"{tenant_id}:{project_id or ''}:{customer_id}".encode()
+    key = f"{tenant_id}:{project_id}:{customer_id}".encode()
     digest = hashlib.sha256(key).hexdigest()
     return int(digest[:16], 16) / float(2**64)
 
 
 def _choose_record(
     tenant_id: str,
-    project_id: str | None,
+    project_id: str,
     customer_id: str | None,
     champion: dict,
     challenger: dict | None,
@@ -210,7 +150,7 @@ def _load_pipeline(record: dict, cache_key: tuple, ttl: int) -> tuple[Any, float
 
 def resolve_model(
     tenant_id: str,
-    project_id: str | None,
+    project_id: str,
     db: Any,
     settings: Any,
     customer_id: str | None = None,
@@ -224,7 +164,7 @@ def resolve_model(
 
 def resolve_batch_models(
     tenant_id: str,
-    project_id: str | None,
+    project_id: str,
     db: Any,
     settings: Any,
 ) -> tuple[tuple[Any, float, dict], tuple[Any, float, dict] | None]:
@@ -249,7 +189,7 @@ def resolve_batch_models(
 
 def choose_for_customer(
     tenant_id: str,
-    project_id: str | None,
+    project_id: str,
     customer_id: str | None,
     champion_loaded: tuple[Any, float, dict],
     challenger_loaded: tuple[Any, float, dict] | None,

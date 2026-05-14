@@ -123,10 +123,8 @@ _COMMON_RESPONSES = {
 
 Realiza a predição de churn para **um único cliente**.
 
-O modelo ativo é selecionado automaticamente seguindo a **cascade de resolução**:
-1. `project_model_config` do projeto da API key, com suporte a champion/challenger
-2. `project_model_config` do tenant (API key sem `project_id`)
-3. Modelo global aprovado em `churn.models`
+O modelo ativo é selecionado a partir do `project_model_config` do projeto vinculado à API key.
+Se o projeto não tiver um champion configurado, a API responde `404 model_not_found`.
 
 Quando há challenger ativo no projeto, a seleção usa hash determinístico de `customer_id`
 e respeita o `traffic_split` configurado.

@@ -23,6 +23,7 @@ from sqlalchemy.engine import Connection, Engine
 
 from src.config import Settings, get_settings
 from src.middleware.auth import AdminClaims, ApiKeyRecord
+from src.middleware.rate_limit import _prefix_tenant_cache
 
 logger = structlog.get_logger()
 
@@ -144,6 +145,7 @@ def get_current_api_key(
         raise unauthorized
 
     _api_key_cache[x_api_key] = record
+    _prefix_tenant_cache[record.key_prefix] = record.tenant_id
 
     # Atualiza last_used_at sem bloquear a resposta
     _update_last_used(record.id, _get_engine(settings))

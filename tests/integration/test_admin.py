@@ -184,12 +184,12 @@ def test_promover_challenger_a_champion(
     db_conn.execute(
         text("""
             INSERT INTO churn.models
-                (id, name, version, scope, status, mlflow_run_id, trained_at)
+                (id, tenant_id, project_id, name, version, status, mlflow_run_id, trained_at)
             VALUES
-                (:id, 'ChallengerModel', 'v-chall', 'global', 'approved',
+                (:id, :tenant_id, :project_id, 'ChallengerModel', 'v-chall', 'approved',
                  'fake-run-chall-000', NOW())
         """),
-        {"id": model2_id},
+        {"id": model2_id, "tenant_id": seed_tenant, "project_id": seed_project},
     )
     db_conn.commit()
 

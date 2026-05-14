@@ -6,6 +6,9 @@ import time
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from domain.exceptions import ModelNotFoundError
 from src.services import model_resolver
 
 
@@ -143,23 +146,13 @@ def test_query_project_model_by_role_returns_none_when_no_row():
     assert result is None
 
 
-def test_query_global_model_returns_dict_when_found():
-    """Retorna dict quando existe modelo global aprovado."""
-    mock_row = {"id": "global-m1", "role": "champion", "scope": "global"}
-    db = MagicMock()
-    db.execute.return_value.mappings.return_value.first.return_value = mock_row
-
-    result = model_resolver._query_global_model(db)
-
-    assert result == mock_row
-
-
-def test_query_global_model_returns_none_when_absent():
-    """Retorna None quando não há modelo global aprovado."""
+def test_query_serving_candidates_raises_404_when_no_champion():
+    """Projeto sem champion configurado levanta ModelNotFoundError."""
     db = MagicMock()
     db.execute.return_value.mappings.return_value.first.return_value = None
 
-    assert model_resolver._query_global_model(db) is None
+    with pytest.raises(ModelNotFoundError):
+        model_resolver._query_serving_candidates("tenant-1", "project-1", db)
 
 
 # ---------------------------------------------------------------------------
@@ -231,43 +224,19 @@ def test_choose_record_no_customer_id_returns_champion():
     assert result["id"] == "champion-id"
 
 
-# ---------------------------------------------------------------------------
-# _query_serving_candidates — escopo de tenant (project_id=None)
-# ---------------------------------------------------------------------------
-
-
-def test_query_serving_candidates_uses_tenant_scope_when_no_project():
-    """Sem project_id usa _query_tenant_model_by_role em vez de _query_project_model_by_role."""
+def test_query_serving_candidates_returns_champion_and_challenger():
+    """Retorna (champion, challenger) quando ambos estão configurados no projeto."""
     champion = _record("champion-id", "champion")
+    challenger = _record("challenger-id", "challenger", split=0.2)
 
-    def _tenant_by_role(tenant_id, role, db):
-        return champion if role == "champion" else None
+    def _by_role(tenant_id, project_id, role, db):
+        return champion if role == "champion" else challenger
 
-    with (
-        patch(
-            "src.services.model_resolver._query_tenant_model_by_role", side_effect=_tenant_by_role
-        ) as mock_tenant,
-        patch("src.services.model_resolver._query_project_model_by_role") as mock_project,
-    ):
-        champ, chal = model_resolver._query_serving_candidates("tenant-1", None, MagicMock())
+    with patch("src.services.model_resolver._query_project_model_by_role", side_effect=_by_role):
+        champ, chal = model_resolver._query_serving_candidates("tenant-1", "project-1", MagicMock())
 
-    mock_tenant.assert_called()
-    mock_project.assert_not_called()
     assert champ["id"] == "champion-id"
-    assert chal is None
-
-
-def test_query_serving_candidates_falls_back_to_global_when_no_tenant_champion():
-    """Quando champion de tenant não existe, usa _query_global_model como fallback."""
-    global_champ = _record("global-id", "champion")
-
-    with (
-        patch("src.services.model_resolver._query_tenant_model_by_role", return_value=None),
-        patch("src.services.model_resolver._query_global_model", return_value=global_champ),
-    ):
-        champ, _ = model_resolver._query_serving_candidates("tenant-1", None, MagicMock())
-
-    assert champ["id"] == "global-id"
+    assert chal["id"] == "challenger-id"
 
 
 # ---------------------------------------------------------------------------
@@ -399,7 +368,7 @@ def test_cache_eviction_when_max_size_exceeded():
     settings = SimpleNamespace(model_cache_ttl_seconds=300)
 
     for i in range(model_resolver._MAX_CACHE_SIZE):
-        model_resolver._cache[(f"tenant-evict-{i}", None, "champion", f"m{i}")] = (
+        model_resolver._cache[(f"tenant-evict-{i}", f"proj-{i}", "champion", f"m{i}")] = (
             object(),
             0.5,
             {},

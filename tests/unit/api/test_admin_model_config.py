@@ -12,14 +12,13 @@ from src.routers import admin
 from src.schemas.tenant import ChallengerModelConfigure, ModelDeactivationRequest
 
 
-def test_validate_model_for_project_accepts_global_approved_model():
-    """Modelo global approved é elegível para qualquer projeto."""
+def test_validate_model_for_project_accepts_matching_tenant_and_project():
+    """Modelo com tenant_id e project_id compatíveis é elegível para o projeto."""
     project = {"id": "project-1", "tenant_id": "tenant-1"}
     model = {
         "id": "model-1",
-        "tenant_id": None,
-        "project_id": None,
-        "scope": "global",
+        "tenant_id": "tenant-1",
+        "project_id": "project-1",
         "status": "approved",
     }
 
@@ -32,9 +31,8 @@ def test_validate_model_for_project_rejects_not_approved_model():
     project = {"id": "project-1", "tenant_id": "tenant-1"}
     model = {
         "id": "model-1",
-        "tenant_id": None,
-        "project_id": None,
-        "scope": "global",
+        "tenant_id": "tenant-1",
+        "project_id": "project-1",
         "status": "validated",
     }
 

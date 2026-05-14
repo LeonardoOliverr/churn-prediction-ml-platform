@@ -26,3 +26,5 @@
 21_cost_model_config [20_challenger_cost_normalization] 2026-05-11T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Tabela cost_model_config para custo real por cliente via cltv e monthly_charges
 22_model_performance_result_costs [21_cost_model_config] 2026-05-11T03:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # model_performance passa a usar fp_cost/fn_cost do resultado (custo medio real) em vez do run (valor CLI)
 23_api_keys_description [22_model_performance_result_costs] 2026-05-13T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona coluna description opcional em api_keys para identificacao humana da key
+24_simplify_model_scope [23_api_keys_description] 2026-05-14T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Remove scope de churn.models e torna tenant_id + project_id obrigatorios
+25_cost_model_config_project_required [24_simplify_model_scope] 2026-05-14T01:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Torna project_id obrigatorio em cost_model_config eliminando fallback de tenant
