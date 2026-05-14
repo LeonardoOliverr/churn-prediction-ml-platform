@@ -28,7 +28,12 @@ def _criar_tenant_completo(db_conn, suffix: str):
             INSERT INTO churn.projects (id, tenant_id, name, slug)
             VALUES (:id, :tenant_id, :name, :slug)
         """),
-        {"id": project_id, "tenant_id": tenant_id, "name": f"Proj {suffix}", "slug": f"proj-{suffix}"},
+        {
+            "id": project_id,
+            "tenant_id": tenant_id,
+            "name": f"Proj {suffix}",
+            "slug": f"proj-{suffix}",
+        },
     )
     key_hash = bcrypt.hashpw(secret.encode(), bcrypt.gensalt(rounds=4)).decode()
     db_conn.execute(

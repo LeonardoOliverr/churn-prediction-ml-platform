@@ -10,7 +10,6 @@ from sqlalchemy import text
 
 from tests.integration.conftest import MINIMAL_PAYLOAD
 
-
 # ---------------------------------------------------------------------------
 # Predição individual
 # ---------------------------------------------------------------------------

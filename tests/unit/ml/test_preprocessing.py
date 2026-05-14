@@ -15,7 +15,6 @@ from sklearn.compose import ColumnTransformer
 from ml.config.settings import BOOL_FEATURES, CATEGORICAL_FEATURES, NUMERIC_FEATURES, TARGET
 from ml.data.preprocessing import build_preprocessor
 
-
 # ---------------------------------------------------------------------------
 # Schema tests — validam estrutura do dataset fake
 # ---------------------------------------------------------------------------
@@ -33,9 +32,7 @@ def test_fake_dataset_has_all_expected_columns(fake_customers_df):
 def test_fake_dataset_target_is_binary(fake_customers_df):
     """[SCHEMA TEST] Coluna target contém apenas valores 0 e 1."""
     unique_values = set(fake_customers_df[TARGET].unique())
-    assert unique_values.issubset({0, 1}), (
-        f"Valores inesperados em '{TARGET}': {unique_values}"
-    )
+    assert unique_values.issubset({0, 1}), f"Valores inesperados em '{TARGET}': {unique_values}"
 
 
 @pytest.mark.schema
@@ -134,9 +131,7 @@ def test_preprocessor_handles_nulls_in_input():
     preprocessor = build_preprocessor()
     result = preprocessor.fit_transform(df_with_nulls)
 
-    assert not np.isnan(result).any(), (
-        "Preprocessor não tratou valores nulos corretamente."
-    )
+    assert not np.isnan(result).any(), "Preprocessor não tratou valores nulos corretamente."
 
 
 def test_preprocessor_number_of_output_columns(fake_customers_df):
@@ -176,9 +171,11 @@ def test_load_data_invalid_split_value_all_raises():
 
 def test_load_data_none_split_does_not_raise():
     """split=None é aceito (carrega todos os registros) sem levantar erro de validação."""
-    from ml.data.preprocessing import load_data
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import MagicMock, patch
+
     import pandas as pd
+
+    from ml.data.preprocessing import load_data
 
     mock_df = pd.DataFrame(columns=["churn_value"])
     with patch("ml.data.preprocessing._build_engine") as mock_engine_fn:
@@ -196,9 +193,11 @@ def test_load_data_none_split_does_not_raise():
 
 def test_load_data_train_split_is_default():
     """split='train' é o default — não levanta erro de validação."""
-    from ml.data.preprocessing import load_data
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import MagicMock, patch
+
     import pandas as pd
+
+    from ml.data.preprocessing import load_data
 
     mock_df = pd.DataFrame(columns=["churn_value"])
     with patch("ml.data.preprocessing._build_engine") as mock_engine_fn:
@@ -220,9 +219,10 @@ def test_load_data_train_split_is_default():
 
 def test_build_engine_uses_env_vars():
     """_build_engine() lê variáveis de ambiente e chama create_engine com a URL correta."""
-    from ml.data.preprocessing import _build_engine
-    from unittest.mock import patch, MagicMock
     import os
+    from unittest.mock import MagicMock, patch
+
+    from ml.data.preprocessing import _build_engine
 
     env = {
         "POSTGRES_USER": "churn_user",
@@ -232,8 +232,10 @@ def test_build_engine_uses_env_vars():
         "POSTGRES_DB": "churn_dev",
     }
     mock_engine = MagicMock()
-    with patch.dict(os.environ, env, clear=False), \
-         patch("ml.data.preprocessing.create_engine", return_value=mock_engine) as mock_ce:
+    with (
+        patch.dict(os.environ, env, clear=False),
+        patch("ml.data.preprocessing.create_engine", return_value=mock_engine) as mock_ce,
+    ):
         engine = _build_engine()
 
     assert engine is mock_engine
@@ -246,8 +248,9 @@ def test_build_engine_uses_env_vars():
 
 def test_resolve_tenant_id_with_slug_queries_by_slug():
     """Com tenant_slug fornecido, executa query com parâmetro :s."""
-    from ml.data.preprocessing import _resolve_tenant_id
     from unittest.mock import MagicMock
+
+    from ml.data.preprocessing import _resolve_tenant_id
 
     conn = MagicMock()
     conn.execute.return_value.scalar_one.return_value = "tenant-uuid"
@@ -261,8 +264,9 @@ def test_resolve_tenant_id_with_slug_queries_by_slug():
 
 def test_resolve_tenant_id_without_slug_queries_first_tenant():
     """Com tenant_slug=None, executa query sem filtro (LIMIT 1)."""
-    from ml.data.preprocessing import _resolve_tenant_id
     from unittest.mock import MagicMock
+
+    from ml.data.preprocessing import _resolve_tenant_id
 
     conn = MagicMock()
     conn.execute.return_value.scalar_one.return_value = "any-uuid"
@@ -276,8 +280,9 @@ def test_resolve_tenant_id_without_slug_queries_first_tenant():
 
 def test_resolve_project_id_queries_by_tenant_and_slug():
     """_resolve_project_id passa tenant_id e slug na query."""
-    from ml.data.preprocessing import _resolve_project_id
     from unittest.mock import MagicMock
+
+    from ml.data.preprocessing import _resolve_project_id
 
     conn = MagicMock()
     conn.execute.return_value.scalar_one.return_value = "project-uuid"
@@ -297,7 +302,8 @@ def test_resolve_project_id_queries_by_tenant_and_slug():
 
 def _mock_load_engine(fake_df):
     """Cria engine + conn mock prontos para load_data()."""
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import MagicMock
+
     mock_conn = MagicMock()
     mock_conn.__enter__ = lambda s: s
     mock_conn.__exit__ = MagicMock(return_value=False)
@@ -307,12 +313,15 @@ def _mock_load_engine(fake_df):
 
 def test_load_data_with_tenant_slug_only(fake_customers_df):
     """tenant_slug sem project_slug usa branch intermediário (elif)."""
+    from unittest.mock import patch
+
     from ml.data.preprocessing import load_data
-    from unittest.mock import patch, MagicMock
 
     mock_conn = _mock_load_engine(fake_customers_df)
-    with patch("ml.data.preprocessing._build_engine") as mock_engine_fn, \
-         patch("pandas.read_sql", return_value=fake_customers_df):
+    with (
+        patch("ml.data.preprocessing._build_engine") as mock_engine_fn,
+        patch("pandas.read_sql", return_value=fake_customers_df),
+    ):
         mock_engine_fn.return_value.connect.return_value = mock_conn
         X, y = load_data(tenant_slug="ibm-telco", project_slug=None, split="train")
 
@@ -322,12 +331,15 @@ def test_load_data_with_tenant_slug_only(fake_customers_df):
 
 def test_load_data_with_tenant_and_project_slug(fake_customers_df):
     """tenant_slug + project_slug usa branch completo (else)."""
+    from unittest.mock import patch
+
     from ml.data.preprocessing import load_data
-    from unittest.mock import patch, MagicMock
 
     mock_conn = _mock_load_engine(fake_customers_df)
-    with patch("ml.data.preprocessing._build_engine") as mock_engine_fn, \
-         patch("pandas.read_sql", return_value=fake_customers_df):
+    with (
+        patch("ml.data.preprocessing._build_engine") as mock_engine_fn,
+        patch("pandas.read_sql", return_value=fake_customers_df),
+    ):
         mock_engine_fn.return_value.connect.return_value = mock_conn
         X, y = load_data(tenant_slug="ibm-telco", project_slug="telco-churn-2018", split="train")
 
@@ -337,12 +349,15 @@ def test_load_data_with_tenant_and_project_slug(fake_customers_df):
 
 def test_load_data_with_tenant_slug_and_none_split(fake_customers_df):
     """split=None com tenant_slug não filtra por split na query."""
+    from unittest.mock import patch
+
     from ml.data.preprocessing import load_data
-    from unittest.mock import patch, MagicMock
 
     mock_conn = _mock_load_engine(fake_customers_df)
-    with patch("ml.data.preprocessing._build_engine") as mock_engine_fn, \
-         patch("pandas.read_sql", return_value=fake_customers_df):
+    with (
+        patch("ml.data.preprocessing._build_engine") as mock_engine_fn,
+        patch("pandas.read_sql", return_value=fake_customers_df),
+    ):
         mock_engine_fn.return_value.connect.return_value = mock_conn
         X, y = load_data(tenant_slug="ibm-telco", project_slug=None, split=None)
 
@@ -351,12 +366,15 @@ def test_load_data_with_tenant_slug_and_none_split(fake_customers_df):
 
 def test_load_data_with_project_and_none_split(fake_customers_df):
     """split=None com tenant+project não filtra por split na query."""
+    from unittest.mock import patch
+
     from ml.data.preprocessing import load_data
-    from unittest.mock import patch, MagicMock
 
     mock_conn = _mock_load_engine(fake_customers_df)
-    with patch("ml.data.preprocessing._build_engine") as mock_engine_fn, \
-         patch("pandas.read_sql", return_value=fake_customers_df):
+    with (
+        patch("ml.data.preprocessing._build_engine") as mock_engine_fn,
+        patch("pandas.read_sql", return_value=fake_customers_df),
+    ):
         mock_engine_fn.return_value.connect.return_value = mock_conn
         X, y = load_data(tenant_slug="ibm-telco", project_slug="telco-churn-2018", split=None)
 

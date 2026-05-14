@@ -14,8 +14,8 @@ foi efetivamente confirmado (ex.: 30/60/90 dias após a predição).
 from __future__ import annotations
 
 import argparse
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -74,7 +74,9 @@ def seed_outcomes(
             {"tenant_id": tenant_id, "project_id": project_id},
         ).fetchall()
 
-    logger.info("outcomes_candidates_found", count=len(rows), tenant=tenant_slug, project=project_slug)
+    logger.info(
+        "outcomes_candidates_found", count=len(rows), tenant=tenant_slug, project=project_slug
+    )
 
     if not rows:
         logger.info("no_outcomes_to_seed")
@@ -95,11 +97,11 @@ def seed_outcomes(
                 _INSERT_OUTCOME,
                 {
                     "prediction_id": str(row.prediction_id),
-                    "tenant_id":     str(row.tenant_id),
-                    "project_id":    str(row.project_id),
-                    "customer_id":   row.customer_id,
-                    "churned":       bool(row.churn_value),
-                    "confirmed_at":  row.requested_at,
+                    "tenant_id": str(row.tenant_id),
+                    "project_id": str(row.project_id),
+                    "customer_id": row.customer_id,
+                    "churned": bool(row.churn_value),
+                    "confirmed_at": row.requested_at,
                 },
             )
 
@@ -111,7 +113,7 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Popula churn.outcomes a partir de predições de clientes holdout."
     )
-    parser.add_argument("--tenant",  required=True, help="Slug do tenant.")
+    parser.add_argument("--tenant", required=True, help="Slug do tenant.")
     parser.add_argument("--project", required=True, help="Slug do projeto.")
     parser.add_argument("--dry-run", action="store_true", help="Simula sem gravar no banco.")
     return parser.parse_args()

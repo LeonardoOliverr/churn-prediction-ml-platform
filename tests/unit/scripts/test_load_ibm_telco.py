@@ -6,13 +6,12 @@ load() com mock de engine. fetch_dataset() e resolve_ids() requerem
 Kaggle e PostgreSQL e ficam reservados para testes de integração.
 """
 
-import numpy as np
-import pandas as pd
-import pytest
 from unittest.mock import patch
 
-from scripts.load_ibm_telco import COLUMN_MAP, YES_NO_COLS, load, transform
+import pandas as pd
+import pytest
 
+from scripts.load_ibm_telco import COLUMN_MAP, YES_NO_COLS, load, transform
 
 # ---------------------------------------------------------------------------
 # Fixture: DataFrame raw com colunas originais do IBM Telco (pré-transform)

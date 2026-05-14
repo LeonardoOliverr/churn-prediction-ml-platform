@@ -74,18 +74,18 @@ def seed(
     engine = _build_engine()
 
     with engine.connect() as conn:
-        tenant_id  = _resolve_tenant_id(conn, tenant_slug)
+        tenant_id = _resolve_tenant_id(conn, tenant_slug)
         project_id = _resolve_project_id(conn, tenant_id, project_slug)
 
     params = {
-        "tenant_id":                tenant_id,
-        "project_id":               project_id,
-        "cost_model":               cost_model,
-        "fp_cost_months":           fp_cost_months,
-        "fp_cost_discount":         fp_cost_discount,
-        "fn_cost_cltv_multiplier":  fn_cost_cltv_multiplier,
+        "tenant_id": tenant_id,
+        "project_id": project_id,
+        "cost_model": cost_model,
+        "fp_cost_months": fp_cost_months,
+        "fp_cost_discount": fp_cost_discount,
+        "fn_cost_cltv_multiplier": fn_cost_cltv_multiplier,
         "fn_cost_months_multiplier": fn_cost_months_multiplier,
-        "notes":                    notes,
+        "notes": notes,
     }
 
     if dry_run:
@@ -116,24 +116,41 @@ def seed(
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Configura cost_model_config para um projeto."
+    parser = argparse.ArgumentParser(description="Configura cost_model_config para um projeto.")
+    parser.add_argument("--tenant", required=True, help="Slug do tenant.")
+    parser.add_argument("--project", required=True, help="Slug do projeto.")
+    parser.add_argument(
+        "--cost-model",
+        default="cltv",
+        choices=["flat", "cltv", "monthly_charges"],
+        help="Modo de cálculo de custo (padrão: cltv).",
     )
-    parser.add_argument("--tenant",                   required=True,        help="Slug do tenant.")
-    parser.add_argument("--project",                  required=True,        help="Slug do projeto.")
-    parser.add_argument("--cost-model",               default="cltv",
-                        choices=["flat", "cltv", "monthly_charges"],
-                        help="Modo de cálculo de custo (padrão: cltv).")
-    parser.add_argument("--fp-cost-months",           type=float, default=2.0,
-                        help="Meses de mensalidade para custo de FP (padrão: 2.0).")
-    parser.add_argument("--fp-cost-discount",         type=float, default=0.20,
-                        help="Desconto aplicado sobre a mensalidade no custo de FP (padrão: 0.20).")
-    parser.add_argument("--fn-cost-cltv-multiplier",  type=float, default=1.0,
-                        help="Fração do CLTV perdida em um FN, modo cltv (padrão: 1.0).")
-    parser.add_argument("--fn-cost-months-multiplier", type=float, default=12.0,
-                        help="Meses de mensalidade perdidos em um FN, modo monthly_charges (padrão: 12.0).")
-    parser.add_argument("--notes",                    default=None,         help="Descrição opcional.")
-    parser.add_argument("--dry-run",                  action="store_true",  help="Simula sem gravar.")
+    parser.add_argument(
+        "--fp-cost-months",
+        type=float,
+        default=2.0,
+        help="Meses de mensalidade para custo de FP (padrão: 2.0).",
+    )
+    parser.add_argument(
+        "--fp-cost-discount",
+        type=float,
+        default=0.20,
+        help="Desconto aplicado sobre a mensalidade no custo de FP (padrão: 0.20).",
+    )
+    parser.add_argument(
+        "--fn-cost-cltv-multiplier",
+        type=float,
+        default=1.0,
+        help="Fração do CLTV perdida em um FN, modo cltv (padrão: 1.0).",
+    )
+    parser.add_argument(
+        "--fn-cost-months-multiplier",
+        type=float,
+        default=12.0,
+        help="Meses de mensalidade perdidos em um FN, modo monthly_charges (padrão: 12.0).",
+    )
+    parser.add_argument("--notes", default=None, help="Descrição opcional.")
+    parser.add_argument("--dry-run", action="store_true", help="Simula sem gravar.")
     return parser.parse_args()
 
 

@@ -36,17 +36,20 @@ def log_prediction_bg(
     """Insere registro de predição em churn.predictions com conexão própria."""
     try:
         with engine.begin() as conn:
-            conn.execute(_INSERT_SQL, {
-                "id":             prediction_id,
-                "tenant_id":      tenant_id,
-                "project_id":     project_id,
-                "customer_id":    customer_id,
-                "model_id":       model_id,
-                "churn_prob":     round(churn_prob, 4),
-                "churn_pred":     churn_pred,
-                "threshold_used": round(threshold_used, 3),
-                "latency_ms":     latency_ms,
-            })
+            conn.execute(
+                _INSERT_SQL,
+                {
+                    "id": prediction_id,
+                    "tenant_id": tenant_id,
+                    "project_id": project_id,
+                    "customer_id": customer_id,
+                    "model_id": model_id,
+                    "churn_prob": round(churn_prob, 4),
+                    "churn_pred": churn_pred,
+                    "threshold_used": round(threshold_used, 3),
+                    "latency_ms": latency_ms,
+                },
+            )
     except Exception as exc:
         # Falha no log não deve impactar a resposta já enviada ao cliente
         logger.error("prediction_log_failed", customer_id=customer_id, error=str(exc))

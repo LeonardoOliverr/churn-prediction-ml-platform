@@ -8,10 +8,9 @@ Cobre a lógica de seed sem dependência de banco de dados:
 - Idempotência via ON CONFLICT DO NOTHING
 """
 
-import pytest
-from types import SimpleNamespace
-from unittest.mock import MagicMock, call, patch
 from datetime import datetime, timezone
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 
 def _make_fake_row(i: int):
@@ -57,9 +56,11 @@ def test_seed_outcomes_dry_run_returns_candidate_count():
     rows = [_make_fake_row(i) for i in range(5)]
     mock_engine, mock_conn_write = _make_mock_engine(rows)
 
-    with patch("scripts.seed_outcomes_from_customers._build_engine", return_value=mock_engine), \
-         patch("scripts.seed_outcomes_from_customers._resolve_tenant_id", return_value="t"), \
-         patch("scripts.seed_outcomes_from_customers._resolve_project_id", return_value="p"):
+    with (
+        patch("scripts.seed_outcomes_from_customers._build_engine", return_value=mock_engine),
+        patch("scripts.seed_outcomes_from_customers._resolve_tenant_id", return_value="t"),
+        patch("scripts.seed_outcomes_from_customers._resolve_project_id", return_value="p"),
+    ):
         count = seed_outcomes("ibm-telco", "telco-churn-2018", dry_run=True)
 
     assert count == 5
@@ -72,9 +73,11 @@ def test_seed_outcomes_dry_run_does_not_write():
     rows = [_make_fake_row(i) for i in range(3)]
     mock_engine, mock_conn_write = _make_mock_engine(rows)
 
-    with patch("scripts.seed_outcomes_from_customers._build_engine", return_value=mock_engine), \
-         patch("scripts.seed_outcomes_from_customers._resolve_tenant_id", return_value="t"), \
-         patch("scripts.seed_outcomes_from_customers._resolve_project_id", return_value="p"):
+    with (
+        patch("scripts.seed_outcomes_from_customers._build_engine", return_value=mock_engine),
+        patch("scripts.seed_outcomes_from_customers._resolve_tenant_id", return_value="t"),
+        patch("scripts.seed_outcomes_from_customers._resolve_project_id", return_value="p"),
+    ):
         seed_outcomes("ibm-telco", "telco-churn-2018", dry_run=True)
 
     mock_conn_write.execute.assert_not_called()
@@ -91,9 +94,11 @@ def test_seed_outcomes_no_rows_returns_zero():
 
     mock_engine, mock_conn_write = _make_mock_engine(rows=[])
 
-    with patch("scripts.seed_outcomes_from_customers._build_engine", return_value=mock_engine), \
-         patch("scripts.seed_outcomes_from_customers._resolve_tenant_id", return_value="t"), \
-         patch("scripts.seed_outcomes_from_customers._resolve_project_id", return_value="p"):
+    with (
+        patch("scripts.seed_outcomes_from_customers._build_engine", return_value=mock_engine),
+        patch("scripts.seed_outcomes_from_customers._resolve_tenant_id", return_value="t"),
+        patch("scripts.seed_outcomes_from_customers._resolve_project_id", return_value="p"),
+    ):
         count = seed_outcomes("ibm-telco", "telco-churn-2018", dry_run=False)
 
     assert count == 0
@@ -105,9 +110,11 @@ def test_seed_outcomes_no_rows_does_not_write():
 
     mock_engine, mock_conn_write = _make_mock_engine(rows=[])
 
-    with patch("scripts.seed_outcomes_from_customers._build_engine", return_value=mock_engine), \
-         patch("scripts.seed_outcomes_from_customers._resolve_tenant_id", return_value="t"), \
-         patch("scripts.seed_outcomes_from_customers._resolve_project_id", return_value="p"):
+    with (
+        patch("scripts.seed_outcomes_from_customers._build_engine", return_value=mock_engine),
+        patch("scripts.seed_outcomes_from_customers._resolve_tenant_id", return_value="t"),
+        patch("scripts.seed_outcomes_from_customers._resolve_project_id", return_value="p"),
+    ):
         seed_outcomes("ibm-telco", "telco-churn-2018", dry_run=False)
 
     mock_conn_write.execute.assert_not_called()
@@ -125,9 +132,11 @@ def test_seed_outcomes_inserts_one_per_row():
     rows = [_make_fake_row(i) for i in range(4)]
     mock_engine, mock_conn_write = _make_mock_engine(rows)
 
-    with patch("scripts.seed_outcomes_from_customers._build_engine", return_value=mock_engine), \
-         patch("scripts.seed_outcomes_from_customers._resolve_tenant_id", return_value="t"), \
-         patch("scripts.seed_outcomes_from_customers._resolve_project_id", return_value="p"):
+    with (
+        patch("scripts.seed_outcomes_from_customers._build_engine", return_value=mock_engine),
+        patch("scripts.seed_outcomes_from_customers._resolve_tenant_id", return_value="t"),
+        patch("scripts.seed_outcomes_from_customers._resolve_project_id", return_value="p"),
+    ):
         count = seed_outcomes("ibm-telco", "telco-churn-2018", dry_run=False)
 
     assert count == 4
@@ -144,9 +153,11 @@ def test_seed_outcomes_maps_churn_value_to_churned():
     ]
     mock_engine, mock_conn_write = _make_mock_engine(rows)
 
-    with patch("scripts.seed_outcomes_from_customers._build_engine", return_value=mock_engine), \
-         patch("scripts.seed_outcomes_from_customers._resolve_tenant_id", return_value="t"), \
-         patch("scripts.seed_outcomes_from_customers._resolve_project_id", return_value="p"):
+    with (
+        patch("scripts.seed_outcomes_from_customers._build_engine", return_value=mock_engine),
+        patch("scripts.seed_outcomes_from_customers._resolve_tenant_id", return_value="t"),
+        patch("scripts.seed_outcomes_from_customers._resolve_project_id", return_value="p"),
+    ):
         seed_outcomes("ibm-telco", "telco-churn-2018", dry_run=False)
 
     calls = mock_conn_write.execute.call_args_list
@@ -166,9 +177,11 @@ def test_seed_outcomes_confirmed_at_equals_requested_at():
 
     mock_engine, mock_conn_write = _make_mock_engine([row])
 
-    with patch("scripts.seed_outcomes_from_customers._build_engine", return_value=mock_engine), \
-         patch("scripts.seed_outcomes_from_customers._resolve_tenant_id", return_value="t"), \
-         patch("scripts.seed_outcomes_from_customers._resolve_project_id", return_value="p"):
+    with (
+        patch("scripts.seed_outcomes_from_customers._build_engine", return_value=mock_engine),
+        patch("scripts.seed_outcomes_from_customers._resolve_tenant_id", return_value="t"),
+        patch("scripts.seed_outcomes_from_customers._resolve_project_id", return_value="p"),
+    ):
         seed_outcomes("ibm-telco", "telco-churn-2018", dry_run=False)
 
     params = mock_conn_write.execute.call_args_list[0][0][1]

@@ -42,7 +42,9 @@ class CustomerFeatures(BaseModel):
         }
     )
 
-    customer_id: str = Field(..., description="Identificador único do cliente no sistema de origem.")
+    customer_id: str = Field(
+        ..., description="Identificador único do cliente no sistema de origem."
+    )
 
     # NUMERIC_FEATURES — ml/config.py
     tenure_months: float = Field(..., description="Meses de contrato ativo.")
@@ -92,16 +94,25 @@ class PredictResponse(BaseModel):
         }
     )
 
-    prediction_id: str = Field(..., description="UUID gerado para esta predição (usado para rastreamento).")
-    customer_id: str = Field(..., description="Identificador do cliente enviado na requisição.")
-    churn_probability: float = Field(..., description="Probabilidade de churn — valor entre 0.0 e 1.0.")
-    risk_level: RiskLevel = Field(
-        ..., description='Classificação de risco: `low` (< 0.3) | `medium` (0.3–0.7) | `high` (> 0.7).'
+    prediction_id: str = Field(
+        ..., description="UUID gerado para esta predição (usado para rastreamento)."
     )
-    churn_pred: bool = Field(..., description='`true` se `churn_probability >= threshold_used`.')
-    threshold_used: float = Field(..., description="Threshold de decisão aplicado (definido em `project_model_config`).")
+    customer_id: str = Field(..., description="Identificador do cliente enviado na requisição.")
+    churn_probability: float = Field(
+        ..., description="Probabilidade de churn — valor entre 0.0 e 1.0."
+    )
+    risk_level: RiskLevel = Field(
+        ...,
+        description="Classificação de risco: `low` (< 0.3) | `medium` (0.3–0.7) | `high` (> 0.7).",
+    )
+    churn_pred: bool = Field(..., description="`true` se `churn_probability >= threshold_used`.")
+    threshold_used: float = Field(
+        ..., description="Threshold de decisão aplicado (definido em `project_model_config`)."
+    )
     model_version: str = Field(..., description="Versão do modelo no MLflow Model Registry.")
-    model_name: str = Field(..., description="Nome do algoritmo registrado (ex.: `LogisticRegression`).")
+    model_name: str = Field(
+        ..., description="Nome do algoritmo registrado (ex.: `LogisticRegression`)."
+    )
     model_id: str = Field(..., description="UUID do modelo em `churn.models`.")
 
 
@@ -137,13 +148,17 @@ class BatchPredictRequest(BaseModel):
         }
     )
 
-    customers: list[CustomerFeatures] = Field(..., description="Lista de clientes para predição em lote (máx. 100).")
+    customers: list[CustomerFeatures] = Field(
+        ..., description="Lista de clientes para predição em lote (máx. 100)."
+    )
 
 
 class BatchPredictResponse(BaseModel):
     """Resposta de predição em lote com resultados e total processado."""
 
-    results: list[PredictResponse] = Field(..., description="Predições na mesma ordem dos clientes enviados.")
+    results: list[PredictResponse] = Field(
+        ..., description="Predições na mesma ordem dos clientes enviados."
+    )
     total: int = Field(..., description="Número total de predições retornadas.")
 
 

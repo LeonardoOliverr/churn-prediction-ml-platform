@@ -34,8 +34,8 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 from sqlalchemy import text
 
-from domain.constants import CostModel
 from core.logger import get_logger
+from domain.constants import CostModel
 from ml.data.preprocessing import _build_engine, _resolve_project_id, _resolve_tenant_id
 
 logger = get_logger()
@@ -78,7 +78,7 @@ _QUERY_COST_CONFIG = text("""
     LIMIT 1
 """)
 
-_SEP    = "=" * 80
+_SEP = "=" * 80
 _SUBSEP = "-" * 80
 
 
@@ -97,7 +97,7 @@ def _compute_row_cost(
         return float(fp_cost_flat or 0), float(fn_cost_flat or 0)
 
     monthly = float(row.monthly_charges or 0)
-    fp_cost  = monthly * float(config["fp_cost_months"]) * float(config["fp_cost_discount"])
+    fp_cost = monthly * float(config["fp_cost_months"]) * float(config["fp_cost_discount"])
 
     if config["cost_model"] == CostModel.CLTV:
         fn_cost = float(row.cltv or 0) * float(config["fn_cost_cltv_multiplier"])
@@ -110,9 +110,9 @@ def _compute_row_cost(
 def _confusion(y_prob: np.ndarray, y_true: np.ndarray, threshold: float) -> dict:
     pred = y_prob >= threshold
     return {
-        "tp": int(( pred &  y_true).sum()),
-        "fp": int(( pred & ~y_true).sum()),
-        "fn": int((~pred &  y_true).sum()),
+        "tp": int((pred & y_true).sum()),
+        "fp": int((pred & ~y_true).sum()),
+        "fn": int((~pred & y_true).sum()),
         "tn": int((~pred & ~y_true).sum()),
     }
 
@@ -120,7 +120,7 @@ def _confusion(y_prob: np.ndarray, y_true: np.ndarray, threshold: float) -> dict
 def _metrics(cm: dict) -> dict:
     tp, fp, fn = cm["tp"], cm["fp"], cm["fn"]
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-    recall    = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
     f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
     return {"precision": precision, "recall": recall, "f1": f1}
 
@@ -139,7 +139,7 @@ def _sweep(
 ) -> list[dict]:
     """Varre thresholds calculando custo real por cliente quando config não é flat."""
     y_prob = np.array([float(r.churn_prob) for r in rows])
-    y_true = np.array([bool(r.churned)     for r in rows], dtype=bool)
+    y_true = np.array([bool(r.churned) for r in rows], dtype=bool)
 
     is_flat = config is None or config["cost_model"] == CostModel.FLAT
 
@@ -152,29 +152,31 @@ def _sweep(
     for t in thresholds:
         pred = y_prob >= float(t)
         cm = {
-            "tp": int(( pred &  y_true).sum()),
-            "fp": int(( pred & ~y_true).sum()),
-            "fn": int((~pred &  y_true).sum()),
+            "tp": int((pred & y_true).sum()),
+            "fp": int((pred & ~y_true).sum()),
+            "fn": int((~pred & y_true).sum()),
             "tn": int((~pred & ~y_true).sum()),
         }
 
         if is_flat:
             cost = cm["fp"] * float(fp_cost_flat or 0) + cm["fn"] * float(fn_cost_flat or 0)
         else:
-            cost = float(
-                row_fp_costs[pred & ~y_true].sum() +
-                row_fn_costs[~pred & y_true].sum()
-            )
+            cost = float(row_fp_costs[pred & ~y_true].sum() + row_fn_costs[~pred & y_true].sum())
 
         m = _metrics(cm)
-        results.append({
-            "threshold": round(float(t), 4),
-            "tp": cm["tp"], "fp": cm["fp"], "fn": cm["fn"], "tn": cm["tn"],
-            "precision": round(m["precision"], 4),
-            "recall":    round(m["recall"],    4),
-            "f1":        round(m["f1"],        4),
-            "cost":      round(cost, 2),
-        })
+        results.append(
+            {
+                "threshold": round(float(t), 4),
+                "tp": cm["tp"],
+                "fp": cm["fp"],
+                "fn": cm["fn"],
+                "tn": cm["tn"],
+                "precision": round(m["precision"], 4),
+                "recall": round(m["recall"], 4),
+                "f1": round(m["f1"], 4),
+                "cost": round(cost, 2),
+            }
+        )
     return results
 
 
@@ -188,7 +190,7 @@ def _format_sweep(
     current_threshold: float,
 ) -> str:
     best_cost = min(rows, key=lambda r: r["cost"])
-    best_f1   = max(rows, key=lambda r: r["f1"])
+    best_f1 = max(rows, key=lambda r: r["f1"])
     n = rows[0]["tp"] + rows[0]["fp"] + rows[0]["fn"] + rows[0]["tn"]
 
     cost_model = config["cost_model"] if config else CostModel.FLAT
@@ -196,7 +198,9 @@ def _format_sweep(
     if cost_model == CostModel.FLAT:
         fp_c = float(fp_cost_flat or 0)
         fn_c = float(fn_cost_flat or 0)
-        bayes_str = f"Bayes ótimo: {_bayes_threshold(fp_c, fn_c):.3f}  |  " if fp_c + fn_c > 0 else ""
+        bayes_str = (
+            f"Bayes ótimo: {_bayes_threshold(fp_c, fn_c):.3f}  |  " if fp_c + fn_c > 0 else ""
+        )
         cost_label = f"FP: R${fp_c:,.2f} (flat)  |  FN: R${fn_c:,.2f} (flat)  |  {bayes_str}"
     elif cost_model == CostModel.CLTV:
         cost_label = (
@@ -242,8 +246,7 @@ def _format_sweep(
         f"→ R${best_cost['cost']:,.2f}  (FP={best_cost['fp']}, FN={best_cost['fn']})"
     )
     lines.append(
-        f"  ◆ Threshold ótimo por F1    : {best_f1['threshold']:.2f}  "
-        f"→ F1={best_f1['f1']:.4f}"
+        f"  ◆ Threshold ótimo por F1    : {best_f1['threshold']:.2f}  → F1={best_f1['f1']:.4f}"
     )
 
     current_rows = [r for r in rows if abs(r["threshold"] - current_threshold) < 1e-6]
@@ -269,18 +272,22 @@ def optimize(
     step: float,
 ) -> None:
     engine = _build_engine()
-    _now         = datetime.now(tz=timezone.utc)
+    _now = datetime.now(tz=timezone.utc)
     period_start = (_now - timedelta(days=days)).replace(hour=0, minute=0, second=0, microsecond=0)
-    thresholds   = np.arange(min_threshold, max_threshold + step / 2, step)
+    thresholds = np.arange(min_threshold, max_threshold + step / 2, step)
 
     with engine.connect() as conn:
-        tenant_id  = _resolve_tenant_id(conn, tenant_slug)
+        tenant_id = _resolve_tenant_id(conn, tenant_slug)
         project_id = _resolve_project_id(conn, tenant_id, project_slug)
 
-        config_row = conn.execute(
-            _QUERY_COST_CONFIG,
-            {"tenant_id": tenant_id, "project_id": project_id},
-        ).mappings().first()
+        config_row = (
+            conn.execute(
+                _QUERY_COST_CONFIG,
+                {"tenant_id": tenant_id, "project_id": project_id},
+            )
+            .mappings()
+            .first()
+        )
 
         config = dict(config_row) if config_row else None
 
@@ -292,7 +299,9 @@ def optimize(
                 )
                 sys.exit(1)
             if config is None:
-                logger.info("cost_model_resolved", mode="flat_cli", fp_cost=fp_cost, fn_cost=fn_cost)
+                logger.info(
+                    "cost_model_resolved", mode="flat_cli", fp_cost=fp_cost, fn_cost=fn_cost
+                )
             else:
                 logger.info(
                     "cost_model_resolved",
@@ -318,12 +327,16 @@ def optimize(
         models.setdefault(key, []).append(row)
 
     for (model_name, model_version), rows in models.items():
-        sweep_results  = _sweep(rows, config, fp_cost, fn_cost, thresholds)
-        best_cost_row  = min(sweep_results, key=lambda r: r["cost"])
-        best_f1_row    = max(sweep_results, key=lambda r: r["f1"])
+        sweep_results = _sweep(rows, config, fp_cost, fn_cost, thresholds)
+        best_cost_row = min(sweep_results, key=lambda r: r["cost"])
+        best_f1_row = max(sweep_results, key=lambda r: r["f1"])
         tabela = _format_sweep(
-            model_name, model_version, sweep_results,
-            config, fp_cost, fn_cost,
+            model_name,
+            model_version,
+            sweep_results,
+            config,
+            fp_cost,
+            fn_cost,
             current_threshold=0.5,
         )
         logger.info(
@@ -343,21 +356,29 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Varre thresholds para encontrar o ponto ótimo de custo."
     )
-    parser.add_argument("--tenant",        default=None,  help="Slug do tenant.")
-    parser.add_argument("--project",       required=True, help="Slug do projeto.")
-    parser.add_argument("--fp-cost",       type=float, default=None,
-                        help="Custo flat de FP (obrigatório se cost_model_config não estiver configurado).")
-    parser.add_argument("--fn-cost",       type=float, default=None,
-                        help="Custo flat de FN (obrigatório se cost_model_config não estiver configurado).")
-    parser.add_argument("--since",         default="90d", help="Janela de análise (ex: 90d).")
+    parser.add_argument("--tenant", default=None, help="Slug do tenant.")
+    parser.add_argument("--project", required=True, help="Slug do projeto.")
+    parser.add_argument(
+        "--fp-cost",
+        type=float,
+        default=None,
+        help="Custo flat de FP (obrigatório se cost_model_config não estiver configurado).",
+    )
+    parser.add_argument(
+        "--fn-cost",
+        type=float,
+        default=None,
+        help="Custo flat de FN (obrigatório se cost_model_config não estiver configurado).",
+    )
+    parser.add_argument("--since", default="90d", help="Janela de análise (ex: 90d).")
     parser.add_argument("--min-threshold", type=float, default=0.05)
     parser.add_argument("--max-threshold", type=float, default=0.90)
-    parser.add_argument("--step",          type=float, default=0.05)
+    parser.add_argument("--step", type=float, default=0.05)
     return parser.parse_args()
 
 
 def main() -> None:
-    args  = _parse_args()
+    args = _parse_args()
     since = args.since
     if not since.endswith("d") or not since[:-1].isdigit():
         logger.error("invalid_since_format", value=since, example="90d")

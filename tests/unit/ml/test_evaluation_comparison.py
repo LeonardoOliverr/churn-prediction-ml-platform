@@ -19,20 +19,24 @@ def _candidate(name: str, f1: float) -> CandidateResult:
 
 
 def test_compare_results_selects_highest_f1():
-    comparison = compare_results([
-        _candidate("dummy", 0.2),
-        _candidate("logistic_regression", 0.7),
-    ])
+    comparison = compare_results(
+        [
+            _candidate("dummy", 0.2),
+            _candidate("logistic_regression", 0.7),
+        ]
+    )
 
     assert comparison.best_candidate.spec.name == "logistic_regression"
     assert [c.spec.name for c in comparison.secondary_candidates] == ["dummy"]
 
 
 def test_compare_results_assigns_statuses():
-    comparison = compare_results([
-        _candidate("dummy", 0.2),
-        _candidate("logistic_regression", 0.7),
-    ])
+    comparison = compare_results(
+        [
+            _candidate("dummy", 0.2),
+            _candidate("logistic_regression", 0.7),
+        ]
+    )
 
     assert comparison.status_by_model == {
         "dummy": "trained",
@@ -41,10 +45,12 @@ def test_compare_results_assigns_statuses():
 
 
 def test_compare_results_tie_keeps_first_candidate():
-    comparison = compare_results([
-        _candidate("first", 0.7),
-        _candidate("second", 0.7),
-    ])
+    comparison = compare_results(
+        [
+            _candidate("first", 0.7),
+            _candidate("second", 0.7),
+        ]
+    )
 
     assert comparison.best_candidate.spec.name == "first"
     assert comparison.status_by_model["first"] == "approved"

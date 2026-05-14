@@ -11,21 +11,24 @@ Inclui:
 
 import argparse
 import sys
+from unittest.mock import MagicMock, patch
 
 import pytest
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
-from unittest.mock import MagicMock, patch
 
 from ml.config.settings import TARGET
 from ml.data.preprocessing import build_preprocessor
 
-
 _FAKE_METRICS = {
-    "f1_mean": 0.71, "f1_std": 0.03,
-    "roc_auc_mean": 0.90, "roc_auc_std": 0.01,
-    "recall_mean": 0.83, "recall_std": 0.03,
-    "precision_mean": 0.63, "precision_std": 0.04,
+    "f1_mean": 0.71,
+    "f1_std": 0.03,
+    "roc_auc_mean": 0.90,
+    "roc_auc_std": 0.01,
+    "recall_mean": 0.83,
+    "recall_std": 0.03,
+    "precision_mean": 0.63,
+    "precision_std": 0.04,
     "train_f1_mean": 0.98,
     "train_roc_auc_mean": 0.99,
     "train_recall_mean": 0.97,
@@ -47,11 +50,14 @@ def test_smoke_pipeline_random_forest(fake_customers_df):
     pipeline = Pipeline(
         [
             ("preprocessor", build_preprocessor()),
-            ("classifier", RandomForestClassifier(
-                n_estimators=10,
-                random_state=42,
-                class_weight="balanced",
-            )),
+            (
+                "classifier",
+                RandomForestClassifier(
+                    n_estimators=10,
+                    random_state=42,
+                    class_weight="balanced",
+                ),
+            ),
         ]
     )
 
@@ -96,9 +102,10 @@ def test_random_forest_has_feature_importances_after_fit(fake_customers_df):
     pipeline = Pipeline(
         [
             ("preprocessor", build_preprocessor()),
-            ("classifier", RandomForestClassifier(
-                n_estimators=10, random_state=42, class_weight="balanced"
-            )),
+            (
+                "classifier",
+                RandomForestClassifier(n_estimators=10, random_state=42, class_weight="balanced"),
+            ),
         ]
     )
     pipeline.fit(X, y)
@@ -146,7 +153,11 @@ def test_derive_scope_returns_two_tuple():
     """_derive_scope retorna sempre uma tupla de 2 elementos."""
     from ml.train import _derive_scope
 
-    for args in [(None, None, "random-forest"), ("t", None, "random-forest"), ("t", "p", "random-forest")]:
+    for args in [
+        (None, None, "random-forest"),
+        ("t", None, "random-forest"),
+        ("t", "p", "random-forest"),
+    ]:
         result = _derive_scope(*args)
         assert len(result) == 2, f"Esperado 2-tuple, got {len(result)}-tuple para {args}"
 
@@ -200,7 +211,9 @@ def test_parse_args_n_estimators():
     """--n-estimators sobrescreve o default de 500."""
     from ml.train import _parse_args
 
-    with patch.object(sys, "argv", ["train.py", "--model", "random_forest", "--n-estimators", "300"]):
+    with patch.object(
+        sys, "argv", ["train.py", "--model", "random_forest", "--n-estimators", "300"]
+    ):
         args = _parse_args()
 
     assert args.n_estimators == 300
@@ -230,7 +243,9 @@ def test_parse_args_project_without_tenant_exits():
     """--project sem --tenant deve encerrar com SystemExit."""
     from ml.train import _parse_args
 
-    with patch.object(sys, "argv", ["train.py", "--model", "random_forest", "--project", "telco-churn-2018"]):
+    with patch.object(
+        sys, "argv", ["train.py", "--model", "random_forest", "--project", "telco-churn-2018"]
+    ):
         with pytest.raises(SystemExit):
             _parse_args()
 
@@ -245,18 +260,28 @@ def test_main_dry_run_calls_train_with_cv_and_register(fake_customers_df):
     from ml.train import main
 
     fake_args = argparse.Namespace(
-        model="random_forest", tenant=None, project=None, dry_run=True,
-        holdout_size=0.2, n_estimators=10, max_depth=None,
+        model="random_forest",
+        tenant=None,
+        project=None,
+        dry_run=True,
+        holdout_size=0.2,
+        n_estimators=10,
+        max_depth=None,
     )
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
 
     mock_pipeline = MagicMock()
 
-    with patch("ml.train._parse_args", return_value=fake_args), \
-         patch("ml.train.load_data", return_value=(X, y)), \
-         patch("ml.train.train_with_cv", return_value={"pipeline": mock_pipeline, "metrics": _FAKE_METRICS}) as mock_train, \
-         patch("ml.train.register_in_db") as mock_register:
+    with (
+        patch("ml.train._parse_args", return_value=fake_args),
+        patch("ml.train.load_data", return_value=(X, y)),
+        patch(
+            "ml.train.train_with_cv",
+            return_value={"pipeline": mock_pipeline, "metrics": _FAKE_METRICS},
+        ) as mock_train,
+        patch("ml.train.register_in_db") as mock_register,
+    ):
         main()
 
     mock_train.assert_called_once()
@@ -273,21 +298,31 @@ def test_main_always_marks_model_as_approved(fake_customers_df):
     from ml.train import main
 
     fake_args = argparse.Namespace(
-        model="random_forest", tenant="ibm-telco", project="telco-churn-2018", dry_run=False,
-        holdout_size=0.2, n_estimators=10, max_depth=None,
+        model="random_forest",
+        tenant="ibm-telco",
+        project="telco-churn-2018",
+        dry_run=False,
+        holdout_size=0.2,
+        n_estimators=10,
+        max_depth=None,
     )
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
 
     mock_pipeline = MagicMock()
 
-    with patch("ml.train._parse_args", return_value=fake_args), \
-         patch("ml.train.load_data", return_value=(X, y)), \
-         patch("ml.train.train_with_cv", return_value={"pipeline": mock_pipeline, "metrics": _FAKE_METRICS}), \
-         patch("ml.train.log_to_mlflow", return_value="mlflow-rf-123"), \
-         patch("ml.train.register_in_db") as mock_register, \
-         patch("ml.train.mlflow.set_tracking_uri"), \
-         patch("ml.train.mlflow.set_experiment"):
+    with (
+        patch("ml.train._parse_args", return_value=fake_args),
+        patch("ml.train.load_data", return_value=(X, y)),
+        patch(
+            "ml.train.train_with_cv",
+            return_value={"pipeline": mock_pipeline, "metrics": _FAKE_METRICS},
+        ),
+        patch("ml.train.log_to_mlflow", return_value="mlflow-rf-123"),
+        patch("ml.train.register_in_db") as mock_register,
+        patch("ml.train.mlflow.set_tracking_uri"),
+        patch("ml.train.mlflow.set_experiment"),
+    ):
         main()
 
     call_kwargs = mock_register.call_args.kwargs
@@ -299,20 +334,30 @@ def test_main_dry_run_does_not_configure_mlflow(fake_customers_df):
     from ml.train import main
 
     fake_args = argparse.Namespace(
-        model="random_forest", tenant=None, project=None, dry_run=True,
-        holdout_size=0.2, n_estimators=10, max_depth=None,
+        model="random_forest",
+        tenant=None,
+        project=None,
+        dry_run=True,
+        holdout_size=0.2,
+        n_estimators=10,
+        max_depth=None,
     )
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
 
     mock_pipeline = MagicMock()
 
-    with patch("ml.train._parse_args", return_value=fake_args), \
-         patch("ml.train.load_data", return_value=(X, y)), \
-         patch("ml.train.train_with_cv", return_value={"pipeline": mock_pipeline, "metrics": _FAKE_METRICS}), \
-         patch("ml.train.register_in_db"), \
-         patch("ml.train.mlflow.set_tracking_uri") as mock_uri, \
-         patch("ml.train.mlflow.set_experiment") as mock_exp:
+    with (
+        patch("ml.train._parse_args", return_value=fake_args),
+        patch("ml.train.load_data", return_value=(X, y)),
+        patch(
+            "ml.train.train_with_cv",
+            return_value={"pipeline": mock_pipeline, "metrics": _FAKE_METRICS},
+        ),
+        patch("ml.train.register_in_db"),
+        patch("ml.train.mlflow.set_tracking_uri") as mock_uri,
+        patch("ml.train.mlflow.set_experiment") as mock_exp,
+    ):
         main()
 
     mock_uri.assert_not_called()
@@ -324,21 +369,31 @@ def test_main_not_dry_run_configures_mlflow(fake_customers_df):
     from ml.train import main
 
     fake_args = argparse.Namespace(
-        model="random_forest", tenant="ibm-telco", project="telco-churn-2018", dry_run=False,
-        holdout_size=0.2, n_estimators=10, max_depth=None,
+        model="random_forest",
+        tenant="ibm-telco",
+        project="telco-churn-2018",
+        dry_run=False,
+        holdout_size=0.2,
+        n_estimators=10,
+        max_depth=None,
     )
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
 
     mock_pipeline = MagicMock()
 
-    with patch("ml.train._parse_args", return_value=fake_args), \
-         patch("ml.train.load_data", return_value=(X, y)), \
-         patch("ml.train.train_with_cv", return_value={"pipeline": mock_pipeline, "metrics": _FAKE_METRICS}), \
-         patch("ml.train.log_to_mlflow", return_value="mlflow-rf-123"), \
-         patch("ml.train.register_in_db"), \
-         patch("ml.train.mlflow.set_tracking_uri") as mock_uri, \
-         patch("ml.train.mlflow.set_experiment") as mock_exp:
+    with (
+        patch("ml.train._parse_args", return_value=fake_args),
+        patch("ml.train.load_data", return_value=(X, y)),
+        patch(
+            "ml.train.train_with_cv",
+            return_value={"pipeline": mock_pipeline, "metrics": _FAKE_METRICS},
+        ),
+        patch("ml.train.log_to_mlflow", return_value="mlflow-rf-123"),
+        patch("ml.train.register_in_db"),
+        patch("ml.train.mlflow.set_tracking_uri") as mock_uri,
+        patch("ml.train.mlflow.set_experiment") as mock_exp,
+    ):
         main()
 
     mock_uri.assert_called_once()

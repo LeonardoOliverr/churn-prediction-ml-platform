@@ -14,7 +14,6 @@ from sqlalchemy import text
 
 from tests.integration.conftest import MINIMAL_PAYLOAD, TEST_SECRET_KEY
 
-
 # ---------------------------------------------------------------------------
 # API Key — casos de falha
 # ---------------------------------------------------------------------------

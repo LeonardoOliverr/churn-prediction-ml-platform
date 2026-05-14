@@ -29,39 +29,39 @@ YES_NO_COLS = [
 ]
 
 COLUMN_MAP = {
-    "CustomerID":       "customer_id",
-    "Count":            "customer_count",
-    "Country":          "country",
-    "State":            "state",
-    "City":             "city",
-    "Zip Code":         "zip_code",
-    "Lat Long":         "lat_long",
-    "Latitude":         "latitude",
-    "Longitude":        "longitude",
-    "Gender":           "gender",
-    "Senior Citizen":   "senior_citizen",
-    "Partner":          "partner",
-    "Dependents":       "dependents",
-    "Tenure Months":    "tenure_months",
-    "Phone Service":    "phone_service",
-    "Multiple Lines":   "multiple_lines",
+    "CustomerID": "customer_id",
+    "Count": "customer_count",
+    "Country": "country",
+    "State": "state",
+    "City": "city",
+    "Zip Code": "zip_code",
+    "Lat Long": "lat_long",
+    "Latitude": "latitude",
+    "Longitude": "longitude",
+    "Gender": "gender",
+    "Senior Citizen": "senior_citizen",
+    "Partner": "partner",
+    "Dependents": "dependents",
+    "Tenure Months": "tenure_months",
+    "Phone Service": "phone_service",
+    "Multiple Lines": "multiple_lines",
     "Internet Service": "internet_service",
-    "Online Security":  "online_security",
-    "Online Backup":    "online_backup",
-    "Device Protection":"device_protection",
-    "Tech Support":     "tech_support",
-    "Streaming TV":     "streaming_tv",
+    "Online Security": "online_security",
+    "Online Backup": "online_backup",
+    "Device Protection": "device_protection",
+    "Tech Support": "tech_support",
+    "Streaming TV": "streaming_tv",
     "Streaming Movies": "streaming_movies",
-    "Contract":         "contract",
-    "Paperless Billing":"paperless_billing",
-    "Payment Method":   "payment_method",
-    "Monthly Charges":  "monthly_charges",
-    "Total Charges":    "total_charges",
-    "Churn Label":      "churn_label",
-    "Churn Value":      "churn_value",
-    "Churn Score":      "churn_score",
-    "CLTV":             "cltv",
-    "Churn Reason":     "churn_reason",
+    "Contract": "contract",
+    "Paperless Billing": "paperless_billing",
+    "Payment Method": "payment_method",
+    "Monthly Charges": "monthly_charges",
+    "Total Charges": "total_charges",
+    "Churn Label": "churn_label",
+    "Churn Value": "churn_value",
+    "Churn Score": "churn_score",
+    "CLTV": "cltv",
+    "Churn Reason": "churn_reason",
 }
 
 
@@ -72,9 +72,10 @@ def assign_split(customer_id: str, holdout_ratio: float = 0.3) -> str:
         (('x' || md5(customer_id))::bit(32)::bigint + 2147483648)::numeric / 4294967296.0 < 0.3
     """
     import hashlib
+
     digest = hashlib.md5(customer_id.encode()).hexdigest()
-    val = int(digest[:8], 16)       # uint32: [0, 2^32-1]
-    bucket = val / 4294967296.0     # [0.0, 1.0)
+    val = int(digest[:8], 16)  # uint32: [0, 2^32-1]
+    bucket = val / 4294967296.0  # [0.0, 1.0)
     return "holdout" if bucket < holdout_ratio else "train"
 
 
@@ -104,14 +105,18 @@ def transform(df: pd.DataFrame) -> pd.DataFrame:
 
 def resolve_ids(engine, tenant_slug: str, project_slug: str) -> tuple[str, str]:
     with engine.connect() as conn:
-        tenant_id = str(conn.execute(
-            text("SELECT id FROM churn.tenants WHERE slug = :s"),
-            {"s": tenant_slug},
-        ).scalar_one())
-        project_id = str(conn.execute(
-            text("SELECT id FROM churn.projects WHERE tenant_id = :t AND slug = :s"),
-            {"t": tenant_id, "s": project_slug},
-        ).scalar_one())
+        tenant_id = str(
+            conn.execute(
+                text("SELECT id FROM churn.tenants WHERE slug = :s"),
+                {"s": tenant_slug},
+            ).scalar_one()
+        )
+        project_id = str(
+            conn.execute(
+                text("SELECT id FROM churn.projects WHERE tenant_id = :t AND slug = :s"),
+                {"t": tenant_id, "s": project_slug},
+            ).scalar_one()
+        )
     return tenant_id, project_id
 
 

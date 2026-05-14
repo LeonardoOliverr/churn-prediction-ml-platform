@@ -117,13 +117,15 @@ def _store_fingerprint(engine, fingerprint: str) -> None:
     """Persiste fingerprint após deploy bem-sucedido (upsert)."""
     with engine.begin() as conn:
         conn.execute(text("CREATE SCHEMA IF NOT EXISTS churn_test_meta"))
-        conn.execute(text("""
+        conn.execute(
+            text("""
             CREATE TABLE IF NOT EXISTS churn_test_meta.schema_info (
                 id            INT PRIMARY KEY,
                 fingerprint   TEXT        NOT NULL,
                 deployed_at   TIMESTAMPTZ DEFAULT NOW()
             )
-        """))
+        """)
+        )
         conn.execute(
             text("""
                 INSERT INTO churn_test_meta.schema_info (id, fingerprint)
@@ -295,7 +297,9 @@ def seed_tenant(db_conn):
     """Insere tenant de teste e retorna seu UUID."""
     tenant_id = str(uuid.uuid4())
     db_conn.execute(
-        text("INSERT INTO churn.tenants (id, name, slug) VALUES (:id, 'Tenant Teste', 'tenant-teste')"),
+        text(
+            "INSERT INTO churn.tenants (id, name, slug) VALUES (:id, 'Tenant Teste', 'tenant-teste')"
+        ),
         {"id": tenant_id},
     )
     db_conn.commit()

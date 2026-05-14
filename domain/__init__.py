@@ -4,13 +4,13 @@ Esta camada não importa nada de outros módulos do projeto.
 """
 
 from domain.constants import (
+    RISK_THRESHOLD_HIGH,
+    RISK_THRESHOLD_LOW,
     ApiScope,
     CostModel,
     EvaluationType,
     ModelRole,
     ModelStatus,
-    RISK_THRESHOLD_HIGH,
-    RISK_THRESHOLD_LOW,
     RiskLevel,
 )
 from domain.exceptions import (

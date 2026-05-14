@@ -71,8 +71,7 @@ def train_with_cv(
 
     if X_holdout is not None:
         holdout_scores = {
-            metric: _compute_score(pipeline, X_holdout, y_holdout, metric)
-            for metric in SCORING
+            metric: _compute_score(pipeline, X_holdout, y_holdout, metric) for metric in SCORING
         }
 
         ho_f1_gap = cv_metrics["train_f1_mean"] - holdout_scores["f1"]

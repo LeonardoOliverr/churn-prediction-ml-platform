@@ -7,17 +7,17 @@ Inclui:
 - log_to_mlflow(): logging no MLflow com e sem feature importances
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
 
-from ml.core.training import SCORING
-
-
 _FAKE_METRICS = {
-    "f1_mean": 0.65, "f1_std": 0.04,
-    "roc_auc_mean": 0.85, "roc_auc_std": 0.02,
-    "recall_mean": 0.80, "recall_std": 0.04,
-    "precision_mean": 0.70, "precision_std": 0.03,
+    "f1_mean": 0.65,
+    "f1_std": 0.04,
+    "roc_auc_mean": 0.85,
+    "roc_auc_std": 0.02,
+    "recall_mean": 0.80,
+    "recall_std": 0.04,
+    "precision_mean": 0.70,
+    "precision_std": 0.03,
     "train_f1_mean": 0.82,
     "train_roc_auc_mean": 0.94,
     "train_recall_mean": 0.89,
@@ -94,12 +94,19 @@ def test_register_in_db_dry_run_no_db_writes(capsys):
 
     mock_engine, mock_conn = _make_mock_engine()
 
-    with patch("ml.core.registry.db._build_engine", return_value=mock_engine), \
-         patch("ml.core.registry.db._next_version", return_value="v1"):
+    with (
+        patch("ml.core.registry.db._build_engine", return_value=mock_engine),
+        patch("ml.core.registry.db._next_version", return_value="v1"),
+    ):
         register_in_db(
-            name="global-baseline", run_id="test-run-id", metrics=_FAKE_METRICS,
-            scope="global", tenant_slug=None, project_slug=None,
-            status="approved", dry_run=True,
+            name="global-baseline",
+            run_id="test-run-id",
+            metrics=_FAKE_METRICS,
+            scope="global",
+            tenant_slug=None,
+            project_slug=None,
+            status="approved",
+            dry_run=True,
         )
 
     captured = capsys.readouterr()
@@ -114,12 +121,19 @@ def test_register_in_db_dry_run_includes_version_in_output(capsys):
 
     mock_engine, _ = _make_mock_engine()
 
-    with patch("ml.core.registry.db._build_engine", return_value=mock_engine), \
-         patch("ml.core.registry.db._next_version", return_value="v3"):
+    with (
+        patch("ml.core.registry.db._build_engine", return_value=mock_engine),
+        patch("ml.core.registry.db._next_version", return_value="v3"),
+    ):
         register_in_db(
-            name="global-baseline", run_id="run-id", metrics=_FAKE_METRICS,
-            scope="global", tenant_slug=None, project_slug=None,
-            status="approved", dry_run=True,
+            name="global-baseline",
+            run_id="run-id",
+            metrics=_FAKE_METRICS,
+            scope="global",
+            tenant_slug=None,
+            project_slug=None,
+            status="approved",
+            dry_run=True,
         )
 
     assert "v3" in capsys.readouterr().out
@@ -131,8 +145,10 @@ def test_register_in_db_dry_run_prints_metadata(capsys):
 
     mock_engine, mock_conn = _make_mock_engine()
 
-    with patch("ml.core.registry.db._build_engine", return_value=mock_engine), \
-         patch("ml.core.registry.db._next_version", return_value="v1"):
+    with (
+        patch("ml.core.registry.db._build_engine", return_value=mock_engine),
+        patch("ml.core.registry.db._next_version", return_value="v1"),
+    ):
         register_in_db(
             name="global-random-forest",
             run_id="run-id",
@@ -165,12 +181,19 @@ def test_register_in_db_approved_status_executes_only_insert():
 
     mock_engine, mock_conn = _make_mock_engine()
 
-    with patch("ml.core.registry.db._build_engine", return_value=mock_engine), \
-         patch("ml.core.registry.db._next_version", return_value="v2"):
+    with (
+        patch("ml.core.registry.db._build_engine", return_value=mock_engine),
+        patch("ml.core.registry.db._next_version", return_value="v2"),
+    ):
         register_in_db(
-            name="global-baseline", run_id="run-id", metrics=_FAKE_METRICS,
-            scope="global", tenant_slug=None, project_slug=None,
-            status="approved", dry_run=False,
+            name="global-baseline",
+            run_id="run-id",
+            metrics=_FAKE_METRICS,
+            scope="global",
+            tenant_slug=None,
+            project_slug=None,
+            status="approved",
+            dry_run=False,
         )
 
     assert mock_conn.execute.call_count == 1
@@ -182,12 +205,19 @@ def test_register_in_db_trained_status_executes_only_insert():
 
     mock_engine, mock_conn = _make_mock_engine()
 
-    with patch("ml.core.registry.db._build_engine", return_value=mock_engine), \
-         patch("ml.core.registry.db._next_version", return_value="v1"):
+    with (
+        patch("ml.core.registry.db._build_engine", return_value=mock_engine),
+        patch("ml.core.registry.db._next_version", return_value="v1"),
+    ):
         register_in_db(
-            name="global-baseline", run_id="run-id", metrics=_DUMMY_METRICS,
-            scope="global", tenant_slug=None, project_slug=None,
-            status="trained", dry_run=False,
+            name="global-baseline",
+            run_id="run-id",
+            metrics=_DUMMY_METRICS,
+            scope="global",
+            tenant_slug=None,
+            project_slug=None,
+            status="trained",
+            dry_run=False,
         )
 
     assert mock_conn.execute.call_count == 1
@@ -201,8 +231,10 @@ def test_register_in_db_persists_training_metadata_jsons():
     hyperparameters = {"n_estimators": 500, "max_depth": None}
     training_params = {"cv_folds": 5, "cv_strategy": "StratifiedKFold"}
 
-    with patch("ml.core.registry.db._build_engine", return_value=mock_engine), \
-         patch("ml.core.registry.db._next_version", return_value="v1"):
+    with (
+        patch("ml.core.registry.db._build_engine", return_value=mock_engine),
+        patch("ml.core.registry.db._next_version", return_value="v1"),
+    ):
         register_in_db(
             name="global-random-forest",
             run_id="run-id",
@@ -232,14 +264,21 @@ def test_register_in_db_tenant_scope_calls_resolve_tenant_id():
 
     mock_engine, _ = _make_mock_engine()
 
-    with patch("ml.core.registry.db._build_engine", return_value=mock_engine), \
-         patch("ml.core.registry.db._next_version", return_value="v1"), \
-         patch("ml.core.registry.db._resolve_tenant_id", return_value="tenant-uuid") as mock_tid, \
-         patch("ml.core.registry.db._resolve_project_id") as mock_pid:
+    with (
+        patch("ml.core.registry.db._build_engine", return_value=mock_engine),
+        patch("ml.core.registry.db._next_version", return_value="v1"),
+        patch("ml.core.registry.db._resolve_tenant_id", return_value="tenant-uuid") as mock_tid,
+        patch("ml.core.registry.db._resolve_project_id") as mock_pid,
+    ):
         register_in_db(
-            name="ibm-telco-baseline", run_id="run-id", metrics=_FAKE_METRICS,
-            scope="tenant", tenant_slug="ibm-telco", project_slug=None,
-            status="approved", dry_run=True,
+            name="ibm-telco-baseline",
+            run_id="run-id",
+            metrics=_FAKE_METRICS,
+            scope="tenant",
+            tenant_slug="ibm-telco",
+            project_slug=None,
+            status="approved",
+            dry_run=True,
         )
 
     mock_tid.assert_called()
@@ -252,14 +291,21 @@ def test_register_in_db_project_scope_calls_both_resolvers():
 
     mock_engine, _ = _make_mock_engine()
 
-    with patch("ml.core.registry.db._build_engine", return_value=mock_engine), \
-         patch("ml.core.registry.db._next_version", return_value="v1"), \
-         patch("ml.core.registry.db._resolve_tenant_id", return_value="tenant-uuid") as mock_tid, \
-         patch("ml.core.registry.db._resolve_project_id", return_value="project-uuid") as mock_pid:
+    with (
+        patch("ml.core.registry.db._build_engine", return_value=mock_engine),
+        patch("ml.core.registry.db._next_version", return_value="v1"),
+        patch("ml.core.registry.db._resolve_tenant_id", return_value="tenant-uuid") as mock_tid,
+        patch("ml.core.registry.db._resolve_project_id", return_value="project-uuid") as mock_pid,
+    ):
         register_in_db(
-            name="ibm-telco-telco-churn-2018-baseline", run_id="run-id", metrics=_FAKE_METRICS,
-            scope="project", tenant_slug="ibm-telco", project_slug="telco-churn-2018",
-            status="approved", dry_run=True,
+            name="ibm-telco-telco-churn-2018-baseline",
+            run_id="run-id",
+            metrics=_FAKE_METRICS,
+            scope="project",
+            tenant_slug="ibm-telco",
+            project_slug="telco-churn-2018",
+            status="approved",
+            dry_run=True,
         )
 
     mock_tid.assert_called()
@@ -272,14 +318,21 @@ def test_register_in_db_tenant_scope_not_dry_run_executes_write():
 
     mock_engine, mock_conn = _make_mock_engine()
 
-    with patch("ml.core.registry.db._build_engine", return_value=mock_engine), \
-         patch("ml.core.registry.db._next_version", return_value="v1"), \
-         patch("ml.core.registry.db._resolve_tenant_id", return_value="tenant-uuid"), \
-         patch("ml.core.registry.db._resolve_project_id", return_value=None):
+    with (
+        patch("ml.core.registry.db._build_engine", return_value=mock_engine),
+        patch("ml.core.registry.db._next_version", return_value="v1"),
+        patch("ml.core.registry.db._resolve_tenant_id", return_value="tenant-uuid"),
+        patch("ml.core.registry.db._resolve_project_id", return_value=None),
+    ):
         register_in_db(
-            name="ibm-telco-baseline", run_id="run-id", metrics=_FAKE_METRICS,
-            scope="tenant", tenant_slug="ibm-telco", project_slug=None,
-            status="approved", dry_run=False,
+            name="ibm-telco-baseline",
+            run_id="run-id",
+            metrics=_FAKE_METRICS,
+            scope="tenant",
+            tenant_slug="ibm-telco",
+            project_slug=None,
+            status="approved",
+            dry_run=False,
         )
 
     assert mock_conn.execute.call_count == 1
@@ -291,14 +344,21 @@ def test_register_in_db_project_scope_not_dry_run_trained_executes_only_insert()
 
     mock_engine, mock_conn = _make_mock_engine()
 
-    with patch("ml.core.registry.db._build_engine", return_value=mock_engine), \
-         patch("ml.core.registry.db._next_version", return_value="v1"), \
-         patch("ml.core.registry.db._resolve_tenant_id", return_value="tenant-uuid"), \
-         patch("ml.core.registry.db._resolve_project_id", return_value="project-uuid"):
+    with (
+        patch("ml.core.registry.db._build_engine", return_value=mock_engine),
+        patch("ml.core.registry.db._next_version", return_value="v1"),
+        patch("ml.core.registry.db._resolve_tenant_id", return_value="tenant-uuid"),
+        patch("ml.core.registry.db._resolve_project_id", return_value="project-uuid"),
+    ):
         register_in_db(
-            name="ibm-telco-telco-churn-2018-baseline", run_id="run-id", metrics=_DUMMY_METRICS,
-            scope="project", tenant_slug="ibm-telco", project_slug="telco-churn-2018",
-            status="trained", dry_run=False,
+            name="ibm-telco-telco-churn-2018-baseline",
+            run_id="run-id",
+            metrics=_DUMMY_METRICS,
+            scope="project",
+            tenant_slug="ibm-telco",
+            project_slug="telco-churn-2018",
+            status="trained",
+            dry_run=False,
         )
 
     assert mock_conn.execute.call_count == 1
@@ -325,11 +385,13 @@ def test_log_to_mlflow_saves_artifact_and_returns_run_id():
 
     mock_pipeline = MagicMock()
 
-    with patch("ml.core.registry.mlflow.mlflow.start_run", return_value=_make_mlflow_ctx("abc-123")), \
-         patch("ml.core.registry.mlflow.mlflow.log_params") as mock_params, \
-         patch("ml.core.registry.mlflow.mlflow.log_metrics") as mock_metrics, \
-         patch("ml.core.registry.mlflow.mlflow.sklearn.save_model"), \
-         patch("ml.core.registry.mlflow.mlflow.log_artifacts") as mock_artifacts:
+    with (
+        patch("ml.core.registry.mlflow.mlflow.start_run", return_value=_make_mlflow_ctx("abc-123")),
+        patch("ml.core.registry.mlflow.mlflow.log_params") as mock_params,
+        patch("ml.core.registry.mlflow.mlflow.log_metrics") as mock_metrics,
+        patch("ml.core.registry.mlflow.mlflow.sklearn.save_model"),
+        patch("ml.core.registry.mlflow.mlflow.log_artifacts") as mock_artifacts,
+    ):
         run_id = log_to_mlflow(
             run_name="test_model",
             params={"model_type": "dummy"},
@@ -351,14 +413,19 @@ def test_log_to_mlflow_does_not_call_fit_on_pipeline():
 
     mock_pipeline = MagicMock()
 
-    with patch("ml.core.registry.mlflow.mlflow.start_run", return_value=_make_mlflow_ctx()), \
-         patch("ml.core.registry.mlflow.mlflow.log_params"), \
-         patch("ml.core.registry.mlflow.mlflow.log_metrics"), \
-         patch("ml.core.registry.mlflow.mlflow.sklearn.save_model"), \
-         patch("ml.core.registry.mlflow.mlflow.log_artifacts"):
+    with (
+        patch("ml.core.registry.mlflow.mlflow.start_run", return_value=_make_mlflow_ctx()),
+        patch("ml.core.registry.mlflow.mlflow.log_params"),
+        patch("ml.core.registry.mlflow.mlflow.log_metrics"),
+        patch("ml.core.registry.mlflow.mlflow.sklearn.save_model"),
+        patch("ml.core.registry.mlflow.mlflow.log_artifacts"),
+    ):
         log_to_mlflow(
-            run_name="test", params={}, metrics=_FAKE_METRICS,
-            pipeline=mock_pipeline, log_feature_importances=False,
+            run_name="test",
+            params={},
+            metrics=_FAKE_METRICS,
+            pipeline=mock_pipeline,
+            log_feature_importances=False,
         )
 
     mock_pipeline.fit.assert_not_called()
@@ -366,30 +433,41 @@ def test_log_to_mlflow_does_not_call_fit_on_pipeline():
 
 def test_log_to_mlflow_logs_feature_importances_when_flag_set(fake_customers_df):
     """log_to_mlflow com log_feature_importances=True chama mlflow.log_dict."""
-    from ml.core.registry import log_to_mlflow
-    from ml.config.settings import TARGET
-    from ml.data.preprocessing import build_preprocessor
     from sklearn.ensemble import RandomForestClassifier
     from sklearn.pipeline import Pipeline
+
+    from ml.config.settings import TARGET
+    from ml.core.registry import log_to_mlflow
+    from ml.data.preprocessing import build_preprocessor
 
     X = fake_customers_df.drop(columns=[TARGET])
     y = fake_customers_df[TARGET]
 
-    pipeline = Pipeline([
-        ("preprocessor", build_preprocessor()),
-        ("classifier", RandomForestClassifier(n_estimators=5, random_state=42, class_weight="balanced")),
-    ])
+    pipeline = Pipeline(
+        [
+            ("preprocessor", build_preprocessor()),
+            (
+                "classifier",
+                RandomForestClassifier(n_estimators=5, random_state=42, class_weight="balanced"),
+            ),
+        ]
+    )
     pipeline.fit(X, y)
 
-    with patch("ml.core.registry.mlflow.mlflow.start_run", return_value=_make_mlflow_ctx()), \
-         patch("ml.core.registry.mlflow.mlflow.log_params"), \
-         patch("ml.core.registry.mlflow.mlflow.log_metrics"), \
-         patch("ml.core.registry.mlflow.mlflow.sklearn.save_model"), \
-         patch("ml.core.registry.mlflow.mlflow.log_artifacts"), \
-         patch("ml.core.registry.mlflow.mlflow.log_dict") as mock_log_dict:
+    with (
+        patch("ml.core.registry.mlflow.mlflow.start_run", return_value=_make_mlflow_ctx()),
+        patch("ml.core.registry.mlflow.mlflow.log_params"),
+        patch("ml.core.registry.mlflow.mlflow.log_metrics"),
+        patch("ml.core.registry.mlflow.mlflow.sklearn.save_model"),
+        patch("ml.core.registry.mlflow.mlflow.log_artifacts"),
+        patch("ml.core.registry.mlflow.mlflow.log_dict") as mock_log_dict,
+    ):
         log_to_mlflow(
-            run_name="rf", params={}, metrics=_FAKE_METRICS,
-            pipeline=pipeline, log_feature_importances=True,
+            run_name="rf",
+            params={},
+            metrics=_FAKE_METRICS,
+            pipeline=pipeline,
+            log_feature_importances=True,
         )
 
     mock_log_dict.assert_called_once()
@@ -402,15 +480,20 @@ def test_log_to_mlflow_skips_feature_importances_when_flag_false():
 
     mock_pipeline = MagicMock()
 
-    with patch("ml.core.registry.mlflow.mlflow.start_run", return_value=_make_mlflow_ctx()), \
-         patch("ml.core.registry.mlflow.mlflow.log_params"), \
-         patch("ml.core.registry.mlflow.mlflow.log_metrics"), \
-         patch("ml.core.registry.mlflow.mlflow.sklearn.save_model"), \
-         patch("ml.core.registry.mlflow.mlflow.log_artifacts"), \
-         patch("ml.core.registry.mlflow.mlflow.log_dict") as mock_log_dict:
+    with (
+        patch("ml.core.registry.mlflow.mlflow.start_run", return_value=_make_mlflow_ctx()),
+        patch("ml.core.registry.mlflow.mlflow.log_params"),
+        patch("ml.core.registry.mlflow.mlflow.log_metrics"),
+        patch("ml.core.registry.mlflow.mlflow.sklearn.save_model"),
+        patch("ml.core.registry.mlflow.mlflow.log_artifacts"),
+        patch("ml.core.registry.mlflow.mlflow.log_dict") as mock_log_dict,
+    ):
         log_to_mlflow(
-            run_name="dummy", params={}, metrics=_FAKE_METRICS,
-            pipeline=mock_pipeline, log_feature_importances=False,
+            run_name="dummy",
+            params={},
+            metrics=_FAKE_METRICS,
+            pipeline=mock_pipeline,
+            log_feature_importances=False,
         )
 
     mock_log_dict.assert_not_called()
