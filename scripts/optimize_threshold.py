@@ -72,9 +72,8 @@ _QUERY_COST_CONFIG = text("""
         fn_cost_months_multiplier
     FROM churn.cost_model_config
     WHERE tenant_id  = :tenant_id
-      AND (project_id = :project_id OR project_id IS NULL)
-      AND is_active   = TRUE
-    ORDER BY project_id NULLS LAST
+      AND project_id = :project_id
+      AND is_active  = TRUE
     LIMIT 1
 """)
 
