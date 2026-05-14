@@ -15,7 +15,9 @@ def setup_function():
 def _make_request(api_key: str | None = None, remote_addr: str = "1.2.3.4") -> MagicMock:
     request = MagicMock()
     # Retorna string vazia quando api_key é None (comportamento correto do header ausente)
-    request.headers.get = lambda key, default="": (api_key if api_key is not None else default) if key == "x-api-key" else default
+    request.headers.get = lambda key, default="": (
+        (api_key if api_key is not None else default) if key == "x-api-key" else default
+    )
     # get_remote_address(request) lê request.client.host
     request.client.host = remote_addr
     return request
