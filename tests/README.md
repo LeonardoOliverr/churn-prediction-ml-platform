@@ -33,9 +33,8 @@ tests/
 │   │   ├── test_registry.py             # registro no MLflow + DB
 │   │   ├── test_compare_models.py       # ml/tools/compare_models.py — plots, MLflow mock, _load_best_runs
 │   │   └── test_export_dataset.py       # ml/tools/export_dataset.py — _get_feature_names (7 branches), export()
-│   ├── pipeline/
-│   │   └── test_pipeline.py             # transform() e load() sem banco
 │   └── scripts/
+│       ├── test_load_ibm_telco.py       # transform() e load() sem banco
 │       └── test_seed_outcomes.py        # seed_outcomes_from_customers.py
 │
 └── integration/                         # testes de integração — requerem PostgreSQL

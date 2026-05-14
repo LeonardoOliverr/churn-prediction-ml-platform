@@ -9,7 +9,7 @@ Plataforma de machine learning end-to-end para previsão de churn de clientes em
 ```
 [1] INGESTÃO
     IBM Telco Dataset (~7k clientes)
-    └── pipeline/load_ibm_telco.py
+    └── scripts/load_ibm_telco.py
         └── churn.customers (PostgreSQL)
                 │
                 ▼
@@ -316,7 +316,7 @@ docker exec -i churn-prediction-ml-platform-postgres-1 \
 ### 7. Carregue o dataset
 
 ```bash
-python pipeline/load_ibm_telco.py
+python scripts/load_ibm_telco.py
 ```
 
 O script baixa o dataset IBM Telco via `kagglehub` (cache local após a primeira execução), transforma e insere ~7.000 registros em `churn.customers`.
@@ -495,7 +495,7 @@ O [notebooks/relatorio_negocio.md](notebooks/relatorio_negocio.md) traduz os ach
 
 ## Pipeline de ingestão
 
-O script [pipeline/load_ibm_telco.py](pipeline/load_ibm_telco.py) realiza a carga completa do dataset IBM Telco no banco de dados:
+O script [scripts/load_ibm_telco.py](scripts/load_ibm_telco.py) realiza a carga completa do dataset IBM Telco no banco de dados:
 
 1. **Download** — baixa o arquivo `Telco_customer_churn.xlsx` via `kagglehub` com cache local
 2. **Transformação** — converte `Yes/No` → `boolean`, `Zip Code` → `string`, coerce `Total Charges` para numérico

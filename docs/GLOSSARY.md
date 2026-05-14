@@ -348,7 +348,7 @@ Organizado em seções temáticas para facilitar a consulta durante a leitura de
 ### Ingestão
 > Processo de coletar dados de uma fonte externa e carregá-los no banco de dados do sistema.
 
-**No projeto:** `pipeline/load_ibm_telco.py` baixa o dataset IBM Telco via kagglehub e insere em `churn.customers`.
+**No projeto:** `scripts/load_ibm_telco.py` baixa o dataset IBM Telco via kagglehub e insere em `churn.customers`.
 
 ---
 
