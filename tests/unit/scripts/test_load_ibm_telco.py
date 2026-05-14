@@ -1,5 +1,5 @@
 """
-Testes unitários para pipeline/load_ibm_telco.py.
+Testes unitários para scripts/load_ibm_telco.py.
 
 Cobre transform() — lógica pura de transformação sem banco de dados — e
 load() com mock de engine. fetch_dataset() e resolve_ids() requerem
@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 from unittest.mock import patch
 
-from pipeline.load_ibm_telco import COLUMN_MAP, YES_NO_COLS, load, transform
+from scripts.load_ibm_telco import COLUMN_MAP, YES_NO_COLS, load, transform
 
 
 # ---------------------------------------------------------------------------
@@ -255,7 +255,7 @@ def test_load_calls_to_sql_with_correct_table_params(raw_telco_df):
 
 def test_assign_split_is_deterministic():
     """assign_split retorna o mesmo resultado para o mesmo customer_id."""
-    from pipeline.load_ibm_telco import assign_split
+    from scripts.load_ibm_telco import assign_split
 
     assert assign_split("7590-VHVEG") == assign_split("7590-VHVEG")
     assert assign_split("5575-GNVDE") == assign_split("5575-GNVDE")
@@ -263,7 +263,7 @@ def test_assign_split_is_deterministic():
 
 def test_assign_split_returns_valid_values():
     """assign_split retorna apenas 'train' ou 'holdout'."""
-    from pipeline.load_ibm_telco import assign_split
+    from scripts.load_ibm_telco import assign_split
 
     customer_ids = [f"CUST-{i:04d}" for i in range(100)]
     splits = [assign_split(cid) for cid in customer_ids]
@@ -272,7 +272,7 @@ def test_assign_split_returns_valid_values():
 
 def test_assign_split_distribution_is_roughly_30_pct():
     """assign_split distribui aproximadamente 30% para holdout em amostra grande."""
-    from pipeline.load_ibm_telco import assign_split
+    from scripts.load_ibm_telco import assign_split
 
     customer_ids = [f"CUST-{i:06d}" for i in range(1000)]
     holdout_count = sum(1 for cid in customer_ids if assign_split(cid) == "holdout")
@@ -282,7 +282,7 @@ def test_assign_split_distribution_is_roughly_30_pct():
 
 def test_assign_split_custom_ratio():
     """assign_split respeita holdout_ratio customizado."""
-    from pipeline.load_ibm_telco import assign_split
+    from scripts.load_ibm_telco import assign_split
 
     customer_ids = [f"CUST-{i:06d}" for i in range(1000)]
     holdout_50 = sum(1 for cid in customer_ids if assign_split(cid, holdout_ratio=0.5) == "holdout")
