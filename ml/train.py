@@ -261,7 +261,6 @@ def _train_candidates(
 
 def _register_comparison(
     comparison,
-    scope: str,
     tenant_slug: str | None,
     project_slug: str | None,
     dry_run: bool,
@@ -273,7 +272,6 @@ def _register_comparison(
             name=db_name,
             run_id=candidate.run_id,
             metrics=candidate.metrics,
-            scope=scope,
             tenant_slug=tenant_slug,
             project_slug=project_slug,
             status=comparison.status_by_model[candidate.spec.name],
@@ -323,7 +321,6 @@ def main() -> None:
     )
     _register_comparison(
         comparison=comparison,
-        scope=scope,
         tenant_slug=args.tenant,
         project_slug=args.project,
         dry_run=args.dry_run,

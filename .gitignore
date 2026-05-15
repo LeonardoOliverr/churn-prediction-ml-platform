@@ -219,3 +219,10 @@ __marimo__/
 
 # Environment secrets
 .env.local
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.*
+!frontend/.env.example

@@ -3,7 +3,7 @@ Testes unitários para ml/core/registry.py.
 
 Inclui:
 - _next_version(): cálculo de versão semântica
-- register_in_db(): inserção em churn.models com dry-run e scopes
+- register_in_db(): inserção em churn.models com dry-run
 - log_to_mlflow(): logging no MLflow com e sem feature importances
 """
 
@@ -59,7 +59,7 @@ def test_next_version_first_model_is_v1():
     from ml.core.registry import _next_version
 
     conn = _make_mock_conn(count=0)
-    assert _next_version(conn, "global", None, None, "global-baseline") == "v1"
+    assert _next_version(conn, "tenant-uuid", "project-uuid", "random-forest") == "v1"
 
 
 def test_next_version_increments_correctly():
@@ -67,19 +67,19 @@ def test_next_version_increments_correctly():
     from ml.core.registry import _next_version
 
     conn = _make_mock_conn(count=3)
-    assert _next_version(conn, "global", None, None, "global-baseline") == "v4"
+    assert _next_version(conn, "tenant-uuid", "project-uuid", "random-forest") == "v4"
 
 
 def test_next_version_passes_correct_params_to_query():
-    """Os parâmetros de escopo são passados corretamente à query."""
+    """Os parâmetros tenant_id, project_id e name são passados corretamente à query."""
     from ml.core.registry import _next_version
 
     conn = _make_mock_conn(count=0)
-    _next_version(conn, "tenant", "tenant-uuid", None, "my-model")
+    _next_version(conn, "tenant-uuid", "project-uuid", "my-model")
 
     call_kwargs = conn.execute.call_args[0][1]
-    assert call_kwargs["scope"] == "tenant"
     assert call_kwargs["tenant_id"] == "tenant-uuid"
+    assert call_kwargs["project_id"] == "project-uuid"
     assert call_kwargs["name"] == "my-model"
 
 
@@ -102,7 +102,6 @@ def test_register_in_db_dry_run_no_db_writes(capsys):
             name="global-baseline",
             run_id="test-run-id",
             metrics=_FAKE_METRICS,
-            scope="global",
             tenant_slug=None,
             project_slug=None,
             status="approved",
@@ -129,7 +128,6 @@ def test_register_in_db_dry_run_includes_version_in_output(capsys):
             name="global-baseline",
             run_id="run-id",
             metrics=_FAKE_METRICS,
-            scope="global",
             tenant_slug=None,
             project_slug=None,
             status="approved",
@@ -153,7 +151,6 @@ def test_register_in_db_dry_run_prints_metadata(capsys):
             name="global-random-forest",
             run_id="run-id",
             metrics=_FAKE_METRICS,
-            scope="global",
             tenant_slug=None,
             project_slug=None,
             status="approved",
@@ -189,7 +186,6 @@ def test_register_in_db_approved_status_executes_only_insert():
             name="global-baseline",
             run_id="run-id",
             metrics=_FAKE_METRICS,
-            scope="global",
             tenant_slug=None,
             project_slug=None,
             status="approved",
@@ -213,7 +209,6 @@ def test_register_in_db_trained_status_executes_only_insert():
             name="global-baseline",
             run_id="run-id",
             metrics=_DUMMY_METRICS,
-            scope="global",
             tenant_slug=None,
             project_slug=None,
             status="trained",
@@ -239,7 +234,6 @@ def test_register_in_db_persists_training_metadata_jsons():
             name="global-random-forest",
             run_id="run-id",
             metrics=_FAKE_METRICS,
-            scope="global",
             tenant_slug=None,
             project_slug=None,
             status="approved",
@@ -259,7 +253,7 @@ def test_register_in_db_persists_training_metadata_jsons():
 
 
 def test_register_in_db_tenant_scope_calls_resolve_tenant_id():
-    """Escopo tenant chama _resolve_tenant_id e não chama _resolve_project_id."""
+    """Quando tenant_slug está definido, chama _resolve_tenant_id; sem project_slug, não chama _resolve_project_id."""
     from ml.core.registry import register_in_db
 
     mock_engine, _ = _make_mock_engine()
@@ -274,7 +268,6 @@ def test_register_in_db_tenant_scope_calls_resolve_tenant_id():
             name="ibm-telco-baseline",
             run_id="run-id",
             metrics=_FAKE_METRICS,
-            scope="tenant",
             tenant_slug="ibm-telco",
             project_slug=None,
             status="approved",
@@ -286,7 +279,7 @@ def test_register_in_db_tenant_scope_calls_resolve_tenant_id():
 
 
 def test_register_in_db_project_scope_calls_both_resolvers():
-    """Escopo project chama _resolve_tenant_id e _resolve_project_id."""
+    """Quando tenant_slug e project_slug estão definidos, ambos os resolvers são chamados."""
     from ml.core.registry import register_in_db
 
     mock_engine, _ = _make_mock_engine()
@@ -301,7 +294,6 @@ def test_register_in_db_project_scope_calls_both_resolvers():
             name="ibm-telco-telco-churn-2018-baseline",
             run_id="run-id",
             metrics=_FAKE_METRICS,
-            scope="project",
             tenant_slug="ibm-telco",
             project_slug="telco-churn-2018",
             status="approved",
@@ -313,7 +305,7 @@ def test_register_in_db_project_scope_calls_both_resolvers():
 
 
 def test_register_in_db_tenant_scope_not_dry_run_executes_write():
-    """Escopo tenant, dry_run=False executa INSERT sem erros."""
+    """tenant_slug sem project_slug, dry_run=False executa INSERT sem erros."""
     from ml.core.registry import register_in_db
 
     mock_engine, mock_conn = _make_mock_engine()
@@ -328,7 +320,6 @@ def test_register_in_db_tenant_scope_not_dry_run_executes_write():
             name="ibm-telco-baseline",
             run_id="run-id",
             metrics=_FAKE_METRICS,
-            scope="tenant",
             tenant_slug="ibm-telco",
             project_slug=None,
             status="approved",
@@ -339,7 +330,7 @@ def test_register_in_db_tenant_scope_not_dry_run_executes_write():
 
 
 def test_register_in_db_project_scope_not_dry_run_trained_executes_only_insert():
-    """Escopo project, dry_run=False, status='trained' executa apenas INSERT."""
+    """tenant+project, dry_run=False, status='trained' executa apenas INSERT."""
     from ml.core.registry import register_in_db
 
     mock_engine, mock_conn = _make_mock_engine()
@@ -354,7 +345,6 @@ def test_register_in_db_project_scope_not_dry_run_trained_executes_only_insert()
             name="ibm-telco-telco-churn-2018-baseline",
             run_id="run-id",
             metrics=_DUMMY_METRICS,
-            scope="project",
             tenant_slug="ibm-telco",
             project_slug="telco-churn-2018",
             status="trained",
