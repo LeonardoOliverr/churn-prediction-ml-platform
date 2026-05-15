@@ -1,0 +1,347 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   Tarpon — Design Tokens (OKLCH, dark-first)
+   ============================================================ */
+:root {
+  /* ---------- Surfaces (graphite scale, cool-neutral) ---------- */
+  --bg-0:        oklch(0.16 0.005 240);
+  --bg-1:        oklch(0.185 0.006 240);
+  --bg-2:        oklch(0.205 0.007 240);
+  --bg-3:        oklch(0.235 0.008 240);
+  --bg-4:        oklch(0.275 0.009 240);
+  --bg-inset:    oklch(0.145 0.005 240);
+
+  /* ---------- Borders ---------- */
+  --border-1:    oklch(0.27 0.008 240);
+  --border-2:    oklch(0.32 0.010 240);
+  --border-3:    oklch(0.38 0.012 240);
+  --divider:     oklch(0.235 0.008 240);
+
+  /* ---------- Foreground ---------- */
+  --fg-1:        oklch(0.96 0.003 240);
+  --fg-2:        oklch(0.78 0.005 240);
+  --fg-3:        oklch(0.62 0.006 240);
+  --fg-4:        oklch(0.48 0.008 240);
+  --fg-5:        oklch(0.38 0.008 240);
+
+  /* ---------- Accents (petroleum blue) ---------- */
+  --accent:          oklch(0.62 0.075 220);
+  --accent-fg:       oklch(0.72 0.085 220);
+  --accent-soft:     oklch(0.30 0.040 220);
+  --accent-line:     oklch(0.40 0.055 220);
+
+  /* ---------- Semantic tones ---------- */
+  --ok:              oklch(0.66 0.08 155);
+  --ok-fg:           oklch(0.76 0.085 155);
+  --ok-soft:         oklch(0.30 0.045 155);
+  --ok-line:         oklch(0.40 0.055 155);
+
+  --warn:            oklch(0.74 0.10 78);
+  --warn-fg:         oklch(0.82 0.10 78);
+  --warn-soft:       oklch(0.30 0.050 60);
+  --warn-line:       oklch(0.42 0.065 70);
+
+  --crit:            oklch(0.62 0.13 25);
+  --crit-fg:         oklch(0.74 0.13 25);
+  --crit-soft:       oklch(0.30 0.060 25);
+  --crit-line:       oklch(0.42 0.080 25);
+
+  /* ---------- Typography ---------- */
+  --font-sans: "Inter Tight", "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* ---------- Density ---------- */
+  --row-h:         34px;
+  --row-py:        8px;
+  --row-px:        12px;
+  --pad-card:      16px;
+  --pad-section:   20px;
+  --gap-card:      12px;
+  --gap-grid:      14px;
+  --sidebar-w:     236px;
+  --topbar-h:      48px;
+
+  /* ---------- Radii ---------- */
+  --r-1: 3px;
+  --r-2: 5px;
+  --r-3: 7px;
+  --r-pill: 999px;
+
+  /* ---------- Type scale ---------- */
+  --t-display: 22px;
+  --t-h1:      18px;
+  --t-h2:      14px;
+  --t-body:    13px;
+  --t-meta:    12px;
+  --t-mini:    11px;
+  --t-micro:   10px;
+
+  /* ---------- Shadow (dialogs only) ---------- */
+  --shadow-pop: 0 0 0 1px var(--border-2), 0 8px 24px -8px rgb(0 0 0 / 0.55);
+
+  /* ─── shadcn/Tailwind compat (uses exact OKLCH values) ─── */
+  --background:             var(--bg-1);
+  --foreground:             var(--fg-1);
+  --card:                   var(--bg-2);
+  --card-foreground:        var(--fg-1);
+  --popover:                var(--bg-2);
+  --popover-foreground:     var(--fg-1);
+  --primary:                var(--accent);
+  --primary-foreground:     var(--fg-1);
+  --secondary:              var(--bg-3);
+  --secondary-foreground:   var(--fg-2);
+  --muted:                  var(--bg-3);
+  --muted-foreground:       var(--fg-3);
+  --destructive:            var(--crit);
+  --destructive-foreground: var(--fg-1);
+  --border:                 var(--border-1);
+  --input:                  var(--bg-inset);
+  --ring:                   var(--accent);
+  --radius:                 var(--r-2);
+}
+
+/* ---------- Density variants ---------- */
+[data-density="comfortable"] {
+  --row-h: 40px;
+  --row-py: 11px;
+  --pad-card: 20px;
+  --pad-section: 24px;
+  --gap-card: 14px;
+}
+[data-density="compact"] {
+  --row-h: 28px;
+  --row-py: 5px;
+  --pad-card: 12px;
+  --pad-section: 14px;
+  --gap-card: 8px;
+  --gap-grid: 10px;
+  --t-body: 12px;
+  --t-meta: 11px;
+}
+
+/* ============================================================
+   Base reset
+   ============================================================ */
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--t-body);
+  line-height: 1.45;
+  color: var(--fg-1);
+  background: var(--bg-0);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "ss01", "cv11";
+}
+
+/* Scrollbar */
+*::-webkit-scrollbar { width: 6px; height: 6px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 999px; }
+*::-webkit-scrollbar-thumb:hover { background: var(--border-3); }
+
+/* Selection */
+::selection { background: var(--accent-soft); color: var(--fg-1); }
+
+/* Focus ring */
+:focus-visible {
+  outline: 1px solid var(--accent-fg);
+  outline-offset: 1px;
+}
+
+/* ============================================================
+   Primitive CSS classes (mirrors tokens.css)
+   ============================================================ */
+
+/* Mono / metric utilities */
+.mono { font-family: var(--font-mono); font-feature-settings: "zero", "ss01"; }
+.num  { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* Card */
+.card {
+  background: var(--bg-2);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-2);
+}
+.card-pad { padding: var(--pad-card); }
+
+/* Section header */
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--divider);
+  min-height: 38px;
+}
+.section-head .title {
+  font-size: var(--t-micro);
+  color: var(--fg-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+}
+
+/* KBD badge */
+.kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 5px;
+  border: 1px solid var(--border-2);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  color: var(--fg-3);
+  background: var(--bg-3);
+}
+
+/* Buttons */
+.btn {
+  font-family: inherit;
+  font-size: var(--t-meta);
+  font-weight: 500;
+  border-radius: var(--r-2);
+  padding: 5px 10px;
+  border: 1px solid var(--border-2);
+  background: var(--bg-3);
+  color: var(--fg-1);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 80ms ease, border-color 80ms ease;
+  white-space: nowrap;
+  line-height: 1;
+}
+.btn:hover { background: var(--bg-4); border-color: var(--border-3); }
+.btn-primary {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--fg-1);
+}
+.btn-primary:hover { background: oklch(from var(--accent-soft) calc(l + 0.04) c h); border-color: var(--accent); }
+.btn-ghost { background: transparent; border-color: transparent; color: var(--fg-2); }
+.btn-ghost:hover { background: var(--bg-3); color: var(--fg-1); border-color: transparent; }
+.btn-danger {
+  background: var(--crit-soft);
+  border-color: var(--crit-line);
+  color: var(--crit-fg);
+}
+.btn-sm { padding: 3px 8px; font-size: 11px; }
+
+/* Tag — mono micro label */
+.tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--bg-3);
+  color: var(--fg-3);
+  border: 1px solid var(--border-1);
+  height: 18px;
+}
+
+/* Inputs / Select */
+.input, .select {
+  font-family: inherit;
+  font-size: var(--t-body);
+  background: var(--bg-inset);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-2);
+  padding: 6px 10px;
+  color: var(--fg-1);
+  width: 100%;
+  outline: none;
+  height: 32px;
+}
+.input:focus, .select:focus { border-color: var(--accent-line); background: var(--bg-2); }
+.input::placeholder { color: var(--fg-4); }
+
+/* Divider */
+.hr { height: 1px; background: var(--divider); border: none; margin: 0; }
+
+/* ============================================================
+   Animations
+   ============================================================ */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.pulse-dot { animation: pulse-dot 2.2s ease-in-out infinite; }
+
+@keyframes blip {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+.blip {
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  border: 1px solid currentColor;
+  animation: blip 2s ease-out infinite;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fade-in 200ms ease-out; }
+
+/* Hide scrollbar */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+
+/* ============================================================
+   Tailwind custom color utilities
+   ============================================================ */
+@layer utilities {
+  /* Surfaces */
+  .bg-bg-0     { background-color: var(--bg-0); }
+  .bg-bg-1     { background-color: var(--bg-1); }
+  .bg-bg-2     { background-color: var(--bg-2); }
+  .bg-bg-3     { background-color: var(--bg-3); }
+  .bg-bg-4     { background-color: var(--bg-4); }
+  .bg-bg-inset { background-color: var(--bg-inset); }
+
+  /* Text */
+  .text-fg-1 { color: var(--fg-1); }
+  .text-fg-2 { color: var(--fg-2); }
+  .text-fg-3 { color: var(--fg-3); }
+  .text-fg-4 { color: var(--fg-4); }
+  .text-fg-5 { color: var(--fg-5); }
+
+  /* Semantic colors */
+  .text-ok      { color: var(--ok-fg); }
+  .text-warn    { color: var(--warn-fg); }
+  .text-crit    { color: var(--crit-fg); }
+  .text-accent  { color: var(--accent-fg); }
+
+  /* Tinted backgrounds */
+  .bg-ok-soft     { background-color: var(--ok-soft); }
+  .bg-warn-soft   { background-color: var(--warn-soft); }
+  .bg-crit-soft   { background-color: var(--crit-soft); }
+  .bg-accent-soft { background-color: var(--accent-soft); }
+
+  /* Tinted borders */
+  .border-ok-line     { border-color: var(--ok-line); }
+  .border-warn-line   { border-color: var(--warn-line); }
+  .border-crit-line   { border-color: var(--crit-line); }
+  .border-accent-line { border-color: var(--accent-line); }
+  .border-border      { border-color: var(--border-1); }
+  .border-divider     { border-color: var(--divider); }
+
+  /* Metric font */
+  .font-metric {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Row height token */
+  .h-row { height: var(--row-h); }
+}
