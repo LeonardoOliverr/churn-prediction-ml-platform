@@ -167,6 +167,22 @@ def create_app() -> FastAPI:
             content={"error": "batch_too_large", "message": str(exc), "request_id": request_id},
         )
 
+    # CORS — descomentar quando o frontend Tarpon for implantado.
+    #
+    # Evolução prevista:
+    #   - dev:  allow_origins=["http://localhost:5173", "http://localhost:4173"]
+    #   - prod: substituir por variável de ambiente CORS_ALLOW_ORIGINS (lista separada por vírgula)
+    #           para suportar múltiplos domínios sem alterar o código.
+    #
+    # from fastapi.middleware.cors import CORSMiddleware
+    # app.add_middleware(
+    #     CORSMiddleware,
+    #     allow_origins=["http://localhost:5173", "http://localhost:4173"],
+    #     allow_credentials=True,
+    #     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    #     allow_headers=["Content-Type", "Authorization", "x-api-key"],
+    # )
+
     # Rate limiting
     app.state.limiter = key_limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
