@@ -11,8 +11,12 @@ Uso:
         --since 90d \\
         --fp-cost 100.00 \\
         --fn-cost 2000.00 \\
+        [--batch-id <uuid>] \\
         [--type monthly|weekly|manual|backtest] \\
         [--dry-run]
+
+Com --batch-id, a avaliação é isolada ao ciclo gerado por predict_holdout_batch.py,
+eliminando contaminação de predições de runs anteriores. Ignora --since.
 """
 
 from __future__ import annotations
@@ -81,6 +85,29 @@ _QUERY_COST_CONFIG = text("""
     LIMIT 1
 """)
 
+_QUERY_EVAL_BY_BATCH = text("""
+    SELECT
+        m.id              AS model_id,
+        m.name            AS model_name,
+        m.version         AS model_version,
+        p.churn_pred,
+        p.churn_prob,
+        p.threshold_used,
+        o.churned,
+        c.cltv,
+        c.monthly_charges
+    FROM churn.predictions p
+    JOIN churn.outcomes  o ON o.prediction_id = p.id
+    JOIN churn.models    m ON m.id = p.model_id
+    JOIN churn.customers c ON c.customer_id = p.customer_id
+                          AND c.project_id  = p.project_id
+                          AND c.tenant_id   = p.tenant_id
+    WHERE p.tenant_id     = :tenant_id
+      AND p.project_id    = :project_id
+      AND p.eval_batch_id = :batch_id
+    ORDER BY m.name, m.version, p.threshold_used
+""")
+
 _QUERY_MISSING_LABELS = text("""
     SELECT m.id AS model_id, COUNT(p.id) AS missing
     FROM churn.predictions p
@@ -89,6 +116,19 @@ _QUERY_MISSING_LABELS = text("""
       AND p.project_id = :project_id
       AND p.requested_at >= :period_start
       AND p.requested_at <  :period_end
+      AND NOT EXISTS (
+          SELECT 1 FROM churn.outcomes o WHERE o.prediction_id = p.id
+      )
+    GROUP BY m.id
+""")
+
+_QUERY_MISSING_LABELS_BY_BATCH = text("""
+    SELECT m.id AS model_id, COUNT(p.id) AS missing
+    FROM churn.predictions p
+    JOIN churn.models m ON m.id = p.model_id
+    WHERE p.tenant_id     = :tenant_id
+      AND p.project_id    = :project_id
+      AND p.eval_batch_id = :batch_id
       AND NOT EXISTS (
           SELECT 1 FROM churn.outcomes o WHERE o.prediction_id = p.id
       )
@@ -385,11 +425,13 @@ def _build_report(
     fp_cost: float,
     fn_cost: float,
     run_id: str | None,
+    batch_id: str | None = None,
 ) -> str:
+    window_label = f"batch={batch_id[:8]}…" if batch_id else f"Janela: {since}"
     lines = [
         "",
         _SEP,
-        f"AVALIAÇÃO HOLDOUT — {project_slug} | Janela: {since}",
+        f"AVALIAÇÃO HOLDOUT — {project_slug} | {window_label}",
         f"FP: R$ {fp_cost:,.2f} | FN: R$ {fn_cost:,.2f}"
         + (f" | run: {run_id}" if run_id else " | dry-run"),
         _SEP,
@@ -435,9 +477,11 @@ def evaluate(
     evaluation_type: str = "manual",
     triggered_by: str = "manual",
     dry_run: bool = False,
+    batch_id: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Avalia todos os modelos com outcomes no período.
+    """Avalia todos os modelos com outcomes no período (ou batch isolado).
 
+    Com batch_id, filtra apenas predições do ciclo especificado — sem contaminação.
     Grava em evaluation_runs + evaluation_run_results.
     Retorna lista de resultados por modelo.
     """
@@ -450,25 +494,26 @@ def evaluate(
         tenant_id = _resolve_tenant_id(conn, tenant_slug)
         project_id = _resolve_project_id(conn, tenant_id, project_slug)
 
-        # Verificar run existente (idempotência)
-        existing = conn.execute(
-            _QUERY_EXISTING_RUN,
-            {
-                "tenant_id": tenant_id,
-                "project_id": project_id,
-                "period_start": period_start,
-                "period_end": period_end,
-                "evaluation_type": evaluation_type,
-            },
-        ).fetchone()
+        # Verificar run existente (idempotência) — apenas no modo período
+        if not batch_id:
+            existing = conn.execute(
+                _QUERY_EXISTING_RUN,
+                {
+                    "tenant_id": tenant_id,
+                    "project_id": project_id,
+                    "period_start": period_start,
+                    "period_end": period_end,
+                    "evaluation_type": evaluation_type,
+                },
+            ).fetchone()
 
-        if existing and not dry_run:
-            logger.warning(
-                "evaluation_run_already_exists",
-                run_id=str(existing.id),
-                hint="Use --type para diferenciar runs no mesmo período.",
-            )
-            return []
+            if existing and not dry_run:
+                logger.warning(
+                    "evaluation_run_already_exists",
+                    run_id=str(existing.id),
+                    hint="Use --type para diferenciar runs no mesmo período.",
+                )
+                return []
 
         cost_config_row = (
             conn.execute(
@@ -485,20 +530,22 @@ def evaluate(
         else:
             logger.info("cost_model_resolved", mode="flat_cli", fp_cost=fp_cost, fn_cost=fn_cost)
 
-        rows = conn.execute(
-            _QUERY_EVAL,
-            {
-                "tenant_id": tenant_id,
-                "project_id": project_id,
-                "period_start": period_start,
-                "period_end": period_end,
-            },
-        ).fetchall()
-
-        missing_by_model: dict[str, int] = {
-            str(r.model_id): int(r.missing)
-            for r in conn.execute(
-                _QUERY_MISSING_LABELS,
+        if batch_id:
+            logger.info("filtering_by_batch_id", batch_id=batch_id)
+            rows = conn.execute(
+                _QUERY_EVAL_BY_BATCH,
+                {"tenant_id": tenant_id, "project_id": project_id, "batch_id": batch_id},
+            ).fetchall()
+            missing_by_model: dict[str, int] = {
+                str(r.model_id): int(r.missing)
+                for r in conn.execute(
+                    _QUERY_MISSING_LABELS_BY_BATCH,
+                    {"tenant_id": tenant_id, "project_id": project_id, "batch_id": batch_id},
+                ).fetchall()
+            }
+        else:
+            rows = conn.execute(
+                _QUERY_EVAL,
                 {
                     "tenant_id": tenant_id,
                     "project_id": project_id,
@@ -506,7 +553,18 @@ def evaluate(
                     "period_end": period_end,
                 },
             ).fetchall()
-        }
+            missing_by_model = {
+                str(r.model_id): int(r.missing)
+                for r in conn.execute(
+                    _QUERY_MISSING_LABELS,
+                    {
+                        "tenant_id": tenant_id,
+                        "project_id": project_id,
+                        "period_start": period_start,
+                        "period_end": period_end,
+                    },
+                ).fetchall()
+            }
 
     if not rows:
         logger.warning(
@@ -591,6 +649,7 @@ def evaluate(
         fp_cost,
         fn_cost,
         run_id=None,
+        batch_id=batch_id,
     )
     logger.info("evaluation_report", report=report)
 
@@ -625,7 +684,8 @@ def evaluate(
                             {
                                 "cost_model": cost_config["cost_model"]
                                 if cost_config
-                                else CostModel.FLAT
+                                else CostModel.FLAT,
+                                **({"eval_batch_id": batch_id} if batch_id else {}),
                             }
                         ),
                     },
@@ -704,6 +764,12 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--project", required=True, help="Slug do projeto.")
     parser.add_argument("--since", default="90d", help="Janela de avaliação (ex: 90d).")
     parser.add_argument(
+        "--batch-id",
+        default=None,
+        help="UUID do ciclo de avaliação (eval_batch_id). "
+        "Se fornecido, ignora --since e avalia apenas este batch.",
+    )
+    parser.add_argument(
         "--fp-cost", type=float, required=True, help="Custo unitário de falso positivo."
     )
     parser.add_argument(
@@ -732,6 +798,7 @@ def main() -> None:
         evaluation_type=args.type,
         triggered_by=args.triggered_by,
         dry_run=args.dry_run,
+        batch_id=args.batch_id,
     )
 
 

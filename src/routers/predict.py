@@ -13,7 +13,7 @@ import uuid
 
 import pandas as pd
 import structlog
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request
 from sqlalchemy.engine import Connection
 
 from domain.exceptions import BatchTooLargeError
@@ -143,6 +143,7 @@ def predict(
     db: Connection = Depends(get_db),
     api_key: ApiKeyRecord = Depends(require_scope("predict")),
     settings: Settings = Depends(get_settings),
+    x_eval_batch_id: str | None = Header(default=None),
 ) -> PredictResponse:
     """Predição de churn para um único cliente."""
     request.state.tenant_id = api_key.tenant_id
@@ -173,6 +174,7 @@ def predict(
         churn_pred=prob >= threshold,
         threshold_used=threshold,
         latency_ms=latency_ms,
+        eval_batch_id=x_eval_batch_id,
     )
 
     return _make_response(customer, prob, threshold, model_record, prediction_id)
@@ -231,6 +233,7 @@ def predict_batch(
     db: Connection = Depends(get_db),
     api_key: ApiKeyRecord = Depends(require_scope("predict")),
     settings: Settings = Depends(get_settings),
+    x_eval_batch_id: str | None = Header(default=None),
 ) -> BatchPredictResponse:
     """Predição em lote. Máximo de MAX_BATCH_SIZE clientes por requisição."""
     request.state.tenant_id = api_key.tenant_id
@@ -301,6 +304,7 @@ def predict_batch(
                 churn_pred=prob >= threshold,
                 threshold_used=threshold,
                 latency_ms=latency_ms,
+                eval_batch_id=x_eval_batch_id,
             )
 
     latency_ms = round((time.perf_counter() - start_ms) * 1000)

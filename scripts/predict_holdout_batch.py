@@ -7,7 +7,9 @@ Uso:
         --api-key <chave_com_escopo_predict> \\
         [--api-url http://localhost:8000] \\
         [--batch-size 100] \\
-        [--dry-run]
+        [--dry-run] \\
+        [--force] \\
+        [--batch-id <uuid>]
 
 Pré-requisitos:
 - API em execução (docker compose up ou uvicorn)
@@ -21,6 +23,7 @@ import argparse
 import os
 import sys
 import time
+import uuid as uuid_lib
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -69,6 +72,35 @@ _QUERY_HOLDOUT_WITHOUT_PREDICTIONS = text("""
     ORDER BY c.customer_id
 """)
 
+_QUERY_HOLDOUT_ALL = text("""
+    SELECT
+        c.customer_id,
+        c.tenure_months,
+        c.monthly_charges,
+        c.total_charges,
+        c.senior_citizen,
+        c.partner,
+        c.dependents,
+        c.phone_service,
+        c.paperless_billing,
+        c.gender,
+        c.multiple_lines,
+        c.internet_service,
+        c.online_security,
+        c.online_backup,
+        c.device_protection,
+        c.tech_support,
+        c.streaming_tv,
+        c.streaming_movies,
+        c.contract,
+        c.payment_method
+    FROM churn.customers c
+    WHERE c.tenant_id  = :tenant_id
+      AND c.project_id = :project_id
+      AND c.split      = 'holdout'
+    ORDER BY c.customer_id
+""")
+
 
 def _row_to_payload(row) -> dict:
     """Converte linha do banco em dict compatível com CustomerFeatures."""
@@ -101,12 +133,16 @@ def _post_batch(
     api_url: str,
     api_key: str,
     payloads: list[dict],
+    eval_batch_id: str | None = None,
 ) -> list[dict]:
     """Envia um lote de clientes para POST /predict/batch e retorna os resultados."""
+    headers = {"x-api-key": api_key}
+    if eval_batch_id:
+        headers["x-eval-batch-id"] = eval_batch_id
     response = client.post(
         f"{api_url.rstrip('/')}/predict/batch",
         json={"customers": payloads},
-        headers={"x-api-key": api_key},
+        headers=headers,
         timeout=30.0,
     )
     response.raise_for_status()
@@ -120,18 +156,31 @@ def predict_holdout_batch(
     api_url: str = "http://localhost:8000",
     batch_size: int = 100,
     dry_run: bool = False,
+    force: bool = False,
+    batch_id: str | None = None,
 ) -> int:
-    """Prediz todos os clientes holdout sem predição registrada.
+    """Prediz clientes holdout, registrando novas predições no banco.
+
+    Com force=True, reprediz todos os clientes holdout independente de já terem predição —
+    útil para gerar novo ciclo de avaliação após mudança de configuração de modelo.
+
+    batch_id identifica este ciclo de avaliação — todas as predições geradas recebem
+    o mesmo eval_batch_id, permitindo isolamento posterior em seed/optimize/evaluate.
+    Se não fornecido, um UUID é gerado automaticamente.
 
     Retorna o número total de predições enviadas.
     """
+    eval_batch_id = batch_id or str(uuid_lib.uuid4())
+    logger.info("eval_batch_started", batch_id=eval_batch_id)
+
     engine = _build_engine()
+    query = _QUERY_HOLDOUT_ALL if force else _QUERY_HOLDOUT_WITHOUT_PREDICTIONS
 
     with engine.connect() as conn:
         tenant_id = _resolve_tenant_id(conn, tenant_slug)
         project_id = _resolve_project_id(conn, tenant_id, project_slug)
         rows = conn.execute(
-            _QUERY_HOLDOUT_WITHOUT_PREDICTIONS,
+            query,
             {"tenant_id": tenant_id, "project_id": project_id},
         ).fetchall()
 
@@ -147,12 +196,20 @@ def predict_holdout_batch(
         logger.info("no_holdout_customers_to_predict")
         return 0
 
+    if force:
+        logger.warning(
+            "force_mode_active",
+            hint="Repredizendo todos os clientes holdout, incluindo os já previstos.",
+            total=total_candidates,
+        )
+
     if dry_run:
         logger.warning(
             "predict_skipped",
             reason="dry_run",
             would_predict=total_candidates,
             batches=-(-total_candidates // batch_size),
+            batch_id=eval_batch_id,
         )
         return total_candidates
 
@@ -166,7 +223,7 @@ def predict_holdout_batch(
             t0 = time.perf_counter()
 
             try:
-                results = _post_batch(client, api_url, api_key, payloads)
+                results = _post_batch(client, api_url, api_key, payloads, eval_batch_id)
                 latency_ms = round((time.perf_counter() - t0) * 1000)
                 total_sent += len(results)
                 logger.info(
@@ -190,6 +247,7 @@ def predict_holdout_batch(
         "predict_holdout_complete",
         total_sent=total_sent,
         total_candidates=total_candidates,
+        batch_id=eval_batch_id,
     )
     return total_sent
 
@@ -208,6 +266,19 @@ def _parse_args() -> argparse.Namespace:
         "--batch-size", type=int, default=100, help="Clientes por requisição (máx. 100)."
     )
     parser.add_argument("--dry-run", action="store_true", help="Simula sem enviar requests.")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Reprediz todos os clientes holdout, mesmo os já previstos. "
+        "Use após mudança de configuração de modelo.",
+    )
+    parser.add_argument(
+        "--batch-id",
+        default=None,
+        help="UUID do ciclo de avaliação (eval_batch_id). "
+        "Gerado automaticamente se omitido. "
+        "Use o valor impresso para filtrar seed/optimize/evaluate.",
+    )
     return parser.parse_args()
 
 
@@ -231,6 +302,8 @@ def main() -> None:
         api_url=args.api_url,
         batch_size=args.batch_size,
         dry_run=args.dry_run,
+        force=args.force,
+        batch_id=args.batch_id,
     )
 
 

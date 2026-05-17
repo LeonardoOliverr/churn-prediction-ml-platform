@@ -28,3 +28,4 @@
 23_api_keys_description [22_model_performance_result_costs] 2026-05-13T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona coluna description opcional em api_keys para identificacao humana da key
 24_simplify_model_scope [23_api_keys_description] 2026-05-14T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Remove scope de churn.models e torna tenant_id + project_id obrigatorios
 25_cost_model_config_project_required [24_simplify_model_scope] 2026-05-14T01:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Torna project_id obrigatorio em cost_model_config eliminando fallback de tenant
+26_predictions_batch_id [25_cost_model_config_project_required] 2026-05-17T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona eval_batch_id em predictions para isolamento de ciclos de avaliacao
