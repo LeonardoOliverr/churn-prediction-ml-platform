@@ -13,12 +13,16 @@ Uso:
         [--fp-cost 100] \\
         [--fn-cost 2000] \\
         [--since 90d] \\
+        [--batch-id <uuid>] \\
         [--min-threshold 0.05] \\
         [--max-threshold 0.90] \\
         [--step 0.05]
 
 --fp-cost e --fn-cost são opcionais quando cost_model_config está configurado com
 modo cltv ou monthly_charges. São obrigatórios apenas no modo flat ou como fallback.
+
+--batch-id isola a análise a um ciclo de avaliação específico gerado por predict_holdout_batch.py.
+Se omitido, usa a janela temporal --since (comportamento original).
 """
 
 from __future__ import annotations
@@ -57,6 +61,27 @@ _QUERY = text("""
     WHERE p.tenant_id  = :tenant_id
       AND p.project_id = :project_id
       AND p.requested_at >= :period_start
+      AND p.churn_prob IS NOT NULL
+    ORDER BY m.name, m.version
+""")
+
+_QUERY_BY_BATCH = text("""
+    SELECT
+        m.name           AS model_name,
+        m.version        AS model_version,
+        p.churn_prob,
+        o.churned,
+        c.cltv,
+        c.monthly_charges
+    FROM churn.predictions p
+    JOIN churn.outcomes  o ON o.prediction_id = p.id
+    JOIN churn.models    m ON m.id = p.model_id
+    JOIN churn.customers c ON c.customer_id = p.customer_id
+                          AND c.project_id  = p.project_id
+                          AND c.tenant_id   = p.tenant_id
+    WHERE p.tenant_id     = :tenant_id
+      AND p.project_id    = :project_id
+      AND p.eval_batch_id = :batch_id
       AND p.churn_prob IS NOT NULL
     ORDER BY m.name, m.version
 """)
@@ -269,6 +294,7 @@ def optimize(
     min_threshold: float,
     max_threshold: float,
     step: float,
+    batch_id: str | None = None,
 ) -> None:
     engine = _build_engine()
     _now = datetime.now(tz=timezone.utc)
@@ -311,10 +337,17 @@ def optimize(
         else:
             logger.info("cost_model_resolved", mode=config["cost_model"], project=project_slug)
 
-        all_rows = conn.execute(
-            _QUERY,
-            {"tenant_id": tenant_id, "project_id": project_id, "period_start": period_start},
-        ).fetchall()
+        if batch_id:
+            logger.info("filtering_by_batch_id", batch_id=batch_id)
+            all_rows = conn.execute(
+                _QUERY_BY_BATCH,
+                {"tenant_id": tenant_id, "project_id": project_id, "batch_id": batch_id},
+            ).fetchall()
+        else:
+            all_rows = conn.execute(
+                _QUERY,
+                {"tenant_id": tenant_id, "project_id": project_id, "period_start": period_start},
+            ).fetchall()
 
     if not all_rows:
         logger.warning("no_outcomes_found", project=project_slug, days=days)
@@ -370,6 +403,12 @@ def _parse_args() -> argparse.Namespace:
         help="Custo flat de FN (obrigatório se cost_model_config não estiver configurado).",
     )
     parser.add_argument("--since", default="90d", help="Janela de análise (ex: 90d).")
+    parser.add_argument(
+        "--batch-id",
+        default=None,
+        help="UUID do ciclo de avaliação (eval_batch_id). "
+        "Se fornecido, ignora --since e filtra apenas este batch.",
+    )
     parser.add_argument("--min-threshold", type=float, default=0.05)
     parser.add_argument("--max-threshold", type=float, default=0.90)
     parser.add_argument("--step", type=float, default=0.05)
@@ -393,6 +432,7 @@ def main() -> None:
         min_threshold=args.min_threshold,
         max_threshold=args.max_threshold,
         step=args.step,
+        batch_id=args.batch_id,
     )
 
 
