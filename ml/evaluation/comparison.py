@@ -49,10 +49,7 @@ def compare_results(
     secondary_candidates = [
         candidate for index, candidate in enumerate(candidates) if index != best_index
     ]
-    status_by_model = {
-        candidate.spec.name: "candidate"
-        for candidate in candidates
-    }
+    status_by_model = {candidate.spec.name: "candidate" for candidate in candidates}
 
     return RunComparison(
         best_candidate=best_candidate,

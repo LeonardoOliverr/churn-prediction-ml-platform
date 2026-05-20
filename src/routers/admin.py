@@ -427,8 +427,22 @@ def _configure_champion_for_scope(
     )
     if old_champion and str(old_champion["model_id"]) != str(payload.model_id):
         old_m = _get_model(db, str(old_champion["model_id"]))
-        _write_audit(db, str(old_m["id"]), str(old_m["tenant_id"]), str(old_m["project_id"]), "demoted", admin.sub)
-    _write_audit(db, str(model["id"]), str(model["tenant_id"]), str(model["project_id"]), "configured", admin.sub)
+        _write_audit(
+            db,
+            str(old_m["id"]),
+            str(old_m["tenant_id"]),
+            str(old_m["project_id"]),
+            "demoted",
+            admin.sub,
+        )
+    _write_audit(
+        db,
+        str(model["id"]),
+        str(model["tenant_id"]),
+        str(model["project_id"]),
+        "configured",
+        admin.sub,
+    )
     db.commit()
     invalidate_model_cache(tenant_id, project_id)
     return ProjectModelConfigResponse(config=config)
@@ -466,8 +480,22 @@ def _configure_challenger_for_scope(
     )
     if old_challenger and str(old_challenger["model_id"]) != str(payload.model_id):
         old_m = _get_model(db, str(old_challenger["model_id"]))
-        _write_audit(db, str(old_m["id"]), str(old_m["tenant_id"]), str(old_m["project_id"]), "demoted", admin.sub)
-    _write_audit(db, str(model["id"]), str(model["tenant_id"]), str(model["project_id"]), "configured", admin.sub)
+        _write_audit(
+            db,
+            str(old_m["id"]),
+            str(old_m["tenant_id"]),
+            str(old_m["project_id"]),
+            "demoted",
+            admin.sub,
+        )
+    _write_audit(
+        db,
+        str(model["id"]),
+        str(model["tenant_id"]),
+        str(model["project_id"]),
+        "configured",
+        admin.sub,
+    )
     db.commit()
     invalidate_model_cache(tenant_id, project_id)
     return ProjectModelConfigResponse(config=config)
@@ -515,9 +543,25 @@ def _promote_challenger_for_scope(
     config = _select_config(db, str(row["id"]))
     if old_champion:
         old_m = _get_model(db, str(old_champion["model_id"]))
-        _write_audit(db, str(old_m["id"]), str(old_m["tenant_id"]), str(old_m["project_id"]), "demoted", admin.sub, reason=payload.activation_reason)
+        _write_audit(
+            db,
+            str(old_m["id"]),
+            str(old_m["tenant_id"]),
+            str(old_m["project_id"]),
+            "demoted",
+            admin.sub,
+            reason=payload.activation_reason,
+        )
     challenger_m = _get_model(db, model_id)
-    _write_audit(db, str(challenger_m["id"]), str(challenger_m["tenant_id"]), str(challenger_m["project_id"]), "promoted", admin.sub, reason=payload.activation_reason)
+    _write_audit(
+        db,
+        str(challenger_m["id"]),
+        str(challenger_m["tenant_id"]),
+        str(challenger_m["project_id"]),
+        "promoted",
+        admin.sub,
+        reason=payload.activation_reason,
+    )
     db.commit()
     invalidate_model_cache(tenant_id, project_id)
     return ProjectModelConfigResponse(config=config)
@@ -540,7 +584,15 @@ def _deactivate_model_for_scope(
         _deactivate_model_config(db, tenant_id, project_id, model_id, payload.reason)
         config = _select_config(db, str(active["id"]))
         dem_m = _get_model(db, model_id)
-        _write_audit(db, str(dem_m["id"]), str(dem_m["tenant_id"]), str(dem_m["project_id"]), "demoted", admin.sub, reason=payload.reason)
+        _write_audit(
+            db,
+            str(dem_m["id"]),
+            str(dem_m["tenant_id"]),
+            str(dem_m["project_id"]),
+            "demoted",
+            admin.sub,
+            reason=payload.reason,
+        )
         db.commit()
         invalidate_model_cache(tenant_id, project_id)
         return ProjectModelConfigResponse(config=config)
@@ -569,8 +621,24 @@ def _deactivate_model_for_scope(
         description=f"Replacement for {model_id}",
     )
     old_m = _get_model(db, model_id)
-    _write_audit(db, str(old_m["id"]), str(old_m["tenant_id"]), str(old_m["project_id"]), "demoted", admin.sub, reason=payload.reason)
-    _write_audit(db, str(replacement_model["id"]), str(replacement_model["tenant_id"]), str(replacement_model["project_id"]), "configured", admin.sub, reason=payload.reason)
+    _write_audit(
+        db,
+        str(old_m["id"]),
+        str(old_m["tenant_id"]),
+        str(old_m["project_id"]),
+        "demoted",
+        admin.sub,
+        reason=payload.reason,
+    )
+    _write_audit(
+        db,
+        str(replacement_model["id"]),
+        str(replacement_model["tenant_id"]),
+        str(replacement_model["project_id"]),
+        "configured",
+        admin.sub,
+        reason=payload.reason,
+    )
     db.commit()
     invalidate_model_cache(tenant_id, project_id)
     return ProjectModelConfigResponse(config=replacement)
@@ -585,14 +653,12 @@ def _resolve_admin_model_scope(db: Connection, tenant_id: str, project_id: str) 
     return tenant_id, project_id
 
 
-_INSERT_AUDIT_LOG = (
-    text("""
+_INSERT_AUDIT_LOG = text("""
         INSERT INTO churn.model_audit_log
             (model_id, tenant_id, project_id, action, old_status, new_status, changed_by, reason, metrics_snapshot)
         VALUES
             (:model_id, :tenant_id, :project_id, :action, :old_status, :new_status, :changed_by, :reason, :metrics_snapshot)
     """).bindparams(bindparam("metrics_snapshot", type_=JSONB))
-)
 
 
 def _write_audit(
@@ -725,7 +791,9 @@ def reject_model(
         raise _not_found(f"Modelo não encontrado no projeto: {model_id!r}")
 
     if model["status"] != "candidate":
-        raise _conflict(f"Apenas modelos com status 'candidate' podem ser reprovados. Status atual: '{model['status']}'.")
+        raise _conflict(
+            f"Apenas modelos com status 'candidate' podem ser reprovados. Status atual: '{model['status']}'."
+        )
 
     db.execute(
         text("UPDATE churn.models SET status = 'rejected' WHERE id = :model_id"),
@@ -781,7 +849,9 @@ def retire_model(
         raise _not_found(f"Modelo não encontrado no projeto: {model_id!r}")
 
     if model["status"] != "approved":
-        raise _conflict(f"Apenas modelos com status 'approved' podem ser aposentados. Status atual: '{model['status']}'.")
+        raise _conflict(
+            f"Apenas modelos com status 'approved' podem ser aposentados. Status atual: '{model['status']}'."
+        )
 
     db.execute(
         text("""

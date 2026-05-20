@@ -83,9 +83,10 @@ def register_in_db(
         tenant_id = _resolve_tenant_id(conn, tenant_slug) if tenant_slug else None
         project_id = _resolve_project_id(conn, tenant_id, project_slug) if project_slug else None
 
-        row = conn.execute(
-            text(
-                """
+        row = (
+            conn.execute(
+                text(
+                    """
                 INSERT INTO churn.models
                     (name, version, tenant_id, project_id,
                      mlflow_run_id, f1_score, roc_auc, precision_score, recall_score,
@@ -98,28 +99,31 @@ def register_in_db(
                      :training_row_count, :training_churn_rate, :tags)
                 RETURNING id
             """
-            ).bindparams(
-                bindparam("hyperparameters", type_=JSONB),
-                bindparam("training_params", type_=JSONB),
-            ),
-            {
-                "name": name,
-                "version": version,
-                "tenant_id": tenant_id,
-                "project_id": project_id,
-                "run_id": run_id,
-                "f1": round(metrics["f1_mean"], 4),
-                "roc_auc": round(metrics["roc_auc_mean"], 4),
-                "precision": round(metrics["precision_mean"], 4),
-                "recall": round(metrics["recall_mean"], 4),
-                "status": status,
-                "hyperparameters": hyperparameters,
-                "training_params": training_params,
-                "training_row_count": metrics.get("train_row_count"),
-                "training_churn_rate": metrics.get("churn_rate"),
-                "tags": [],
-            },
-        ).mappings().first()
+                ).bindparams(
+                    bindparam("hyperparameters", type_=JSONB),
+                    bindparam("training_params", type_=JSONB),
+                ),
+                {
+                    "name": name,
+                    "version": version,
+                    "tenant_id": tenant_id,
+                    "project_id": project_id,
+                    "run_id": run_id,
+                    "f1": round(metrics["f1_mean"], 4),
+                    "roc_auc": round(metrics["roc_auc_mean"], 4),
+                    "precision": round(metrics["precision_mean"], 4),
+                    "recall": round(metrics["recall_mean"], 4),
+                    "status": status,
+                    "hyperparameters": hyperparameters,
+                    "training_params": training_params,
+                    "training_row_count": metrics.get("train_row_count"),
+                    "training_churn_rate": metrics.get("churn_rate"),
+                    "tags": [],
+                },
+            )
+            .mappings()
+            .first()
+        )
 
         model_id = str(row["id"])
 
