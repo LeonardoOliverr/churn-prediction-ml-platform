@@ -50,8 +50,8 @@ def compare_results(
         candidate for index, candidate in enumerate(candidates) if index != best_index
     ]
     status_by_model = {
-        candidate.spec.name: "approved" if index == best_index else "trained"
-        for index, candidate in enumerate(candidates)
+        candidate.spec.name: "candidate"
+        for candidate in candidates
     }
 
     return RunComparison(

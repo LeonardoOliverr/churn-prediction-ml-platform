@@ -25,6 +25,14 @@ def _next_version(conn, tenant_id, project_id, name: str) -> str:
     return f"v{count + 1}"
 
 
+_INSERT_AUDIT = text("""
+    INSERT INTO churn.model_audit_log
+        (model_id, tenant_id, project_id, action, old_status, new_status, changed_by, metrics_snapshot)
+    VALUES
+        (:model_id, :tenant_id, :project_id, :action, :old_status, :new_status, :changed_by, :metrics_snapshot)
+""")
+
+
 def register_in_db(
     name: str,
     run_id: str,
@@ -36,7 +44,7 @@ def register_in_db(
     hyperparameters: dict | None = None,
     training_params: dict | None = None,
 ) -> None:
-    """Insert the trained model metadata into churn.models."""
+    """Insert the trained model metadata into churn.models and audit log."""
     hyperparameters = hyperparameters or {}
     training_params = training_params or {}
     engine = _build_engine()
@@ -64,21 +72,31 @@ def register_in_db(
         )
         return
 
+    metrics_snapshot = {
+        "f1": round(metrics["f1_mean"], 4),
+        "roc_auc": round(metrics["roc_auc_mean"], 4),
+        "recall": round(metrics["recall_mean"], 4),
+        "precision": round(metrics["precision_mean"], 4),
+    }
+
     with engine.begin() as conn:
         tenant_id = _resolve_tenant_id(conn, tenant_slug) if tenant_slug else None
         project_id = _resolve_project_id(conn, tenant_id, project_slug) if project_slug else None
 
-        conn.execute(
+        row = conn.execute(
             text(
                 """
                 INSERT INTO churn.models
                     (name, version, tenant_id, project_id,
                      mlflow_run_id, f1_score, roc_auc, precision_score, recall_score,
-                     status, hyperparameters, training_params)
+                     status, hyperparameters, training_params,
+                     training_row_count, training_churn_rate, tags)
                 VALUES
                     (:name, :version, :tenant_id, :project_id,
                      :run_id, :f1, :roc_auc, :precision, :recall,
-                     :status, :hyperparameters, :training_params)
+                     :status, :hyperparameters, :training_params,
+                     :training_row_count, :training_churn_rate, :tags)
+                RETURNING id
             """
             ).bindparams(
                 bindparam("hyperparameters", type_=JSONB),
@@ -97,6 +115,25 @@ def register_in_db(
                 "status": status,
                 "hyperparameters": hyperparameters,
                 "training_params": training_params,
+                "training_row_count": metrics.get("train_row_count"),
+                "training_churn_rate": metrics.get("churn_rate"),
+                "tags": [],
+            },
+        ).mappings().first()
+
+        model_id = str(row["id"])
+
+        conn.execute(
+            _INSERT_AUDIT.bindparams(bindparam("metrics_snapshot", type_=JSONB)),
+            {
+                "model_id": model_id,
+                "tenant_id": tenant_id,
+                "project_id": project_id,
+                "action": "registered",
+                "old_status": None,
+                "new_status": status,
+                "changed_by": "ml.train",
+                "metrics_snapshot": metrics_snapshot,
             },
         )
 
@@ -105,6 +142,7 @@ def register_in_db(
         name=name,
         version=version,
         status=status,
+        model_id=model_id,
         tenant=tenant_slug or "-",
         project=project_slug or "-",
     )
