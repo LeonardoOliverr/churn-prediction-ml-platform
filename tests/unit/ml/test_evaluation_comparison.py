@@ -39,8 +39,8 @@ def test_compare_results_assigns_statuses():
     )
 
     assert comparison.status_by_model == {
-        "dummy": "trained",
-        "logistic_regression": "approved",
+        "dummy": "candidate",
+        "logistic_regression": "candidate",
     }
 
 
@@ -53,8 +53,8 @@ def test_compare_results_tie_keeps_first_candidate():
     )
 
     assert comparison.best_candidate.spec.name == "first"
-    assert comparison.status_by_model["first"] == "approved"
-    assert comparison.status_by_model["second"] == "trained"
+    assert comparison.status_by_model["first"] == "candidate"
+    assert comparison.status_by_model["second"] == "candidate"
 
 
 def test_compare_results_requires_candidates():

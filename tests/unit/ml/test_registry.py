@@ -173,7 +173,7 @@ def test_register_in_db_dry_run_prints_metadata(capsys):
 
 
 def test_register_in_db_approved_status_executes_only_insert():
-    """status='approved' executa apenas INSERT do novo modelo."""
+    """status='approved' executa INSERT em models + INSERT em model_audit_log."""
     from ml.core.registry import register_in_db
 
     mock_engine, mock_conn = _make_mock_engine()
@@ -192,11 +192,11 @@ def test_register_in_db_approved_status_executes_only_insert():
             dry_run=False,
         )
 
-    assert mock_conn.execute.call_count == 1
+    assert mock_conn.execute.call_count == 2
 
 
-def test_register_in_db_trained_status_executes_only_insert():
-    """status='trained' executa apenas INSERT, sem UPDATE de arquivamento."""
+def test_register_in_db_candidate_status_executes_two_inserts():
+    """status='candidate' executa INSERT em models + INSERT em model_audit_log."""
     from ml.core.registry import register_in_db
 
     mock_engine, mock_conn = _make_mock_engine()
@@ -211,11 +211,11 @@ def test_register_in_db_trained_status_executes_only_insert():
             metrics=_DUMMY_METRICS,
             tenant_slug=None,
             project_slug=None,
-            status="trained",
+            status="candidate",
             dry_run=False,
         )
 
-    assert mock_conn.execute.call_count == 1
+    assert mock_conn.execute.call_count == 2
 
 
 def test_register_in_db_persists_training_metadata_jsons():
@@ -242,7 +242,7 @@ def test_register_in_db_persists_training_metadata_jsons():
             training_params=training_params,
         )
 
-    insert_params = mock_conn.execute.call_args[0][1]
+    insert_params = mock_conn.execute.call_args_list[0][0][1]
     assert insert_params["hyperparameters"] == hyperparameters
     assert insert_params["training_params"] == training_params
 
@@ -305,7 +305,7 @@ def test_register_in_db_project_scope_calls_both_resolvers():
 
 
 def test_register_in_db_tenant_scope_not_dry_run_executes_write():
-    """tenant_slug sem project_slug, dry_run=False executa INSERT sem erros."""
+    """tenant_slug sem project_slug, dry_run=False executa INSERT em models + audit log."""
     from ml.core.registry import register_in_db
 
     mock_engine, mock_conn = _make_mock_engine()
@@ -326,11 +326,11 @@ def test_register_in_db_tenant_scope_not_dry_run_executes_write():
             dry_run=False,
         )
 
-    assert mock_conn.execute.call_count == 1
+    assert mock_conn.execute.call_count == 2
 
 
-def test_register_in_db_project_scope_not_dry_run_trained_executes_only_insert():
-    """tenant+project, dry_run=False, status='trained' executa apenas INSERT."""
+def test_register_in_db_project_scope_not_dry_run_candidate_executes_two_inserts():
+    """tenant+project, dry_run=False, status='candidate' executa INSERT em models + audit log."""
     from ml.core.registry import register_in_db
 
     mock_engine, mock_conn = _make_mock_engine()
@@ -347,11 +347,11 @@ def test_register_in_db_project_scope_not_dry_run_trained_executes_only_insert()
             metrics=_DUMMY_METRICS,
             tenant_slug="ibm-telco",
             project_slug="telco-churn-2018",
-            status="trained",
+            status="candidate",
             dry_run=False,
         )
 
-    assert mock_conn.execute.call_count == 1
+    assert mock_conn.execute.call_count == 2
 
 
 # ---------------------------------------------------------------------------

@@ -325,7 +325,7 @@ def test_main_dry_run_does_not_configure_mlflow(fake_customers_df):
 
 
 def test_main_not_dry_run_marks_best_model_as_approved(fake_customers_df):
-    """main() sem dry_run marca logistic_regression como 'approved' e dummy como 'trained'."""
+    """main() sem dry_run registra todos os modelos como 'candidate' aguardando aprovação humana."""
     from ml.train import main
 
     fake_args = argparse.Namespace(
@@ -352,8 +352,8 @@ def test_main_not_dry_run_marks_best_model_as_approved(fake_customers_df):
         main()
 
     statuses = {c.kwargs["name"]: c.kwargs["status"] for c in mock_register.call_args_list}
-    assert statuses["logistic-regression"] == "approved"
-    assert statuses["dummy-stratified"] == "trained"
+    assert statuses["logistic-regression"] == "candidate"
+    assert statuses["dummy-stratified"] == "candidate"
 
 
 def test_main_not_dry_run_configures_mlflow(fake_customers_df):

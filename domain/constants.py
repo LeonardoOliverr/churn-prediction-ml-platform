@@ -23,10 +23,10 @@ class ModelRole(str, Enum):
 
 
 class ModelStatus(str, Enum):
-    TRAINED = "trained"
-    VALIDATED = "validated"
+    CANDIDATE = "candidate"
     APPROVED = "approved"
-    ARCHIVED = "archived"
+    REJECTED = "rejected"
+    RETIRED = "retired"
 
 
 class CostModel(str, Enum):

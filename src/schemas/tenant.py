@@ -211,6 +211,21 @@ class ModelDeactivationRequest(BaseModel):
     )
 
 
+class ModelRejectRequest(BaseModel):
+    """Payload para reprovar um modelo candidate."""
+
+    reason: str | None = Field(None, description="Motivo da reprovação.")
+
+
+class ModelRetireRequest(BaseModel):
+    """Payload para aposentar um modelo aprovado."""
+
+    reason: str | None = Field(None, description="Motivo do encerramento do ciclo de vida.")
+    successor_model_id: str | None = Field(
+        None, description="ID do modelo substituto, para encadear versoes."
+    )
+
+
 class ProjectModelConfigRecord(BaseModel):
     """Registro operacional de modelo configurado para um tenant ou projeto."""
 

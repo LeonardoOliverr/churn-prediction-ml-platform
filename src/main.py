@@ -95,6 +95,23 @@ _TAGS_METADATA = [
         "para verificar liveness e readiness da API.",
     },
     {
+        "name": "admin",
+        "description": "**Administração da plataforma.** Gerencia tenants, projetos e API keys. "
+        "Requer JWT Bearer de admin. O `secret` de uma API key é retornado **apenas no momento da criação**.",
+    },
+    {
+        "name": "model lifecycle",
+        "description": "**Ciclo de vida de modelos.** Aprovação, reprovação e aposentadoria de modelos "
+        "treinados. Controla a transição de status `candidate → approved → retired`. "
+        "Requer JWT Bearer de admin.",
+    },
+    {
+        "name": "model deployment",
+        "description": "**Configuração de deployment.** Define qual modelo está ativo como champion ou "
+        "challenger por projeto, controla o traffic split e gerencia promoções. "
+        "Requer JWT Bearer de admin.",
+    },
+    {
         "name": "inference",
         "description": "**Endpoints de inferência de churn.** Recebem features do cliente e retornam "
         "probabilidade de churn, nível de risco (`low` / `medium` / `high`) e metadados do modelo. "
@@ -105,12 +122,6 @@ _TAGS_METADATA = [
         "description": "**Histórico de predições.** Consulta paginada das predições realizadas pelo "
         "tenant/projeto. O isolamento multi-tenant é garantido — não é possível acessar predições de "
         "outro tenant. Requer API Key com escopo `predict`.",
-    },
-    {
-        "name": "admin",
-        "description": "**Administração da plataforma.** Gerencia tenants, projetos, API keys e configuração "
-        "champion/challenger de modelos. Requer JWT Bearer de admin. O `secret` de uma API key é retornado "
-        "**apenas no momento da criação**.",
     },
 ]
 
