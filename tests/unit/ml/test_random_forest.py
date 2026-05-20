@@ -294,7 +294,7 @@ def test_main_dry_run_calls_train_with_cv_and_register(fake_customers_df):
 
 
 def test_main_always_marks_model_as_approved(fake_customers_df):
-    """main() sempre registra o Random Forest com status='approved'."""
+    """main() registra o Random Forest com status='candidate' aguardando aprovação humana."""
     from ml.train import main
 
     fake_args = argparse.Namespace(
@@ -326,7 +326,7 @@ def test_main_always_marks_model_as_approved(fake_customers_df):
         main()
 
     call_kwargs = mock_register.call_args.kwargs
-    assert call_kwargs["status"] == "approved"
+    assert call_kwargs["status"] == "candidate"
 
 
 def test_main_dry_run_does_not_configure_mlflow(fake_customers_df):
