@@ -29,3 +29,7 @@
 24_simplify_model_scope [23_api_keys_description] 2026-05-14T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Remove scope de churn.models e torna tenant_id + project_id obrigatorios
 25_cost_model_config_project_required [24_simplify_model_scope] 2026-05-14T01:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Torna project_id obrigatorio em cost_model_config eliminando fallback de tenant
 26_predictions_batch_id [25_cost_model_config_project_required] 2026-05-17T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona eval_batch_id em predictions para isolamento de ciclos de avaliacao
+27_model_governance [26_predictions_batch_id] 2026-05-17T01:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Campos de governanca enterprise em churn.models (aprovacao, lifecycle, dataset snapshot, tags)
+28_model_audit_log [27_model_governance] 2026-05-17T02:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Audit trail append-only de transicoes de status de modelos
+29_rename_model_statuses [28_model_audit_log] 2026-05-17T03:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Renomeia statuses: trained->candidate, archived->retired; adiciona rejected
+30_update_audit_actions [29_rename_model_statuses] 2026-05-17T04:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Atualiza CHECK de actions no audit log: demoted e retired substituem deprecated
