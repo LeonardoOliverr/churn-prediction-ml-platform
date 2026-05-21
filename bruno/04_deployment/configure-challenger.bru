@@ -1,0 +1,24 @@
+meta {
+  name: Configurar challenger
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/admin/tenants/{{tenant_id}}/projects/{{project_id}}/models/{{model_id}}/challenger
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+body:json {
+  {
+    "threshold": 0.5,
+    "traffic_split": 0.2,
+    "activation_reason": "Teste controlado — 20% do tráfego",
+    "description": ""
+  }
+}

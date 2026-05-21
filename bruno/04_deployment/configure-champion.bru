@@ -1,0 +1,23 @@
+meta {
+  name: Configurar champion
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/admin/tenants/{{tenant_id}}/projects/{{project_id}}/models/{{model_id}}/champion
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+body:json {
+  {
+    "threshold": 0.5,
+    "activation_reason": "Modelo aprovado para produção",
+    "description": ""
+  }
+}

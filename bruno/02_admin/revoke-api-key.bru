@@ -1,0 +1,15 @@
+meta {
+  name: Revogar API key
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{base_url}}/admin/keys/{{key_id}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}

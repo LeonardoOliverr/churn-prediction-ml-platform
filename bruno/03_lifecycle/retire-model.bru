@@ -1,0 +1,22 @@
+meta {
+  name: Aposentar modelo
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{base_url}}/admin/tenants/{{tenant_id}}/projects/{{project_id}}/models/{{model_id}}/retire
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+body:json {
+  {
+    "reason": "Substituído por versão com melhor F1",
+    "successor_model_id": null
+  }
+}

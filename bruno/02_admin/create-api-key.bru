@@ -1,0 +1,24 @@
+meta {
+  name: Gerar API key
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/admin/keys
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+body:json {
+  {
+    "tenant_id": "{{tenant_id}}",
+    "project_id": "{{project_id}}",
+    "scopes": ["predict", "predictions:read"],
+    "description": "Dev key"
+  }
+}

@@ -1,0 +1,15 @@
+meta {
+  name: Aprovar modelo
+  type: http
+  seq: 1
+}
+
+patch {
+  url: {{base_url}}/admin/tenants/{{tenant_id}}/projects/{{project_id}}/models/{{model_id}}/approve
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}

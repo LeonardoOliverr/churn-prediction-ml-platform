@@ -155,12 +155,11 @@ class ApiKeyRecord(BaseModel):
 
 
 class ChampionModelConfigure(BaseModel):
-    """Payload para ativar ou trocar o champion de um tenant ou projeto."""
+    """Payload para ativar ou trocar o champion de um projeto."""
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "model_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
                 "threshold": 0.5,
                 "activation_reason": "baseline aprovado para producao",
                 "description": "Logistic Regression v1",
@@ -168,7 +167,6 @@ class ChampionModelConfigure(BaseModel):
         }
     )
 
-    model_id: str = Field(..., description="UUID do modelo em churn.models.")
     threshold: float = Field(0.5, ge=0, le=1, description="Threshold operacional do modelo.")
     activation_reason: str | None = Field(None, description="Motivo para ativar esta configuracao.")
     description: str | None = Field(
@@ -177,12 +175,11 @@ class ChampionModelConfigure(BaseModel):
 
 
 class ChallengerModelConfigure(ChampionModelConfigure):
-    """Payload para ativar ou trocar o challenger de um tenant ou projeto."""
+    """Payload para ativar ou trocar o challenger de um projeto."""
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "model_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
                 "threshold": 0.5,
                 "traffic_split": 0.2,
                 "activation_reason": "teste controlado com Random Forest",

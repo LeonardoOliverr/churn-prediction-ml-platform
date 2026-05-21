@@ -13,7 +13,7 @@ import secrets
 
 import bcrypt
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.engine import Connection
@@ -407,17 +407,18 @@ def _configure_champion_for_scope(
     admin: AdminClaims,
     tenant_id: str,
     project_id: str,
+    model_id: str,
     payload: ChampionModelConfigure,
 ) -> ProjectModelConfigResponse:
     """Ativa um modelo aprovado como champion do projeto."""
-    model = _validate_model_for_scope(db, tenant_id, project_id, payload.model_id)
+    model = _validate_model_for_scope(db, tenant_id, project_id, model_id)
     old_champion = _active_config_by_role(db, tenant_id, project_id, "champion")
     _deactivate_role(db, tenant_id, project_id, "champion")
     config = _upsert_model_config(
         db=db,
         tenant_id=tenant_id,
         project_id=project_id,
-        model_id=payload.model_id,
+        model_id=model_id,
         role="champion",
         threshold=payload.threshold,
         traffic_split=0.0,
@@ -425,7 +426,7 @@ def _configure_champion_for_scope(
         activation_reason=payload.activation_reason,
         description=payload.description,
     )
-    if old_champion and str(old_champion["model_id"]) != str(payload.model_id):
+    if old_champion and str(old_champion["model_id"]) != str(model_id):
         old_m = _get_model(db, str(old_champion["model_id"]))
         _write_audit(
             db,
@@ -453,12 +454,13 @@ def _configure_challenger_for_scope(
     admin: AdminClaims,
     tenant_id: str,
     project_id: str,
+    model_id: str,
     payload: ChallengerModelConfigure,
 ) -> ProjectModelConfigResponse:
     """Ativa um modelo aprovado como challenger do projeto."""
-    model = _validate_model_for_scope(db, tenant_id, project_id, payload.model_id)
+    model = _validate_model_for_scope(db, tenant_id, project_id, model_id)
 
-    active = _active_config_by_model(db, tenant_id, project_id, payload.model_id)
+    active = _active_config_by_model(db, tenant_id, project_id, model_id)
     if active and active["role"] == "champion":
         raise _conflict(
             "O champion ativo não pode ser configurado simultaneamente como challenger."
@@ -470,7 +472,7 @@ def _configure_challenger_for_scope(
         db=db,
         tenant_id=tenant_id,
         project_id=project_id,
-        model_id=payload.model_id,
+        model_id=model_id,
         role="challenger",
         threshold=payload.threshold,
         traffic_split=payload.traffic_split,
@@ -478,7 +480,7 @@ def _configure_challenger_for_scope(
         activation_reason=payload.activation_reason,
         description=payload.description,
     )
-    if old_challenger and str(old_challenger["model_id"]) != str(payload.model_id):
+    if old_challenger and str(old_challenger["model_id"]) != str(model_id):
         old_m = _get_model(db, str(old_challenger["model_id"]))
         _write_audit(
             db,
@@ -690,7 +692,7 @@ def _write_audit(
 
 
 @router.patch(
-    "/tenants/{tenant_id}/models/{model_id}/approve",
+    "/tenants/{tenant_id}/projects/{project_id}/models/{model_id}/approve",
     tags=["model lifecycle"],
     summary="Aprovar modelo para produção",
     description="""
@@ -708,8 +710,8 @@ Registra entrada no `model_audit_log` com action=`approved`.
 )
 def approve_model(
     tenant_id: str,
+    project_id: str,
     model_id: str,
-    project_id: str = Query(..., description="ID do projeto ao qual o modelo pertence."),
     db: Connection = Depends(get_db),
     admin: AdminClaims = Depends(get_current_admin),
 ):
@@ -759,7 +761,7 @@ def approve_model(
 
 
 @router.patch(
-    "/tenants/{tenant_id}/models/{model_id}/reject",
+    "/tenants/{tenant_id}/projects/{project_id}/models/{model_id}/reject",
     tags=["model lifecycle"],
     summary="Reprovar modelo candidate",
     description="""
@@ -776,9 +778,9 @@ Registra entrada no `model_audit_log` com action=`rejected`.
 )
 def reject_model(
     tenant_id: str,
+    project_id: str,
     model_id: str,
     payload: ModelRejectRequest,
-    project_id: str = Query(..., description="ID do projeto ao qual o modelo pertence."),
     db: Connection = Depends(get_db),
     admin: AdminClaims = Depends(get_current_admin),
 ):
@@ -816,7 +818,7 @@ def reject_model(
 
 
 @router.patch(
-    "/tenants/{tenant_id}/models/{model_id}/retire",
+    "/tenants/{tenant_id}/projects/{project_id}/models/{model_id}/retire",
     tags=["model lifecycle"],
     summary="Aposentar modelo aprovado",
     description="""
@@ -834,9 +836,9 @@ Registra entrada no `model_audit_log` com action=`retired`.
 )
 def retire_model(
     tenant_id: str,
+    project_id: str,
     model_id: str,
     payload: ModelRetireRequest,
-    project_id: str = Query(..., description="ID do projeto ao qual o modelo pertence."),
     db: Connection = Depends(get_db),
     admin: AdminClaims = Depends(get_current_admin),
 ):
@@ -1152,7 +1154,7 @@ def list_api_keys(
 
 
 @router.get(
-    "/tenants/{tenant_id}/models/config",
+    "/tenants/{tenant_id}/projects/{project_id}/models/config",
     tags=["model deployment"],
     response_model=ProjectModelConfigListResponse,
     summary="Listar configurações de modelos",
@@ -1160,7 +1162,7 @@ def list_api_keys(
 )
 def list_tenant_model_config(
     tenant_id: str,
-    project_id: str = Query(..., description="ID do projeto."),
+    project_id: str,
     db: Connection = Depends(get_db),
     admin: AdminClaims = Depends(get_current_admin),
 ) -> ProjectModelConfigListResponse:
@@ -1173,7 +1175,7 @@ def list_tenant_model_config(
 
 
 @router.post(
-    "/tenants/{tenant_id}/models/champion",
+    "/tenants/{tenant_id}/projects/{project_id}/models/{model_id}/champion",
     tags=["model deployment"],
     response_model=ProjectModelConfigResponse,
     summary="Configurar champion do projeto",
@@ -1181,8 +1183,9 @@ def list_tenant_model_config(
 )
 def configure_tenant_champion(
     tenant_id: str,
+    project_id: str,
+    model_id: str,
     payload: ChampionModelConfigure,
-    project_id: str = Query(..., description="ID do projeto."),
     db: Connection = Depends(get_db),
     admin: AdminClaims = Depends(get_current_admin),
 ) -> ProjectModelConfigResponse:
@@ -1192,14 +1195,14 @@ def configure_tenant_champion(
         "tenant_champion_configured",
         tenant_id=tenant_id,
         project_id=project_id,
-        model_id=payload.model_id,
+        model_id=model_id,
         by=admin.sub,
     )
-    return _configure_champion_for_scope(db, admin, tenant_id, project_id, payload)
+    return _configure_champion_for_scope(db, admin, tenant_id, project_id, model_id, payload)
 
 
 @router.post(
-    "/tenants/{tenant_id}/models/challenger",
+    "/tenants/{tenant_id}/projects/{project_id}/models/{model_id}/challenger",
     tags=["model deployment"],
     response_model=ProjectModelConfigResponse,
     summary="Configurar challenger do projeto",
@@ -1207,8 +1210,9 @@ def configure_tenant_champion(
 )
 def configure_tenant_challenger(
     tenant_id: str,
+    project_id: str,
+    model_id: str,
     payload: ChallengerModelConfigure,
-    project_id: str = Query(..., description="ID do projeto."),
     db: Connection = Depends(get_db),
     admin: AdminClaims = Depends(get_current_admin),
 ) -> ProjectModelConfigResponse:
@@ -1218,15 +1222,15 @@ def configure_tenant_challenger(
         "tenant_challenger_configured",
         tenant_id=tenant_id,
         project_id=project_id,
-        model_id=payload.model_id,
+        model_id=model_id,
         traffic_split=payload.traffic_split,
         by=admin.sub,
     )
-    return _configure_challenger_for_scope(db, admin, tenant_id, project_id, payload)
+    return _configure_challenger_for_scope(db, admin, tenant_id, project_id, model_id, payload)
 
 
 @router.post(
-    "/tenants/{tenant_id}/models/{model_id}/promote",
+    "/tenants/{tenant_id}/projects/{project_id}/models/{model_id}/promote",
     tags=["model deployment"],
     response_model=ProjectModelConfigResponse,
     summary="Promover challenger do projeto a champion",
@@ -1234,9 +1238,9 @@ def configure_tenant_challenger(
 )
 def promote_tenant_challenger(
     tenant_id: str,
+    project_id: str,
     model_id: str,
     payload: ModelPromotionRequest,
-    project_id: str = Query(..., description="ID do projeto."),
     db: Connection = Depends(get_db),
     admin: AdminClaims = Depends(get_current_admin),
 ) -> ProjectModelConfigResponse:
@@ -1253,7 +1257,7 @@ def promote_tenant_challenger(
 
 
 @router.post(
-    "/tenants/{tenant_id}/models/{model_id}/deactivate",
+    "/tenants/{tenant_id}/projects/{project_id}/models/{model_id}/deactivate",
     tags=["model deployment"],
     response_model=ProjectModelConfigResponse,
     summary="Desligar modelo da produção do projeto",
@@ -1261,9 +1265,9 @@ def promote_tenant_challenger(
 )
 def deactivate_tenant_model_config(
     tenant_id: str,
+    project_id: str,
     model_id: str,
     payload: ModelDeactivationRequest,
-    project_id: str = Query(..., description="ID do projeto."),
     db: Connection = Depends(get_db),
     admin: AdminClaims = Depends(get_current_admin),
 ) -> ProjectModelConfigResponse:
@@ -1277,113 +1281,3 @@ def deactivate_tenant_model_config(
         by=admin.sub,
     )
     return _deactivate_model_for_scope(db, admin, tenant_id, project_id, model_id, payload)
-
-
-@router.get(
-    "/projects/{project_id}/models/config",
-    response_model=ProjectModelConfigListResponse,
-    include_in_schema=False,
-    summary="Listar configurações de modelos do projeto",
-    responses=_ADMIN_RESPONSES,
-)
-def list_project_model_config(
-    project_id: str,
-    db: Connection = Depends(get_db),
-    admin: AdminClaims = Depends(get_current_admin),
-) -> ProjectModelConfigListResponse:
-    """Lista champion, challenger e histórico recente de configurações."""
-    project = _get_project(db, project_id)
-    logger.info("project_model_config_listed", project_id=project_id, by=admin.sub)
-    return _list_model_config(db, str(project["tenant_id"]), project_id)
-
-
-@router.post(
-    "/projects/{project_id}/models/champion",
-    response_model=ProjectModelConfigResponse,
-    include_in_schema=False,
-    summary="Configurar champion do projeto",
-    responses=_ADMIN_RESPONSES,
-)
-def configure_champion(
-    project_id: str,
-    payload: ChampionModelConfigure,
-    db: Connection = Depends(get_db),
-    admin: AdminClaims = Depends(get_current_admin),
-) -> ProjectModelConfigResponse:
-    """Ativa um modelo aprovado como champion do projeto."""
-    project = _get_project(db, project_id)
-    logger.info(
-        "champion_configured", project_id=project_id, model_id=payload.model_id, by=admin.sub
-    )
-    return _configure_champion_for_scope(db, admin, str(project["tenant_id"]), project_id, payload)
-
-
-@router.post(
-    "/projects/{project_id}/models/challenger",
-    response_model=ProjectModelConfigResponse,
-    include_in_schema=False,
-    summary="Configurar challenger do projeto",
-    responses=_ADMIN_RESPONSES,
-)
-def configure_challenger(
-    project_id: str,
-    payload: ChallengerModelConfigure,
-    db: Connection = Depends(get_db),
-    admin: AdminClaims = Depends(get_current_admin),
-) -> ProjectModelConfigResponse:
-    """Ativa um modelo aprovado como challenger do projeto."""
-    project = _get_project(db, project_id)
-    logger.info(
-        "challenger_configured",
-        project_id=project_id,
-        model_id=payload.model_id,
-        traffic_split=payload.traffic_split,
-        by=admin.sub,
-    )
-    return _configure_challenger_for_scope(
-        db, admin, str(project["tenant_id"]), project_id, payload
-    )
-
-
-@router.post(
-    "/projects/{project_id}/models/{model_id}/promote",
-    response_model=ProjectModelConfigResponse,
-    include_in_schema=False,
-    summary="Promover challenger a champion",
-    responses=_ADMIN_RESPONSES,
-)
-def promote_challenger(
-    project_id: str,
-    model_id: str,
-    payload: ModelPromotionRequest,
-    db: Connection = Depends(get_db),
-    admin: AdminClaims = Depends(get_current_admin),
-) -> ProjectModelConfigResponse:
-    """Promove o challenger ativo para champion."""
-    project = _get_project(db, project_id)
-    logger.info("challenger_promoted", project_id=project_id, model_id=model_id, by=admin.sub)
-    return _promote_challenger_for_scope(
-        db, admin, str(project["tenant_id"]), project_id, model_id, payload
-    )
-
-
-@router.post(
-    "/projects/{project_id}/models/{model_id}/deactivate",
-    response_model=ProjectModelConfigResponse,
-    include_in_schema=False,
-    summary="Desligar modelo da produção",
-    responses=_ADMIN_RESPONSES,
-)
-def deactivate_model_config(
-    project_id: str,
-    model_id: str,
-    payload: ModelDeactivationRequest,
-    db: Connection = Depends(get_db),
-    admin: AdminClaims = Depends(get_current_admin),
-) -> ProjectModelConfigResponse:
-    """Desativa challenger ou substitui champion por outro modelo aprovado."""
-    project = _get_project(db, project_id)
-    logger.info("model_config_deactivated", project_id=project_id, model_id=model_id, by=admin.sub)
-    return _deactivate_model_for_scope(
-        db, admin, str(project["tenant_id"]), project_id, model_id, payload
-    )

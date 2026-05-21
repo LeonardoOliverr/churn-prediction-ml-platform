@@ -1,0 +1,15 @@
+meta {
+  name: Listar configurações do projeto
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/admin/tenants/{{tenant_id}}/projects/{{project_id}}/models/config
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
