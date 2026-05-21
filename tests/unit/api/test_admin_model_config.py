@@ -45,13 +45,13 @@ def test_validate_model_for_project_rejects_not_approved_model():
 
 def test_configure_challenger_rejects_active_champion_as_challenger():
     """O mesmo modelo não pode ser champion e challenger ativo ao mesmo tempo."""
-    payload = ChallengerModelConfigure(model_id="model-1", threshold=0.5, traffic_split=0.2)
+    payload = ChallengerModelConfigure(threshold=0.5, traffic_split=0.2)
     claims = SimpleNamespace(sub="admin-1")
 
     with (
         patch(
-            "src.routers.admin._get_project",
-            return_value={"id": "project-1", "tenant_id": "tenant-1"},
+            "src.routers.admin._resolve_admin_model_scope",
+            return_value=("tenant-1", "project-1"),
         ),
         patch("src.routers.admin._validate_model_for_scope"),
         patch(
@@ -60,7 +60,9 @@ def test_configure_challenger_rejects_active_champion_as_challenger():
         ),
     ):
         with pytest.raises(HTTPException) as exc:
-            admin.configure_challenger("project-1", payload, MagicMock(), claims)
+            admin.configure_tenant_challenger(
+                "tenant-1", "project-1", "model-1", payload, MagicMock(), claims
+            )
 
     assert exc.value.status_code == 409
 
@@ -72,8 +74,8 @@ def test_deactivate_champion_without_replacement_returns_conflict():
 
     with (
         patch(
-            "src.routers.admin._get_project",
-            return_value={"id": "project-1", "tenant_id": "tenant-1"},
+            "src.routers.admin._resolve_admin_model_scope",
+            return_value=("tenant-1", "project-1"),
         ),
         patch(
             "src.routers.admin._active_config_by_model",
@@ -81,6 +83,8 @@ def test_deactivate_champion_without_replacement_returns_conflict():
         ),
     ):
         with pytest.raises(HTTPException) as exc:
-            admin.deactivate_model_config("project-1", "model-1", payload, MagicMock(), claims)
+            admin.deactivate_tenant_model_config(
+                "tenant-1", "project-1", "model-1", payload, MagicMock(), claims
+            )
 
     assert exc.value.status_code == 409

@@ -139,9 +139,8 @@ def test_listar_keys_do_tenant(client, admin_headers, seed_api_key):
 @pytest.mark.integration
 def test_configurar_champion(client, admin_headers, seed_tenant, seed_project, seed_model):
     r = client.post(
-        f"/admin/tenants/{seed_tenant}/models/champion",
-        params={"project_id": seed_project},
-        json={"model_id": seed_model, "threshold": 0.45},
+        f"/admin/tenants/{seed_tenant}/projects/{seed_project}/models/{seed_model}/champion",
+        json={"threshold": 0.45},
         headers=admin_headers,
     )
     assert r.status_code == 200
@@ -158,9 +157,8 @@ def test_configurar_champion_modelo_inexistente_retorna_409(
     import uuid
 
     r = client.post(
-        f"/admin/tenants/{seed_tenant}/models/champion",
-        params={"project_id": seed_project},
-        json={"model_id": str(uuid.uuid4()), "threshold": 0.5},
+        f"/admin/tenants/{seed_tenant}/projects/{seed_project}/models/{uuid.uuid4()}/champion",
+        json={"threshold": 0.5},
         headers=admin_headers,
     )
     # Modelo não existe no catálogo → ModelNotFoundError → 404
@@ -195,17 +193,15 @@ def test_promover_challenger_a_champion(
 
     # Configura como challenger
     r = client.post(
-        f"/admin/tenants/{seed_tenant}/models/challenger",
-        params={"project_id": seed_project},
-        json={"model_id": model2_id, "threshold": 0.5, "traffic_split": 0.2},
+        f"/admin/tenants/{seed_tenant}/projects/{seed_project}/models/{model2_id}/challenger",
+        json={"threshold": 0.5, "traffic_split": 0.2},
         headers=admin_headers,
     )
     assert r.status_code == 200
 
     # Promove challenger a champion
     r2 = client.post(
-        f"/admin/tenants/{seed_tenant}/models/{model2_id}/promote",
-        params={"project_id": seed_project},
+        f"/admin/tenants/{seed_tenant}/projects/{seed_project}/models/{model2_id}/promote",
         json={},
         headers=admin_headers,
     )
@@ -215,8 +211,7 @@ def test_promover_challenger_a_champion(
 
     # Verifica que apenas um champion ativo existe no projeto
     r3 = client.get(
-        f"/admin/tenants/{seed_tenant}/models/config",
-        params={"project_id": seed_project},
+        f"/admin/tenants/{seed_tenant}/projects/{seed_project}/models/config",
         headers=admin_headers,
     )
     body = r3.json()
