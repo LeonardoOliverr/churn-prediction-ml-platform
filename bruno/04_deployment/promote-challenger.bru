@@ -1,0 +1,21 @@
+meta {
+  name: Promover challenger a champion
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{base_url}}/admin/tenants/{{tenant_id}}/projects/{{project_id}}/models/{{model_id}}/promote
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+body:json {
+  {
+    "activation_reason": "Challenger superou champion em F1 e custo operacional"
+  }
+}
