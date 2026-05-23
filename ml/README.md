@@ -44,7 +44,7 @@ A lógica pesada permanece nos módulos especializados:
 - comparação e relatórios em `ml/evaluation/`;
 - persistência em `ml/core/registry/`.
 
-Na v1, a decisão é local ao run: o maior `f1_mean` vira `approved`; os demais candidatos ficam como `trained`. Essa etapa ainda não altera `churn.project_model_config`.
+Todos os modelos saem do run com status `candidate` — a aprovação é feita manualmente via `PATCH /admin/tenants/{t}/projects/{p}/models/{m}/approve`. Essa etapa não altera `churn.project_model_config`.
 
 ---
 
@@ -177,8 +177,10 @@ Catálogo técnico dos modelos treinados.
 
 | Situação | Status |
 |---|---|
-| Melhor F1 do run | `approved` |
-| Demais modelos do run | `trained` |
+| Todos os modelos do run | `candidate` |
+
+Ciclo de vida completo: `candidate` → `approved` → `retired` (ou `rejected`).
+Transições registradas em `churn.model_audit_log` com `changed_by` e timestamp.
 
 Campos principais: `name`, `version`, `scope`, `tenant_id`, `project_id`, `mlflow_run_id`, F1, ROC-AUC, Recall, Precision e `status`.
 
@@ -249,6 +251,14 @@ from ml.models.xgboost import SPECS as XGBOOST_SPECS
 `ml/evaluate_production.py` avalia predictions contra outcomes reais (ground truth do holdout).
 
 ```bash
+# Com isolamento por ciclo (recomendado):
+python -m ml.evaluate_production \
+  --project telco-churn-2018 \
+  --batch-id <uuid-do-ciclo> \
+  --fp-cost 100 \
+  --fn-cost 2000
+
+# Por janela temporal (compatibilidade):
 python -m ml.evaluate_production \
   --project telco-churn-2018 \
   --since 90d \
