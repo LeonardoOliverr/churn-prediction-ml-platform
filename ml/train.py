@@ -1,9 +1,9 @@
 """CLI unificado de treinamento.
 
 Uso:
-    python -m ml.train --model baseline [--tenant X] [--project Y] [--dry-run]
-    python -m ml.train --model random_forest [--n-estimators 300] [--max-depth 10]
-    python -m ml.train --model random_forest --holdout-size 0.0
+    python -m ml.train --model baseline --tenant X --project Y [--dry-run]
+    python -m ml.train --model random_forest --tenant X --project Y [--n-estimators 300]
+    python -m ml.train --model xgboost --tenant X --project Y
 """
 
 from __future__ import annotations
@@ -68,18 +68,18 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--model",
         required=True,
-        choices=["baseline", "random_forest"],
+        choices=["baseline", "random_forest", "xgboost"],
         help="Familia de modelos a treinar.",
     )
     parser.add_argument(
         "--tenant",
-        default=None,
-        help="Slug do tenant. Omitir para escopo global.",
+        required=True,
+        help="Slug do tenant.",
     )
     parser.add_argument(
         "--project",
-        default=None,
-        help="Slug do projeto. Requer --tenant.",
+        required=True,
+        help="Slug do projeto.",
     )
     parser.add_argument(
         "--dry-run",
@@ -96,7 +96,7 @@ def _parse_args() -> argparse.Namespace:
         "--n-estimators",
         type=int,
         default=500,
-        help="Numero de arvores no Random Forest.",
+        help="Numero de estimadores (arvores).",
     )
     parser.add_argument(
         "--max-depth",
@@ -104,35 +104,78 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help="Profundidade maxima das arvores.",
     )
+    parser.add_argument(
+        "--learning-rate",
+        type=float,
+        default=None,
+        help="Taxa de aprendizado (XGBoost).",
+    )
+    parser.add_argument(
+        "--subsample",
+        type=float,
+        default=None,
+        help="Fracao de amostras por arvore (XGBoost).",
+    )
+    parser.add_argument(
+        "--colsample-bytree",
+        type=float,
+        default=None,
+        help="Fracao de features por arvore (XGBoost).",
+    )
+    parser.add_argument(
+        "--scale-pos-weight",
+        type=float,
+        default=None,
+        help="Peso da classe positiva para desbalanceamento (XGBoost).",
+    )
+    parser.add_argument(
+        "--reg-alpha",
+        type=float,
+        default=None,
+        help="Regularizacao L1 (XGBoost).",
+    )
+    parser.add_argument(
+        "--reg-lambda",
+        type=float,
+        default=None,
+        help="Regularizacao L2 (XGBoost).",
+    )
+    parser.add_argument(
+        "--min-child-weight",
+        type=int,
+        default=None,
+        help="Peso minimo por folha — aumentar reduz overfitting (XGBoost).",
+    )
+    parser.add_argument(
+        "--gamma",
+        type=float,
+        default=None,
+        help="Reducao minima de loss para split — aumentar reduz overfitting (XGBoost).",
+    )
     args = parser.parse_args()
-
-    if args.project and not args.tenant:
-        parser.error("--project requer --tenant.")
 
     return args
 
 
 def _resolve_specs(model_name: str) -> list[ModelSpec]:
     """Retorna a lista de ModelSpec para o modelo solicitado."""
-    from ml.models import BASELINE_SPECS, RANDOM_FOREST_SPECS
+    from ml.models import BASELINE_SPECS, RANDOM_FOREST_SPECS, XGBOOST_SPECS
 
     if model_name == "baseline":
         return BASELINE_SPECS
     if model_name == "random_forest":
         return RANDOM_FOREST_SPECS
+    if model_name == "xgboost":
+        return XGBOOST_SPECS
     raise ValueError(f"Modelo desconhecido: {model_name!r}")
 
 
 def _derive_scope(
-    tenant_slug: str | None,
-    project_slug: str | None,
+    tenant_slug: str,
+    project_slug: str,
     experiment_suffix: str,
 ) -> tuple[str, str]:
     """Retorna (scope, experiment_name) a partir dos slugs e do sufixo."""
-    if tenant_slug is None:
-        return "global", f"global/{experiment_suffix}"
-    if project_slug is None:
-        return "tenant", f"{tenant_slug}/{experiment_suffix}"
     return "project", f"{tenant_slug}/{project_slug}/{experiment_suffix}"
 
 
@@ -185,26 +228,33 @@ def _build_mlflow_params(
 
 def _hp_overrides_from_args(args: argparse.Namespace) -> dict:
     """Extrai hiperparametros opcionais do CLI."""
-    hp_overrides: dict = {}
-    if args.n_estimators != 500:
-        hp_overrides["n_estimators"] = args.n_estimators
-    if args.max_depth is not None:
-        hp_overrides["max_depth"] = args.max_depth
-    return hp_overrides
+    candidates = {
+        "n_estimators": getattr(args, "n_estimators", None),
+        "max_depth": getattr(args, "max_depth", None),
+        "learning_rate": getattr(args, "learning_rate", None),
+        "subsample": getattr(args, "subsample", None),
+        "colsample_bytree": getattr(args, "colsample_bytree", None),
+        "scale_pos_weight": getattr(args, "scale_pos_weight", None),
+        "reg_alpha": getattr(args, "reg_alpha", None),
+        "reg_lambda": getattr(args, "reg_lambda", None),
+        "min_child_weight": getattr(args, "min_child_weight", None),
+        "gamma": getattr(args, "gamma", None),
+    }
+    return {k: v for k, v in candidates.items() if v is not None}
 
 
 def _log_run_context(
     scope: str,
-    tenant_slug: str | None,
-    project_slug: str | None,
+    tenant_slug: str,
+    project_slug: str,
     experiment_name: str,
     holdout_size: float,
 ) -> None:
     logger.info(
         "run_context",
         scope=scope,
-        tenant=tenant_slug or "-",
-        project=project_slug or "-",
+        tenant=tenant_slug,
+        project=project_slug,
         experiment=experiment_name,
         holdout=f"{holdout_size:.0%}" if holdout_size > 0 else "disabled",
     )
@@ -218,6 +268,9 @@ def _train_candidates(
     hp_overrides: dict,
 ) -> list[CandidateResult]:
     """Executa treino e logging, retornando candidatos avaliaveis pelo run."""
+    train_row_count = len(X)
+    churn_rate = round(float(y.mean()), 4)
+
     candidates: list[CandidateResult] = []
     for spec in specs:
         applicable = {k: v for k, v in hp_overrides.items() if k in spec.cli_overrides}
@@ -231,7 +284,11 @@ def _train_candidates(
             holdout_size=args.holdout_size,
         )
         pipeline = result["pipeline"]
-        metrics = result["metrics"]
+        metrics = {
+            **result["metrics"],
+            "train_row_count": train_row_count,
+            "churn_rate": churn_rate,
+        }
 
         if args.dry_run:
             logger.warning("mlflow_run_skipped", reason="dry_run")

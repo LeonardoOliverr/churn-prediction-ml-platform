@@ -51,7 +51,19 @@ def test_parse_args_model_baseline():
     """--model baseline define args.model corretamente."""
     from ml.train import _parse_args
 
-    with patch.object(sys, "argv", ["train.py", "--model", "baseline"]):
+    with patch.object(
+        sys,
+        "argv",
+        [
+            "train.py",
+            "--model",
+            "baseline",
+            "--tenant",
+            "ibm-telco",
+            "--project",
+            "telco-churn-2018",
+        ],
+    ):
         args = _parse_args()
 
     assert args.model == "baseline"
@@ -61,7 +73,19 @@ def test_parse_args_model_random_forest():
     """--model random_forest define args.model corretamente."""
     from ml.train import _parse_args
 
-    with patch.object(sys, "argv", ["train.py", "--model", "random_forest"]):
+    with patch.object(
+        sys,
+        "argv",
+        [
+            "train.py",
+            "--model",
+            "random_forest",
+            "--tenant",
+            "ibm-telco",
+            "--project",
+            "telco-churn-2018",
+        ],
+    ):
         args = _parse_args()
 
     assert args.model == "random_forest"
@@ -71,7 +95,19 @@ def test_parse_args_holdout_size_defaults_to_0_2():
     """--holdout-size padrão é 0.2."""
     from ml.train import _parse_args
 
-    with patch.object(sys, "argv", ["train.py", "--model", "baseline"]):
+    with patch.object(
+        sys,
+        "argv",
+        [
+            "train.py",
+            "--model",
+            "baseline",
+            "--tenant",
+            "ibm-telco",
+            "--project",
+            "telco-churn-2018",
+        ],
+    ):
         args = _parse_args()
 
     assert args.holdout_size == 0.2
@@ -81,7 +117,21 @@ def test_parse_args_holdout_size_custom():
     """--holdout-size aceita valor customizado."""
     from ml.train import _parse_args
 
-    with patch.object(sys, "argv", ["train.py", "--model", "baseline", "--holdout-size", "0.3"]):
+    with patch.object(
+        sys,
+        "argv",
+        [
+            "train.py",
+            "--model",
+            "baseline",
+            "--tenant",
+            "ibm-telco",
+            "--project",
+            "telco-churn-2018",
+            "--holdout-size",
+            "0.3",
+        ],
+    ):
         args = _parse_args()
 
     assert args.holdout_size == 0.3
@@ -91,7 +141,21 @@ def test_parse_args_holdout_size_zero_disables_holdout():
     """--holdout-size 0.0 desativa o holdout (CV puro)."""
     from ml.train import _parse_args
 
-    with patch.object(sys, "argv", ["train.py", "--model", "baseline", "--holdout-size", "0.0"]):
+    with patch.object(
+        sys,
+        "argv",
+        [
+            "train.py",
+            "--model",
+            "baseline",
+            "--tenant",
+            "ibm-telco",
+            "--project",
+            "telco-churn-2018",
+            "--holdout-size",
+            "0.0",
+        ],
+    ):
         args = _parse_args()
 
     assert args.holdout_size == 0.0
@@ -101,7 +165,19 @@ def test_parse_args_n_estimators_default():
     """--n-estimators padrão é 500."""
     from ml.train import _parse_args
 
-    with patch.object(sys, "argv", ["train.py", "--model", "random_forest"]):
+    with patch.object(
+        sys,
+        "argv",
+        [
+            "train.py",
+            "--model",
+            "random_forest",
+            "--tenant",
+            "ibm-telco",
+            "--project",
+            "telco-churn-2018",
+        ],
+    ):
         args = _parse_args()
 
     assert args.n_estimators == 500
@@ -111,7 +187,19 @@ def test_parse_args_max_depth_default_is_none():
     """--max-depth padrão é None."""
     from ml.train import _parse_args
 
-    with patch.object(sys, "argv", ["train.py", "--model", "random_forest"]):
+    with patch.object(
+        sys,
+        "argv",
+        [
+            "train.py",
+            "--model",
+            "random_forest",
+            "--tenant",
+            "ibm-telco",
+            "--project",
+            "telco-churn-2018",
+        ],
+    ):
         args = _parse_args()
 
     assert args.max_depth is None
@@ -177,7 +265,7 @@ def test_resolve_specs_unknown_model_raises():
     from ml.train import _resolve_specs
 
     with pytest.raises(ValueError):
-        _resolve_specs("xgboost")
+        _resolve_specs("unknown_model")
 
 
 # ---------------------------------------------------------------------------
@@ -185,32 +273,21 @@ def test_resolve_specs_unknown_model_raises():
 # ---------------------------------------------------------------------------
 
 
-def test_derive_scope_global():
-    """(None, None) → escopo global."""
-    from ml.train import _derive_scope
-
-    scope, experiment = _derive_scope(None, None, "random-forest")
-    assert scope == "global"
-    assert experiment == "global/random-forest"
-
-
-def test_derive_scope_tenant():
-    """(slug, None) → escopo tenant."""
-    from ml.train import _derive_scope
-
-    scope, experiment = _derive_scope("ibm-telco", None, "random-forest")
-    assert scope == "tenant"
-    assert "ibm-telco" in experiment
-
-
 def test_derive_scope_project():
-    """(slug, slug) → escopo project."""
+    """(tenant, project) → escopo project com experiment name correto."""
     from ml.train import _derive_scope
 
     scope, experiment = _derive_scope("ibm-telco", "telco-churn-2018", "random-forest")
     assert scope == "project"
-    assert "ibm-telco" in experiment
-    assert "telco-churn-2018" in experiment
+    assert experiment == "ibm-telco/telco-churn-2018/random-forest"
+
+
+def test_derive_scope_always_returns_project():
+    """_derive_scope sempre retorna scope=project independente dos slugs."""
+    from ml.train import _derive_scope
+
+    scope, _ = _derive_scope("any-tenant", "any-project", "baseline")
+    assert scope == "project"
 
 
 # ---------------------------------------------------------------------------
@@ -500,7 +577,7 @@ def test_main_not_dry_run_configures_mlflow_for_baseline(fake_customers_df):
     fake_args = argparse.Namespace(
         model="baseline",
         tenant="ibm-telco",
-        project=None,
+        project="telco-churn-2018",
         dry_run=False,
         holdout_size=0.2,
         n_estimators=500,
@@ -523,4 +600,4 @@ def test_main_not_dry_run_configures_mlflow_for_baseline(fake_customers_df):
     ):
         main()
 
-    mock_exp.assert_called_once_with("ibm-telco/baseline")
+    mock_exp.assert_called_once_with("ibm-telco/telco-churn-2018/baseline")
