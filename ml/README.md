@@ -48,53 +48,46 @@ Todos os modelos saem do run com status `candidate` — a aprovação é feita m
 
 ---
 
-## Escopos
-
-Todos os modelos respeitam a hierarquia multi-tenant via flags CLI:
-
-| Escopo | `--tenant` | `--project` | Dados usados | Experimento MLflow |
-|---|---|---|---|---|
-| `global` | omitido | omitido | Todos os tenants | `global/<modelo>` |
-| `tenant` | informado | omitido | Clientes do tenant | `{tenant}/<modelo>` |
-| `project` | informado | informado | Clientes do projeto | `{tenant}/{project}/<modelo>` |
-
-Produção não é definida por `scope`. A fonte de verdade para serving por projeto é `churn.project_model_config`.
-
----
-
 ## Comandos
+
+`--tenant` e `--project` são obrigatórios em todos os comandos de treino.
 
 ### Baseline
 
-Treina `DummyClassifier` e `LogisticRegression` e aprova o melhor F1 do run.
+Treina `DummyClassifier` e `LogisticRegression`.
 
 ```bash
-python -m ml.train --model baseline
-python -m ml.train --model baseline --dry-run
-python -m ml.train --model baseline --tenant ibm-telco
 python -m ml.train --model baseline --tenant ibm-telco --project telco-churn-2018
+python -m ml.train --model baseline --tenant ibm-telco --project telco-churn-2018 --dry-run
 ```
 
 ### Random Forest
 
 ```bash
-python -m ml.train --model random_forest
-python -m ml.train --model random_forest --dry-run
 python -m ml.train --model random_forest --tenant ibm-telco --project telco-churn-2018
-python -m ml.train --model random_forest --n-estimators 300 --max-depth 10
+python -m ml.train --model random_forest --tenant ibm-telco --project telco-churn-2018 --dry-run
+python -m ml.train --model random_forest --tenant ibm-telco --project telco-churn-2018 --n-estimators 300 --max-depth 10
+```
+
+### XGBoost
+
+```bash
+python -m ml.train --model xgboost --tenant ibm-telco --project telco-churn-2018
+python -m ml.train --model xgboost --tenant ibm-telco --project telco-churn-2018 --dry-run
+python -m ml.train --model xgboost --tenant ibm-telco --project telco-churn-2018 --n-estimators 300 --max-depth 6
 ```
 
 ### Avaliação
 
 ```bash
 # Padrão: 5-fold CV nos dados de treino + holdout fixo de 20%
-python -m ml.train --model random_forest
+python -m ml.train --model random_forest --tenant ibm-telco --project telco-churn-2018
 
 # Holdout customizado
-python -m ml.train --model random_forest --holdout-size 0.3
+python -m ml.train --model random_forest --tenant ibm-telco --project telco-churn-2018 --holdout-size 0.3
 
 # CV puro, sem holdout separado
-python -m ml.train --model random_forest --holdout-size 0.0
+python -m ml.train --model random_forest --tenant ibm-telco --project telco-churn-2018 --holdout-size 0.0
 ```
 
 ### Docker
@@ -102,6 +95,7 @@ python -m ml.train --model random_forest --holdout-size 0.0
 ```bash
 docker compose --profile tools run --rm trainer python -m ml.train --model baseline --tenant ibm-telco --project telco-churn-2018
 docker compose --profile tools run --rm trainer python -m ml.train --model random_forest --tenant ibm-telco --project telco-churn-2018
+docker compose --profile tools run --rm trainer python -m ml.train --model xgboost --tenant ibm-telco --project telco-churn-2018
 ```
 
 ### Dry run
@@ -270,10 +264,49 @@ Grava em `churn.evaluation_run_results`: F1, ROC-AUC, FPR/FNR, segmentação por
 
 ---
 
+## Seleção de Threshold
+
+O threshold define o ponto de corte da probabilidade predita a partir do qual o cliente é classificado como churn. Não existe valor universalmente correto — a escolha depende do custo operacional da intervenção de retenção.
+
+### Trade-off recall × precision
+
+| Threshold | Recall | Precision | Perfil de uso |
+|---|---|---|---|
+| 0.30–0.40 | ~0.93 | ~0.46 | Intervenção barata (e-mail, notificação) — maximizar cobertura |
+| 0.45–0.55 | ~0.87 | ~0.52 | Equilíbrio — ponto de partida recomendado em produção |
+| 0.60+ | ~0.80 | ~0.57 | Intervenção cara (desconto, contato humano) — alta seletividade |
+
+Valores de referência medidos no dataset IBM Telco com XGBoost v1 (threshold_f1=0.60).
+
+### Relação com custo de negócio
+
+- **FN (falso negativo):** churner não identificado → perda do CLTV do cliente. Custo alto.
+- **FP (falso positivo):** alarme falso → custo da intervenção desnecessária. Custo baixo se a ação for automatizada.
+
+Quando `fn_cost >> fp_cost`, thresholds baixos minimizam custo total mas geram volume operacional alto. O ponto ótimo por custo raramente é o mesmo que o ótimo por F1 — use `scripts/optimize_threshold.py` para encontrar o equilíbrio do seu projeto.
+
+### Como ajustar
+
+```bash
+# 1. Encontrar threshold ótimo para o ciclo atual
+python scripts/optimize_threshold.py \
+  --project telco-churn-2018 \
+  --batch-id <uuid> \
+  --fn-cost 2000 \
+  --fp-cost 100
+
+# 2. Atualizar no project_model_config via API
+PATCH /admin/tenants/{t}/projects/{p}/models/{m}/champion
+body: { "threshold": 0.55 }
+```
+
+---
+
 ## Resultados Consolidados
 
 | Modelo | F1 | ROC-AUC | Recall | Precision |
 |---|---:|---:|---:|---:|
 | DummyClassifier | 0.3148 | 0.5347 | 30.9% | 32.0% |
-| Logistic Regression | **0.6586** | **0.8636** | **82.3%** | 54.9% |
-| Random Forest | 0.6476 | 0.8530 | 76.7% | **56.1%** |
+| Logistic Regression | 0.6586 | 0.8636 | 82.3% | 54.9% |
+| Random Forest | 0.6476 | 0.8530 | 76.7% | 56.1% |
+| XGBoost (threshold=0.60) | **0.6667** | **0.8654** | **80.4%** | **56.9%** |

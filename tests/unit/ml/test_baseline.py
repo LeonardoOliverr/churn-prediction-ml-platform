@@ -139,45 +139,22 @@ def test_baseline_specs_contain_expected_names():
 # ---------------------------------------------------------------------------
 
 
-def test_derive_scope_global():
-    """(None, None) → escopo global."""
-    from ml.train import _derive_scope
-
-    scope, experiment = _derive_scope(None, None, "baseline")
-    assert scope == "global"
-    assert experiment == "global/baseline"
-
-
-def test_derive_scope_tenant():
-    """(slug, None) → escopo tenant."""
-    from ml.train import _derive_scope
-
-    scope, experiment = _derive_scope("ibm-telco", None, "baseline")
-    assert scope == "tenant"
-    assert "ibm-telco" in experiment
-
-
 def test_derive_scope_project():
-    """(slug, slug) → escopo project."""
+    """(tenant, project) → escopo project com experiment name correto."""
     from ml.train import _derive_scope
 
     scope, experiment = _derive_scope("ibm-telco", "telco-churn-2018", "baseline")
     assert scope == "project"
-    assert "ibm-telco" in experiment
-    assert "telco-churn-2018" in experiment
+    assert experiment == "ibm-telco/telco-churn-2018/baseline"
 
 
-def test_derive_scope_returns_two_tuple():
-    """_derive_scope retorna sempre uma tupla de 2 elementos."""
+def test_derive_scope_always_returns_project():
+    """_derive_scope sempre retorna scope=project e 2-tupla."""
     from ml.train import _derive_scope
 
-    for args, expected_scope in [
-        ((None, None, "baseline"), "global"),
-        (("slug", None, "baseline"), "tenant"),
-        (("slug", "proj", "baseline"), "project"),
-    ]:
-        scope, _ = _derive_scope(*args)
-        assert scope == expected_scope
+    result = _derive_scope("ibm-telco", "telco-churn-2018", "baseline")
+    assert len(result) == 2
+    assert result[0] == "project"
 
 
 # ---------------------------------------------------------------------------
@@ -186,27 +163,36 @@ def test_derive_scope_returns_two_tuple():
 
 
 def test_parse_args_defaults():
-    """Sem argumentos opcionais → tenant=None, project=None, dry_run=False."""
+    """--tenant e --project obrigatórios → dry_run=False por padrão."""
     from ml.train import _parse_args
 
-    with patch.object(sys, "argv", ["train.py", "--model", "baseline"]):
-        args = _parse_args()
-
-    assert args.tenant is None
-    assert args.project is None
-    assert args.dry_run is False
-
-
-def test_parse_args_tenant_only():
-    """--tenant define tenant sem afetar project ou dry_run."""
-    from ml.train import _parse_args
-
-    with patch.object(sys, "argv", ["train.py", "--model", "baseline", "--tenant", "ibm-telco"]):
+    with patch.object(
+        sys,
+        "argv",
+        [
+            "train.py",
+            "--model",
+            "baseline",
+            "--tenant",
+            "ibm-telco",
+            "--project",
+            "telco-churn-2018",
+        ],
+    ):
         args = _parse_args()
 
     assert args.tenant == "ibm-telco"
-    assert args.project is None
+    assert args.project == "telco-churn-2018"
     assert args.dry_run is False
+
+
+def test_parse_args_requires_tenant_and_project():
+    """Sem --tenant e --project deve encerrar com SystemExit."""
+    from ml.train import _parse_args
+
+    with patch.object(sys, "argv", ["train.py", "--model", "baseline"]):
+        with pytest.raises(SystemExit):
+            _parse_args()
 
 
 def test_parse_args_tenant_and_project():
@@ -236,7 +222,20 @@ def test_parse_args_dry_run_flag():
     """--dry-run ativa o modo de simulação."""
     from ml.train import _parse_args
 
-    with patch.object(sys, "argv", ["train.py", "--model", "baseline", "--dry-run"]):
+    with patch.object(
+        sys,
+        "argv",
+        [
+            "train.py",
+            "--model",
+            "baseline",
+            "--tenant",
+            "ibm-telco",
+            "--project",
+            "telco-churn-2018",
+            "--dry-run",
+        ],
+    ):
         args = _parse_args()
 
     assert args.dry_run is True
@@ -363,7 +362,7 @@ def test_main_not_dry_run_configures_mlflow(fake_customers_df):
     fake_args = argparse.Namespace(
         model="baseline",
         tenant="ibm-telco",
-        project=None,
+        project="telco-churn-2018",
         dry_run=False,
         holdout_size=0.2,
         n_estimators=500,
@@ -384,4 +383,4 @@ def test_main_not_dry_run_configures_mlflow(fake_customers_df):
         main()
 
     mock_uri.assert_called_once()
-    mock_exp.assert_called_once_with("ibm-telco/baseline")
+    mock_exp.assert_called_once_with("ibm-telco/telco-churn-2018/baseline")

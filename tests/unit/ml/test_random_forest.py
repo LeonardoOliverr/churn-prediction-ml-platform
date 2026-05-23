@@ -120,46 +120,22 @@ def test_random_forest_has_feature_importances_after_fit(fake_customers_df):
 # ---------------------------------------------------------------------------
 
 
-def test_derive_scope_global():
-    """(None, None) → escopo global, experimento global/random-forest."""
-    from ml.train import _derive_scope
-
-    scope, experiment = _derive_scope(None, None, "random-forest")
-    assert scope == "global"
-    assert experiment == "global/random-forest"
-
-
-def test_derive_scope_tenant():
-    """(slug, None) → escopo tenant, experimento contém o slug."""
-    from ml.train import _derive_scope
-
-    scope, experiment = _derive_scope("ibm-telco", None, "random-forest")
-    assert scope == "tenant"
-    assert "ibm-telco" in experiment
-    assert "random-forest" in experiment
-
-
 def test_derive_scope_project():
-    """(slug, slug) → escopo project, experimento contém tenant e projeto."""
+    """(tenant, project) → escopo project com experiment name correto."""
     from ml.train import _derive_scope
 
     scope, experiment = _derive_scope("ibm-telco", "telco-churn-2018", "random-forest")
     assert scope == "project"
-    assert "ibm-telco" in experiment
-    assert "telco-churn-2018" in experiment
+    assert experiment == "ibm-telco/telco-churn-2018/random-forest"
 
 
-def test_derive_scope_returns_two_tuple():
-    """_derive_scope retorna sempre uma tupla de 2 elementos."""
+def test_derive_scope_always_returns_project():
+    """_derive_scope sempre retorna scope=project e 2-tupla."""
     from ml.train import _derive_scope
 
-    for args in [
-        (None, None, "random-forest"),
-        ("t", None, "random-forest"),
-        ("t", "p", "random-forest"),
-    ]:
-        result = _derive_scope(*args)
-        assert len(result) == 2, f"Esperado 2-tuple, got {len(result)}-tuple para {args}"
+    result = _derive_scope("ibm-telco", "telco-churn-2018", "random-forest")
+    assert len(result) == 2
+    assert result[0] == "project"
 
 
 # ---------------------------------------------------------------------------
@@ -194,14 +170,26 @@ def test_db_name_project():
 
 
 def test_parse_args_defaults():
-    """Sem argumentos opcionais → tenant=None, project=None, dry_run=False, n_estimators=500, max_depth=None."""
+    """--tenant e --project obrigatórios → dry_run=False, n_estimators=500, max_depth=None."""
     from ml.train import _parse_args
 
-    with patch.object(sys, "argv", ["train.py", "--model", "random_forest"]):
+    with patch.object(
+        sys,
+        "argv",
+        [
+            "train.py",
+            "--model",
+            "random_forest",
+            "--tenant",
+            "ibm-telco",
+            "--project",
+            "telco-churn-2018",
+        ],
+    ):
         args = _parse_args()
 
-    assert args.tenant is None
-    assert args.project is None
+    assert args.tenant == "ibm-telco"
+    assert args.project == "telco-churn-2018"
     assert args.dry_run is False
     assert args.n_estimators == 500
     assert args.max_depth is None
@@ -212,7 +200,19 @@ def test_parse_args_n_estimators():
     from ml.train import _parse_args
 
     with patch.object(
-        sys, "argv", ["train.py", "--model", "random_forest", "--n-estimators", "300"]
+        sys,
+        "argv",
+        [
+            "train.py",
+            "--model",
+            "random_forest",
+            "--tenant",
+            "ibm-telco",
+            "--project",
+            "telco-churn-2018",
+            "--n-estimators",
+            "300",
+        ],
     ):
         args = _parse_args()
 
@@ -223,7 +223,21 @@ def test_parse_args_max_depth():
     """--max-depth define a profundidade máxima."""
     from ml.train import _parse_args
 
-    with patch.object(sys, "argv", ["train.py", "--model", "random_forest", "--max-depth", "10"]):
+    with patch.object(
+        sys,
+        "argv",
+        [
+            "train.py",
+            "--model",
+            "random_forest",
+            "--tenant",
+            "ibm-telco",
+            "--project",
+            "telco-churn-2018",
+            "--max-depth",
+            "10",
+        ],
+    ):
         args = _parse_args()
 
     assert args.max_depth == 10
@@ -233,7 +247,20 @@ def test_parse_args_dry_run_flag():
     """--dry-run ativa o modo de simulação."""
     from ml.train import _parse_args
 
-    with patch.object(sys, "argv", ["train.py", "--model", "random_forest", "--dry-run"]):
+    with patch.object(
+        sys,
+        "argv",
+        [
+            "train.py",
+            "--model",
+            "random_forest",
+            "--tenant",
+            "ibm-telco",
+            "--project",
+            "telco-churn-2018",
+            "--dry-run",
+        ],
+    ):
         args = _parse_args()
 
     assert args.dry_run is True
