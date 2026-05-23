@@ -19,7 +19,7 @@ Plataforma de machine learning end-to-end para previsão de churn de clientes em
 | Experiment tracking | MLflow (porta 5000) |
 | Ingestão | kagglehub + pandas + SQLAlchemy |
 | EDA | Jupyter + matplotlib + seaborn |
-| Treinamento | scikit-learn (baseline + Random Forest) |
+| Treinamento | scikit-learn (baseline + Random Forest + XGBoost) |
 | Avaliação | `ml/evaluate_production.py` + `scripts/optimize_threshold.py` |
 | API | FastAPI |
 
@@ -125,7 +125,8 @@ O agente deve respeitar as seguintes regras:
 | Isolamento de ciclos de avaliação (`eval_batch_id`) | ✅ Completo |
 | Avaliação em produção (`ml/evaluate_production.py`) | ✅ Completo |
 | Scripts operacionais (`scripts/`) | ✅ Completo |
-| Próximos experimentos (`ml/`) — XGBoost, MLP | 🔲 Pendente |
+| XGBoost (`ml/models/xgboost.py`) — champion em produção | ✅ Completo |
+| Próximos experimentos (`ml/`) — MLP PyTorch | 🔲 Pendente |
 
 ---
 

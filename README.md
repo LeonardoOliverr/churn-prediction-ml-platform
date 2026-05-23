@@ -107,7 +107,7 @@ Requerem JWT Bearer (`Authorization: Bearer <token>`). Gerado com `APP_SECRET_KE
 | Containerização | Docker + Docker Compose | Orquestração dos serviços |
 | Ingestão | kagglehub + pandas + SQLAlchemy | Download e carga do dataset no PostgreSQL |
 | EDA | Jupyter + matplotlib + seaborn + scikit-learn | Análise exploratória e relatório de negócio |
-| Modelagem | Scikit-learn | Baseline: DummyClassifier + Logistic Regression |
+| Modelagem | Scikit-learn + XGBoost | Baseline: DummyClassifier + Logistic Regression + Random Forest + XGBoost (champion) |
 | Modelagem (deep learning) | PyTorch | _(a implementar)_ |
 | API de inferência | FastAPI | Predição individual e em lote, multi-tenant |
 
@@ -494,7 +494,8 @@ churn-prediction-ml-platform/
 | Avaliação em produção — holdout split + outcomes + evaluation runs | ✅ Completo |
 | Análise de custo com matriz de confusão (`churn.evaluation_run_results`) | ✅ Completo |
 | Otimização de threshold (`scripts/optimize_threshold.py`) | ✅ Completo |
-| Próximos experimentos (`ml/`) — XGBoost, MLP | 🔲 Pendente |
+| XGBoost (`ml/models/xgboost.py`) — champion em produção | ✅ Completo |
+| Próximos experimentos (`ml/`) — MLP PyTorch | 🔲 Pendente |
 
 ---
 
