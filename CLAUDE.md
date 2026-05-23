@@ -56,10 +56,11 @@ cp .env.example .env
 churn.tenants
 churn.projects
 churn.customers              ← dataset IBM Telco (~7k registros, split train/holdout)
-churn.models
+churn.models                 ← statuses: candidate → approved → retired (ou rejected)
+churn.model_audit_log        ← audit trail append-only de transições de status e deployment
 churn.project_model_config
 churn.api_keys               ← autenticação de inferência
-churn.predictions
+churn.predictions            ← log de inferências (eval_batch_id para isolamento de ciclos)
 churn.outcomes               ← ground truth de churn real (cross com predictions)
 churn.evaluation_runs        ← runs de avaliação (período, custos configurados)
 churn.evaluation_run_results ← métricas por modelo por run (F1, ROC-AUC, FPR, segmentação)
@@ -112,7 +113,7 @@ O agente deve respeitar as seguintes regras:
 | Módulo | Status |
 |---|---|
 | Infraestrutura (Docker + PostgreSQL + MLflow) | ✅ Completo |
-| Schema multi-tenant (Sqitch — migrations 00–25) | ✅ Completo |
+| Schema multi-tenant (Sqitch — migrations 00–30) | ✅ Completo |
 | Pipeline de ingestão (`scripts/load_ibm_telco.py`) | ✅ Completo |
 | EDA (`notebooks/01_eda.ipynb`) | ✅ Completo |
 | Relatório de negócio (`notebooks/relatorio_negocio.md`) | ✅ Completo |
@@ -120,6 +121,8 @@ O agente deve respeitar as seguintes regras:
 | Random Forest (`ml/models/random_forest/`) | ✅ Completo |
 | Testes automatizados (`tests/`) — unit 85%, integração 43% (isolados) | ✅ Completo |
 | API de inferência (`src/`) | ✅ Completo |
+| Governança de modelos (approve/reject/retire + audit log) | ✅ Completo |
+| Isolamento de ciclos de avaliação (`eval_batch_id`) | ✅ Completo |
 | Avaliação em produção (`ml/evaluate_production.py`) | ✅ Completo |
 | Scripts operacionais (`scripts/`) | ✅ Completo |
 | Próximos experimentos (`ml/`) — XGBoost, MLP | 🔲 Pendente |
@@ -132,7 +135,7 @@ O agente deve respeitar as seguintes regras:
 |---|---|
 | `docker-compose.yml` | Orquestra PostgreSQL e MLflow |
 | `db/sqitch.conf` | Configuração do Sqitch (target: localhost:5434) |
-| `db/deploy/*.sql` | Migrations de schema (00–25) |
+| `db/deploy/*.sql` | Migrations de schema (00–30) |
 | `db/seed/001_default_tenant.sql` | Seed de tenant e projeto padrão |
 | `scripts/load_ibm_telco.py` | Carga do dataset IBM Telco |
 | `ml/evaluate_production.py` | Avalia predictions × outcomes, grava evaluation_run_results |

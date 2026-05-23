@@ -22,10 +22,14 @@ Plataforma de machine learning end-to-end para previsão de churn de clientes em
     ml/models/baseline/baseline.py  (roda via Docker trainer)
     ├── MLflow      → artefatos + métricas por run
     └── churn.models → catálogo técnico
-                        ├── melhor modelo  → status: approved
-                        └── demais modelos → status: trained
+                        └── todos os modelos → status: candidate
                 │
-                │
+                ▼
+[3.5] GOVERNANÇA
+    PATCH /admin/tenants/{tenant_id}/projects/{project_id}/models/{model_id}/approve
+    └── model.status: candidate → approved
+        (ou reject → rejected | retire → retired)
+        └── audit trail em churn.model_audit_log
                 │
                 ▼
 [4] CONFIGURAÇÃO DE PRODUÇÃO
@@ -58,6 +62,40 @@ Plataforma de machine learning end-to-end para previsão de churn de clientes em
 
 ---
 
+## Endpoints administrativos
+
+Requerem JWT Bearer (`Authorization: Bearer <token>`). Gerado com `APP_SECRET_KEY` (HS256).
+
+### Gerenciamento
+
+| Método | Path | Descrição |
+|---|---|---|
+| POST | `/admin/tenants` | Criar tenant |
+| POST | `/admin/projects` | Criar projeto |
+| POST | `/admin/keys` | Gerar API key |
+| DELETE | `/admin/keys/{key_id}` | Revogar API key |
+| GET | `/admin/tenants/{tenant_id}/keys` | Listar API keys do tenant |
+
+### Ciclo de vida de modelos
+
+| Método | Path | Descrição |
+|---|---|---|
+| PATCH | `/admin/tenants/{t}/projects/{p}/models/{m}/approve` | `candidate` → `approved` |
+| PATCH | `/admin/tenants/{t}/projects/{p}/models/{m}/reject` | `candidate` → `rejected` |
+| PATCH | `/admin/tenants/{t}/projects/{p}/models/{m}/retire` | `approved` → `retired` |
+
+### Deployment
+
+| Método | Path | Descrição |
+|---|---|---|
+| GET | `/admin/tenants/{t}/projects/{p}/models/config` | Listar champion/challenger ativos |
+| POST | `/admin/tenants/{t}/projects/{p}/models/{m}/champion` | Configurar champion |
+| POST | `/admin/tenants/{t}/projects/{p}/models/{m}/challenger` | Configurar challenger |
+| POST | `/admin/tenants/{t}/projects/{p}/models/{m}/promote` | Promover challenger a champion |
+| POST | `/admin/tenants/{t}/projects/{p}/models/{m}/deactivate` | Desligar modelo da produção |
+
+---
+
 ## Stack
 
 | Componente | Tecnologia | Função |
@@ -83,10 +121,11 @@ O schema `churn` segue uma hierarquia de isolamento multi-tenant:
 tenant        →  isolamento por empresa/cliente
   └── project →  isolamento por produto ou caso de uso
         ├── customers               replica fiel do schema IBM Telco (split train/holdout)
-        ├── models                  catálogo técnico de modelos treinados
+        ├── models                  catálogo técnico (statuses: candidate/approved/rejected/retired)
+        ├── model_audit_log         audit trail de aprovações, deployments e aposentadorias
         ├── project_model_config    configuração de produção ativa por project
         ├── api_keys                chaves de autenticação de inferência
-        ├── predictions             log de inferências da API
+        ├── predictions             log de inferências (eval_batch_id para isolamento de ciclos)
         ├── outcomes                ground truth de churn real (cross com predictions)
         ├── evaluation_runs         runs de avaliação (período, custos configurados)
         └── evaluation_run_results  métricas por modelo por run (F1, ROC-AUC, FPR, segmentação, promoção)
@@ -110,12 +149,12 @@ O schema `public` é reservado para as tabelas internas do MLflow.
 
 | Status | Significado |
 |---|---|
-| `trained` | Modelo recém-registrado após o treino |
-| `validated` | Modelo avaliado e testado manualmente |
-| `approved` | Elegível para servir em produção |
-| `archived` | Descontinuado — não deve ser selecionado |
+| `candidate` | Recém-registrado após o treino — aguarda revisão humana |
+| `approved` | Aprovado manualmente — elegível para champion/challenger |
+| `rejected` | Reprovado na revisão — não pode ir a produção |
+| `retired` | Descontinuado — encerrado por decisão operacional |
 
-O pipeline de treinamento (`ml/models/baseline/baseline.py`) atribui `approved` ao modelo de melhor F1 do run e `trained` aos demais. A promoção entre status (`trained → validated → approved`) é uma decisão operacional, feita manualmente ou via automação.
+O pipeline de treinamento registra todos os modelos como `candidate`. A aprovação é feita manualmente via `PATCH .../approve`. Cada transição é registrada em `churn.model_audit_log` com `changed_by` e timestamp.
 
 > `status='approved'` indica elegibilidade técnica. **Não significa que o modelo está em produção.** Produção é definida exclusivamente por `churn.project_model_config`.
 
@@ -424,7 +463,7 @@ churn-prediction-ml-platform/
     │   ├── 06_predictions.sql
     │   ├── 07_cost_analysis.sql
     │   ├── 08_models_unique_constraint.sql
-    │   ├── 09_models_status.sql    # status técnico: trained, validated, approved, archived
+    │   ├── 09_models_status.sql    # status técnico (renomeado em migration 29: candidate/approved/rejected/retired)
     │   ├── 10_api_keys.sql         # tabela de API keys para autenticação de inferência
     │   ├── 11_models_status_and_project_config_semantics.sql  # semântica de produção via project_model_config
     │   ├── 12_champion_challenger.sql # champion/challenger e traffic split
@@ -523,8 +562,8 @@ docker compose --profile tools run --rm trainer python ml/models/baseline/baseli
 
 Após o treino, o script registra cada modelo em `churn.models`:
 
-- O modelo com maior F1 do run recebe `status='approved'`
-- Os demais modelos do run recebem `status='trained'`
+- Todos os modelos do run recebem `status='candidate'`
+- A aprovação é feita manualmente via `PATCH .../approve`
 - Nenhum modelo é automaticamente colocado em produção
 
 **Para colocar um modelo em produção**, use os endpoints administrativos. A API de inferência carrega o artefato MLflow em `runs:/<mlflow_run_id>/model` a partir da configuração operacional.
