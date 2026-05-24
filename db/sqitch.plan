@@ -33,3 +33,4 @@
 28_model_audit_log [27_model_governance] 2026-05-17T02:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Audit trail append-only de transicoes de status de modelos
 29_rename_model_statuses [28_model_audit_log] 2026-05-17T03:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Renomeia statuses: trained->candidate, archived->retired; adiciona rejected
 30_update_audit_actions [29_rename_model_statuses] 2026-05-17T04:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Atualiza CHECK de actions no audit log: demoted e retired substituem deprecated
+31_predictions_shap [30_update_audit_actions] 2026-05-23T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona shap_values JSONB em predictions para armazenar explicações SHAP por feature
