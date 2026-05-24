@@ -1,0 +1,23 @@
+meta {
+  name: Criar projeto
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/admin/projects
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+body:json {
+  {
+    "tenant_id": "{{tenant_id}}",
+    "name": "Telco Churn 2018",
+    "slug": "telco-churn-2018"
+  }
+}

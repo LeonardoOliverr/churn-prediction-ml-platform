@@ -151,6 +151,9 @@ activemq-data/
 .env
 .envrc
 .venv
+
+# Bruno — ambiente local com UUIDs e variáveis secretas
+bruno/environments/local.bru
 env/
 venv/
 ENV/
@@ -216,3 +219,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Environment secrets
+.env.local
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.*
+!frontend/.env.example

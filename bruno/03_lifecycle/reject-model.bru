@@ -1,0 +1,21 @@
+meta {
+  name: Reprovar modelo
+  type: http
+  seq: 2
+}
+
+patch {
+  url: {{base_url}}/admin/tenants/{{tenant_id}}/projects/{{project_id}}/models/{{model_id}}/reject
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+body:json {
+  {
+    "reason": "F1 abaixo do threshold mínimo aceitável"
+  }
+}

@@ -1,0 +1,22 @@
+meta {
+  name: Desligar modelo da produção
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{base_url}}/admin/tenants/{{tenant_id}}/projects/{{project_id}}/models/{{model_id}}/deactivate
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+body:json {
+  {
+    "reason": "Substituído por novo champion",
+    "replacement_model_id": null
+  }
+}

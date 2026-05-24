@@ -1,0 +1,36 @@
+%syntax-version=1.0.0
+%project=churn_prediction
+%uri=https://github.com/user/churn-prediction-ml-platform
+
+00_schema 2026-04-28T22:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Cria o schema churn
+01_tenants 2026-04-28T22:07:57Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Tabela de tenants
+02_projects 2026-04-28T22:09:47Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Tabela de projects
+03_customers 2026-04-28T22:11:30Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Tabela de customers
+04_models 2026-04-28T22:12:53Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Tabela de models
+05_project_model_config 2026-04-28T22:15:08Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Config de modelo por project
+06_predictions 2026-04-28T22:16:49Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Log de inferencias
+07_cost_analysis 2026-04-28T22:18:43Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Analises de custo por project
+08_models_unique_constraint [04_models] 2026-04-30T03:16:13Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Corrige UNIQUE constraint em churn.models para suporte multi-tenant
+09_models_status [04_models] 2026-04-30T03:40:47Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona status (active/shadow/archived) em churn.models
+10_api_keys [01_tenants 02_projects] 2026-05-01T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Tabela de API keys para autenticação de inferência
+11_models_status_and_project_config_semantics [05_project_model_config 09_models_status] 2026-05-02T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Separa status tecnico de modelos da configuracao de producao por projeto
+12_champion_challenger [11_models_status_and_project_config_semantics] 2026-05-04T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona configuracao champion-challenger por projeto
+13_models_training_metadata [12_champion_challenger] 2026-05-06T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona metadados de hiperparametros e treino em churn.models
+14_holdout_evaluation [13_models_training_metadata] 2026-05-06T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona split em customers, tabela outcomes e metricas de avaliacao holdout em cost_analysis
+15_evaluation_runs [14_holdout_evaluation] 2026-05-07T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Modelo enterprise de avaliacao: evaluation_runs + evaluation_run_results com snapshot operacional
+16_deprecate_cost_analysis [15_evaluation_runs] 2026-05-07T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Depreca cost_analysis e cria view de compatibilidade cost_analysis_v2
+17_comments [16_deprecate_cost_analysis] 2026-05-07T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona COMMENT ON TABLE em todas as tabelas e preenche colunas ausentes em customers
+18_analytics_enhancements [17_comments] 2026-05-09T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona taxas derivadas, segmentacao de risco e recomendacao de promocao; cria view evaluation_comparison
+19_grafana_readonly [18_analytics_enhancements] 2026-05-10T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Cria role grafana_readonly e user grafana_user para acesso read-only ao Grafana
+20_challenger_cost_normalization [19_grafana_readonly] 2026-05-10T12:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona cost_per_prediction e traffic_split_pct; recria evaluation_comparison com delta normalizado
+21_cost_model_config [20_challenger_cost_normalization] 2026-05-11T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Tabela cost_model_config para custo real por cliente via cltv e monthly_charges
+22_model_performance_result_costs [21_cost_model_config] 2026-05-11T03:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # model_performance passa a usar fp_cost/fn_cost do resultado (custo medio real) em vez do run (valor CLI)
+23_api_keys_description [22_model_performance_result_costs] 2026-05-13T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona coluna description opcional em api_keys para identificacao humana da key
+24_simplify_model_scope [23_api_keys_description] 2026-05-14T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Remove scope de churn.models e torna tenant_id + project_id obrigatorios
+25_cost_model_config_project_required [24_simplify_model_scope] 2026-05-14T01:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Torna project_id obrigatorio em cost_model_config eliminando fallback de tenant
+26_predictions_batch_id [25_cost_model_config_project_required] 2026-05-17T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona eval_batch_id em predictions para isolamento de ciclos de avaliacao
+27_model_governance [26_predictions_batch_id] 2026-05-17T01:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Campos de governanca enterprise em churn.models (aprovacao, lifecycle, dataset snapshot, tags)
+28_model_audit_log [27_model_governance] 2026-05-17T02:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Audit trail append-only de transicoes de status de modelos
+29_rename_model_statuses [28_model_audit_log] 2026-05-17T03:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Renomeia statuses: trained->candidate, archived->retired; adiciona rejected
+30_update_audit_actions [29_rename_model_statuses] 2026-05-17T04:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Atualiza CHECK de actions no audit log: demoted e retired substituem deprecated
+31_predictions_shap [30_update_audit_actions] 2026-05-23T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona shap_values JSONB em predictions para armazenar explicações SHAP por feature

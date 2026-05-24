@@ -1,0 +1,15 @@
+meta {
+  name: Listar API keys do tenant
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{base_url}}/admin/tenants/{{tenant_id}}/keys
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}

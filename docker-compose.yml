@@ -1,0 +1,113 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mlflow:
+    build:
+      context: .
+      dockerfile: docker/mlflow.Dockerfile
+    command: >
+      mlflow server
+        --backend-store-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+        --serve-artifacts
+        --artifacts-destination /mlflow/artifacts
+        --default-artifact-root mlflow-artifacts:/
+        --host 0.0.0.0
+        --port 5000
+        --allowed-hosts localhost,localhost:5000,127.0.0.1,127.0.0.1:5000,mlflow,mlflow:5000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_artifacts:/mlflow/artifacts
+    environment:
+      MLFLOW_TRACKING_URI: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+
+  trainer:
+    profiles:
+      - tools
+    build:
+      context: .
+      dockerfile: docker/trainer.Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      GIT_PYTHON_REFRESH: quiet
+    volumes:
+      - ./ml:/app/ml:ro
+      - mlflow_artifacts:/mlflow/artifacts
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      APP_SECRET_KEY: ${APP_SECRET_KEY}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-30}
+      API_KEY_CACHE_TTL_SECONDS: ${API_KEY_CACHE_TTL_SECONDS:-60}
+      MODEL_CACHE_TTL_SECONDS: ${MODEL_CACHE_TTL_SECONDS:-300}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+      MAX_BATCH_SIZE: ${MAX_BATCH_SIZE:-100}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SHAP_ENABLED: ${SHAP_ENABLED:-false}
+      SHAP_TOP_N: ${SHAP_TOP_N:-5}
+    volumes:
+      - mlflow_artifacts:/mlflow/artifacts
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      POSTGRES_DB: ${POSTGRES_DB}
+      GRAFANA_DB_USER: ${GRAFANA_DB_USER:-grafana_user}
+      GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD:-grafana_pass}
+    volumes:
+      - grafana_storage:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  mlflow_artifacts:
+  grafana_storage:

@@ -1,0 +1,52 @@
+# Git / agent metadata
+.git
+.github
+.claude
+AGENTS.md
+CLAUDE.md
+
+# Python environments
+.venv
+venv
+env
+ENV
+__pycache__
+*.py[cod]
+*$py.class
+
+# Test and coverage artifacts
+.pytest_cache
+.coverage
+.coverage.*
+htmlcov
+.mypy_cache
+.ruff_cache
+.hypothesis
+
+# Local environment/secrets
+.env
+.env.*
+!.env.example
+
+# Local data and generated artifacts
+data
+charts
+models
+mlruns
+mlartifacts
+
+# Notebook runtime artifacts
+.ipynb_checkpoints
+notebooks/.ipynb_checkpoints
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.idea
+.vscode
+tempCodeRunnerFile.py
+
+# Build outputs
+build
+dist
+*.egg-info

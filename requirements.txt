@@ -1,0 +1,15 @@
+# Ambiente local completo — inclui todas as dependências.
+# As imagens Docker usam arquivos menores e específicos:
+# - requirements-api.txt     → runtime da API FastAPI
+# - requirements-ml.txt      → treinamento de modelos
+# - requirements-pipeline.txt → ingestão do dataset
+# - requirements-notebooks.txt → EDA e análise exploratória
+# - requirements-dev.txt     → testes e ferramentas de desenvolvimento
+
+-r requirements-api.txt
+-r requirements-ml.txt
+-r requirements-pipeline.txt
+-r requirements-notebooks.txt
+-r requirements-dev.txt
+
+setuptools>=70.0.0

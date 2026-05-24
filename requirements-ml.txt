@@ -1,0 +1,17 @@
+# Treinamento e ferramentas de modelos
+pandas==2.2.2
+numpy>=1.26.0
+scikit-learn==1.5.0
+joblib>=1.4.0
+mlflow==3.11.1
+xgboost>=2.0.0
+shap>=0.45.0
+
+# Banco de dados
+psycopg2-binary==2.9.12
+sqlalchemy==2.0.30
+
+# Utilitários visuais e ambiente
+matplotlib==3.9.0
+python-dotenv==1.0.1
+structlog>=24.0.0
