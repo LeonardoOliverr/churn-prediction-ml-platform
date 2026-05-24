@@ -20,6 +20,7 @@ Plataforma de machine learning end-to-end para previsão de churn de clientes em
 | Ingestão | kagglehub + pandas + SQLAlchemy |
 | EDA | Jupyter + matplotlib + seaborn |
 | Treinamento | scikit-learn (baseline + Random Forest + XGBoost) |
+| Explicabilidade | shap>=0.45 — XGBoost nativo (`pred_contribs`) + TreeExplainer (RF) + LinearExplainer (LR) |
 | Avaliação | `ml/evaluate_production.py` + `scripts/optimize_threshold.py` |
 | API | FastAPI |
 
@@ -60,7 +61,7 @@ churn.models                 ← statuses: candidate → approved → retired (o
 churn.model_audit_log        ← audit trail append-only de transições de status e deployment
 churn.project_model_config
 churn.api_keys               ← autenticação de inferência
-churn.predictions            ← log de inferências (eval_batch_id para isolamento de ciclos)
+churn.predictions            ← log de inferências (eval_batch_id + shap_values JSONB)
 churn.outcomes               ← ground truth de churn real
 churn.evaluation_runs        ← runs de avaliação (período, custos)
 churn.evaluation_run_results ← métricas por modelo por run
@@ -114,7 +115,7 @@ O agente deve respeitar as seguintes regras:
 | Módulo | Status |
 |---|---|
 | Infraestrutura (Docker + PostgreSQL + MLflow) | ✅ Completo |
-| Schema multi-tenant (Sqitch — migrations 00–30) | ✅ Completo |
+| Schema multi-tenant (Sqitch — migrations 00–31) | ✅ Completo |
 | Pipeline de ingestão (`scripts/load_ibm_telco.py`) | ✅ Completo |
 | EDA (`notebooks/01_eda.ipynb`) | ✅ Completo |
 | Relatório de negócio (`notebooks/relatorio_negocio.md`) | ✅ Completo |
@@ -127,6 +128,7 @@ O agente deve respeitar as seguintes regras:
 | Avaliação em produção (`ml/evaluate_production.py`) | ✅ Completo |
 | Scripts operacionais (`scripts/`) | ✅ Completo |
 | XGBoost (`ml/models/xgboost.py`) — champion em produção | ✅ Completo |
+| Explicabilidade SHAP (`ml/explainability/`) — online via `SHAP_ENABLED` + batch com `--shap` | ✅ Completo |
 | Próximos experimentos (`ml/`) — MLP PyTorch | 🔲 Pendente |
 
 ---
@@ -138,7 +140,8 @@ O agente deve respeitar as seguintes regras:
 | `docker-compose.yml` | Orquestra PostgreSQL, MLflow, API e Grafana |
 | `Makefile` | Atalhos para lint, test, run, build, logs |
 | `db/sqitch.conf` | Configuração do Sqitch (target: localhost:5434) |
-| `db/deploy/*.sql` | Migrations de schema (00–30) |
+| `db/deploy/*.sql` | Migrations de schema (00–31) |
+| `ml/explainability/shap_explainer.py` | Cálculo SHAP: nativo XGBoost + TreeExplainer RF + LinearExplainer LR |
 | `db/seed/001_default_tenant.sql` | Seed de tenant e projeto padrão |
 | `scripts/load_ibm_telco.py` | Carga do dataset IBM Telco |
 | `ml/evaluate_production.py` | Avalia predictions × outcomes, grava evaluation_run_results |
