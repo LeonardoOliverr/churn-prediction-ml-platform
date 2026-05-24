@@ -44,7 +44,8 @@ Plataforma de machine learning end-to-end para previsão de churn de clientes em
     ├── resolve modelo com split determinístico por customer_id:
     │     champion/challenger do projeto (404 explícito se não configurado)
     ├── carrega artefato do MLflow
-    └── churn.predictions   → log de cada predição
+    ├── churn.predictions   → log de cada predição
+    └── explanation         → top-N contribuições SHAP por feature (quando SHAP_ENABLED=true)
                 │
                 ▼
 [6] AVALIAÇÃO
@@ -108,6 +109,7 @@ Requerem JWT Bearer (`Authorization: Bearer <token>`). Gerado com `APP_SECRET_KE
 | Ingestão | kagglehub + pandas + SQLAlchemy | Download e carga do dataset no PostgreSQL |
 | EDA | Jupyter + matplotlib + seaborn + scikit-learn | Análise exploratória e relatório de negócio |
 | Modelagem | Scikit-learn + XGBoost | Baseline: DummyClassifier + Logistic Regression + Random Forest + XGBoost (champion) |
+| Explicabilidade | shap>=0.45 | XGBoost nativo (`pred_contribs`) + TreeExplainer (RF) + LinearExplainer (LR) |
 | Modelagem (deep learning) | PyTorch | _(a implementar)_ |
 | API de inferência | FastAPI | Predição individual e em lote, multi-tenant |
 
@@ -125,7 +127,7 @@ tenant        →  isolamento por empresa/cliente
         ├── model_audit_log         audit trail de aprovações, deployments e aposentadorias
         ├── project_model_config    configuração de produção ativa por project
         ├── api_keys                chaves de autenticação de inferência
-        ├── predictions             log de inferências (eval_batch_id para isolamento de ciclos)
+        ├── predictions             log de inferências (eval_batch_id + shap_values JSONB)
         ├── outcomes                ground truth de churn real (cross com predictions)
         ├── evaluation_runs         runs de avaliação (período, custos configurados)
         └── evaluation_run_results  métricas por modelo por run (F1, ROC-AUC, FPR, segmentação, promoção)
@@ -292,6 +294,8 @@ cp .env.example .env
 | `JWT_EXPIRE_MINUTES` | Tempo de expiração do JWT em minutos | `30` |
 | `MLFLOW_TRACKING_URI` | URI do servidor MLflow | `http://localhost:5000` |
 | `DATABASE_URL` | Connection string da API (psycopg2) | — |
+| `SHAP_ENABLED` | Ativa cálculo SHAP inline em `/predict` e `/predict/batch` | `false` |
+| `SHAP_TOP_N` | Número de features SHAP retornadas por predição | `5` |
 
 #### Gerando o APP_SECRET_KEY
 
@@ -434,7 +438,10 @@ churn-prediction-ml-platform/
 │   │   └── preprocessing.py        # load_data() com filtro por split + build_preprocessor()
 │   ├── models/
 │   │   ├── baseline/               # DummyClassifier + Logistic Regression
-│   │   └── random_forest/          # RandomForestClassifier
+│   │   ├── random_forest/          # RandomForestClassifier
+│   │   └── xgboost.py              # XGBClassifier (champion em produção)
+│   ├── explainability/
+│   │   └── shap_explainer.py       # SHAP: XGBoost nativo + TreeExplainer RF + LinearExplainer LR
 │   └── evaluate_production.py      # avaliação predictions × outcomes → evaluation_run_results
 ├── models/                         # artefatos de modelos exportados — a implementar
 ├── notebooks/
@@ -495,6 +502,7 @@ churn-prediction-ml-platform/
 | Análise de custo com matriz de confusão (`churn.evaluation_run_results`) | ✅ Completo |
 | Otimização de threshold (`scripts/optimize_threshold.py`) | ✅ Completo |
 | XGBoost (`ml/models/xgboost.py`) — champion em produção | ✅ Completo |
+| Explicabilidade SHAP (`ml/explainability/`) — online via `SHAP_ENABLED` + batch com `--shap` | ✅ Completo |
 | Próximos experimentos (`ml/`) — MLP PyTorch | 🔲 Pendente |
 
 ---
@@ -775,12 +783,21 @@ Resposta esperada:
   "churn_probability": 0.8341,
   "risk_level": "high",
   "churn_pred": true,
-  "threshold_used": 0.5,
+  "threshold_used": 0.6,
   "model_version": "1",
-  "model_name": "LogisticRegression",
-  "model_id": "..."
+  "model_name": "XGBClassifier",
+  "model_id": "...",
+  "explanation": {
+    "contract_Month-to-month": 0.312441,
+    "monthly_charges": 0.181203,
+    "tenure_months": -0.143870,
+    "internet_service_Fiber optic": 0.091042,
+    "online_security_No": 0.074318
+  }
 }
 ```
+
+> `explanation` retorna os top-N fatores SHAP quando `SHAP_ENABLED=true` no `.env`. `null` caso contrário. Valores positivos aumentam a probabilidade de churn; negativos reduzem.
 
 #### Python
 

@@ -20,6 +20,7 @@ Pré-requisitos:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 import time
@@ -28,9 +29,11 @@ import uuid as uuid_lib
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import httpx
+import pandas as pd
 from sqlalchemy import text
 
 from core.logger import get_logger
+from domain.exceptions import ModelNotFoundError
 from ml.data.preprocessing import _build_engine, _resolve_project_id, _resolve_tenant_id
 
 logger = get_logger()
@@ -102,6 +105,77 @@ _QUERY_HOLDOUT_ALL = text("""
 """)
 
 
+_QUERY_CHAMPION_RUN_ID = text("""
+    SELECT m.mlflow_run_id
+    FROM churn.project_model_config pmc
+    JOIN churn.models m ON m.id = pmc.model_id
+    WHERE pmc.tenant_id  = :tenant_id
+      AND pmc.project_id = :project_id
+      AND pmc.environment = 'production'
+      AND pmc.is_active   = TRUE
+      AND pmc.role        = 'champion'
+      AND m.status        = 'approved'
+    ORDER BY pmc.configured_at DESC
+    LIMIT 1
+""")
+
+_UPDATE_SHAP = text("""
+    UPDATE churn.predictions
+       SET shap_values = :shap_values
+     WHERE id = :id
+""")
+
+
+def _load_champion_pipeline(engine, tenant_id: str, project_id: str):
+    """Carrega o pipeline sklearn do champion via MLflow para cálculo SHAP local."""
+    import mlflow.sklearn
+
+    with engine.connect() as conn:
+        run_id = conn.execute(
+            _QUERY_CHAMPION_RUN_ID,
+            {"tenant_id": tenant_id, "project_id": project_id},
+        ).scalar_one_or_none()
+
+    if run_id is None:
+        raise ModelNotFoundError(
+            f"Nenhum champion ativo encontrado para project_id={project_id}. "
+            "Configure um modelo champion antes de calcular SHAP."
+        )
+
+    mlflow_uri = f"runs:/{run_id}/model"
+    logger.info("loading_champion_for_shap", mlflow_uri=mlflow_uri)
+    return mlflow.sklearn.load_model(mlflow_uri)
+
+
+def _compute_shap_batch(
+    pipeline,
+    rows: list,
+    top_n: int = 5,
+) -> list[dict]:
+    """Calcula valores SHAP para cada linha e retorna lista de dicts {feature: shap_value}."""
+    from ml.core.registry.mlflow import _get_feature_names
+    from ml.explainability.shap_explainer import compute_shap_values
+
+    df = pd.DataFrame([_row_to_payload(r) for r in rows]).drop(columns=["customer_id"])
+    preprocessor = pipeline.named_steps["preprocessor"]
+    X_transformed = preprocessor.transform(df)
+    if hasattr(X_transformed, "toarray"):
+        X_transformed = X_transformed.toarray()
+
+    feature_names = _get_feature_names(pipeline)
+    return compute_shap_values(pipeline, X_transformed, feature_names, top_n=top_n)
+
+
+def _update_shap_in_db(engine, prediction_shap_pairs: list[tuple[str, dict]]) -> None:
+    """Atualiza shap_values em churn.predictions para cada (prediction_id, shap_dict)."""
+    with engine.begin() as conn:
+        for prediction_id, shap_dict in prediction_shap_pairs:
+            conn.execute(
+                _UPDATE_SHAP,
+                {"id": prediction_id, "shap_values": json.dumps(shap_dict)},
+            )
+
+
 def _row_to_payload(row) -> dict:
     """Converte linha do banco em dict compatível com CustomerFeatures."""
     return {
@@ -158,6 +232,8 @@ def predict_holdout_batch(
     dry_run: bool = False,
     force: bool = False,
     batch_id: str | None = None,
+    shap: bool = False,
+    shap_top_n: int = 5,
 ) -> int:
     """Prediz clientes holdout, registrando novas predições no banco.
 
@@ -168,10 +244,13 @@ def predict_holdout_batch(
     o mesmo eval_batch_id, permitindo isolamento posterior em seed/optimize/evaluate.
     Se não fornecido, um UUID é gerado automaticamente.
 
+    Com shap=True, carrega o pipeline champion localmente e calcula valores SHAP após
+    o envio dos batches, fazendo UPDATE em churn.predictions.
+
     Retorna o número total de predições enviadas.
     """
     eval_batch_id = batch_id or str(uuid_lib.uuid4())
-    logger.info("eval_batch_started", batch_id=eval_batch_id)
+    logger.info("eval_batch_started", batch_id=eval_batch_id, shap_enabled=shap)
 
     engine = _build_engine()
     query = _QUERY_HOLDOUT_ALL if force else _QUERY_HOLDOUT_WITHOUT_PREDICTIONS
@@ -216,6 +295,7 @@ def predict_holdout_batch(
     batches = [rows[i : i + batch_size] for i in range(0, len(rows), batch_size)]
     total_sent = 0
     total_batches = len(batches)
+    all_results: list[dict] = []
 
     with httpx.Client() as client:
         for batch_num, batch in enumerate(batches, start=1):
@@ -226,6 +306,7 @@ def predict_holdout_batch(
                 results = _post_batch(client, api_url, api_key, payloads, eval_batch_id)
                 latency_ms = round((time.perf_counter() - t0) * 1000)
                 total_sent += len(results)
+                all_results.extend(results)
                 logger.info(
                     "batch_sent",
                     batch=batch_num,
@@ -249,7 +330,38 @@ def predict_holdout_batch(
         total_candidates=total_candidates,
         batch_id=eval_batch_id,
     )
+
+    if shap and all_results:
+        _run_shap_update(engine, tenant_id, project_id, rows, all_results, shap_top_n)
+
     return total_sent
+
+
+def _run_shap_update(engine, tenant_id, project_id, rows, api_results, top_n: int) -> None:
+    """Calcula SHAP localmente e faz UPDATE em churn.predictions."""
+    logger.info("shap_update_started", total=len(rows))
+
+    pipeline = _load_champion_pipeline(engine, tenant_id, project_id)
+
+    # mapeia customer_id → prediction_id a partir das respostas da API
+    customer_to_prediction: dict[str, str] = {
+        r["customer_id"]: r["prediction_id"] for r in api_results
+    }
+
+    # filtra apenas linhas que têm prediction_id (ignora possíveis falhas pontuais)
+    valid_rows = [r for r in rows if r.customer_id in customer_to_prediction]
+    if not valid_rows:
+        logger.warning("shap_update_skipped", reason="no_valid_predictions")
+        return
+
+    shap_dicts = _compute_shap_batch(pipeline, valid_rows, top_n=top_n)
+    pairs = [
+        (customer_to_prediction[row.customer_id], shap_dict)
+        for row, shap_dict in zip(valid_rows, shap_dicts, strict=False)
+    ]
+
+    _update_shap_in_db(engine, pairs)
+    logger.info("shap_update_complete", updated=len(pairs))
 
 
 def _parse_args() -> argparse.Namespace:
@@ -279,6 +391,18 @@ def _parse_args() -> argparse.Namespace:
         "Gerado automaticamente se omitido. "
         "Use o valor impresso para filtrar seed/optimize/evaluate.",
     )
+    parser.add_argument(
+        "--shap",
+        action="store_true",
+        help="Calcula valores SHAP após o envio dos batches e grava em churn.predictions. "
+        "Requer o pacote shap instalado e o champion disponível no MLflow.",
+    )
+    parser.add_argument(
+        "--shap-top-n",
+        type=int,
+        default=5,
+        help="Número de features SHAP a armazenar por predição (padrão: 5).",
+    )
     return parser.parse_args()
 
 
@@ -304,6 +428,8 @@ def main() -> None:
         dry_run=args.dry_run,
         force=args.force,
         batch_id=args.batch_id,
+        shap=args.shap,
+        shap_top_n=args.shap_top_n,
     )
 
 

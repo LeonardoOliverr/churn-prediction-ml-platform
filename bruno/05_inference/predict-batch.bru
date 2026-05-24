@@ -64,3 +64,38 @@ body:json {
     ]
   }
 }
+
+tests {
+  test("status 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("results retorna array com total correto", function() {
+    expect(res.body).to.have.property("results");
+    expect(res.body).to.have.property("total");
+    expect(res.body.results.length).to.equal(res.body.total);
+  });
+
+  test("cada resultado tem campos obrigatórios", function() {
+    res.body.results.forEach(function(item) {
+      expect(item).to.have.property("prediction_id");
+      expect(item).to.have.property("customer_id");
+      expect(item).to.have.property("churn_probability");
+      expect(item).to.have.property("risk_level");
+      expect(item).to.have.property("explanation");
+    });
+  });
+
+  test("explanation: dict com features quando SHAP ativo, null caso contrário", function() {
+    res.body.results.forEach(function(item) {
+      var explanation = item.explanation;
+      if (explanation !== null) {
+        expect(typeof explanation).to.equal("object");
+        expect(Object.keys(explanation).length).to.be.greaterThan(0);
+        Object.values(explanation).forEach(function(val) {
+          expect(typeof val).to.equal("number");
+        });
+      }
+    });
+  });
+}

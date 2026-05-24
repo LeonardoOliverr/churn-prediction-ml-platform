@@ -46,12 +46,37 @@ def _build_dataframe(customers: list[CustomerFeatures]) -> pd.DataFrame:
     return pd.DataFrame(rows)[_FEATURE_COLS]
 
 
+def _compute_shap(pipeline, X: pd.DataFrame, settings) -> list[dict] | None:
+    """Computa SHAP para todas as linhas de X. Retorna None se desabilitado ou erro.
+
+    XGBoost usa pred_contribs nativo (sem importar shap).
+    RF e LR usam shap.TreeExplainer / LinearExplainer.
+    """
+    if not settings.shap_enabled:
+        return None
+    try:
+        from ml.core.registry.mlflow import _get_feature_names
+        from ml.explainability.shap_explainer import compute_shap_values
+
+        preprocessor = pipeline.named_steps["preprocessor"]
+        X_t = preprocessor.transform(X)
+        if hasattr(X_t, "toarray"):
+            X_t = X_t.toarray()
+
+        feature_names = _get_feature_names(pipeline)
+        return compute_shap_values(pipeline, X_t, feature_names, top_n=settings.shap_top_n)
+    except Exception as exc:
+        logger.warning("shap_computation_failed", error=str(exc))
+        return None
+
+
 def _make_response(
     customer: CustomerFeatures,
     prob: float,
     threshold: float,
     model_record: dict,
     prediction_id: str,
+    explanation: dict | None = None,
 ) -> PredictResponse:
     """Monta PredictResponse a partir da probabilidade bruta do modelo."""
     return PredictResponse(
@@ -64,6 +89,7 @@ def _make_response(
         model_version=str(model_record["version"]),
         model_name=str(model_record["name"]),
         model_id=str(model_record["id"]),
+        explanation=explanation,
     )
 
 
@@ -159,6 +185,10 @@ def predict(
 
     X = _build_dataframe([customer])
     prob = float(pipeline.predict_proba(X)[0, 1])
+
+    shap_dicts = _compute_shap(pipeline, X, settings)
+    explanation = shap_dicts[0] if shap_dicts else None
+
     latency_ms = round((time.perf_counter() - start_ms) * 1000)
     prediction_id = str(uuid.uuid4())
 
@@ -175,9 +205,10 @@ def predict(
         threshold_used=threshold,
         latency_ms=latency_ms,
         eval_batch_id=x_eval_batch_id,
+        shap_values=explanation,
     )
 
-    return _make_response(customer, prob, threshold, model_record, prediction_id)
+    return _make_response(customer, prob, threshold, model_record, prediction_id, explanation)
 
 
 @router.post(
@@ -287,11 +318,16 @@ def predict_batch(
         threshold = group["threshold"]
         model_record = group["model_record"]
 
-        for (index, customer), prob in zip(group["items"], probs, strict=False):
+        shap_dicts = _compute_shap(group["pipeline"], X, settings)
+
+        for i, ((index, customer), prob) in enumerate(zip(group["items"], probs, strict=False)):
             prob = float(prob)
+            explanation = shap_dicts[i] if shap_dicts else None
             latency_ms = round((time.perf_counter() - start_ms) * 1000)
             prediction_id = str(uuid.uuid4())
-            results[index] = _make_response(customer, prob, threshold, model_record, prediction_id)
+            results[index] = _make_response(
+                customer, prob, threshold, model_record, prediction_id, explanation
+            )
             background_tasks.add_task(
                 log_prediction_bg,
                 engine=engine,
@@ -305,6 +341,7 @@ def predict_batch(
                 threshold_used=threshold,
                 latency_ms=latency_ms,
                 eval_batch_id=x_eval_batch_id,
+                shap_values=explanation,
             )
 
     latency_ms = round((time.perf_counter() - start_ms) * 1000)

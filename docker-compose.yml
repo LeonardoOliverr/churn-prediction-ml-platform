@@ -83,6 +83,8 @@ services:
       BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
       MAX_BATCH_SIZE: ${MAX_BATCH_SIZE:-100}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SHAP_ENABLED: ${SHAP_ENABLED:-false}
+      SHAP_TOP_N: ${SHAP_TOP_N:-5}
     volumes:
       - mlflow_artifacts:/mlflow/artifacts
 
