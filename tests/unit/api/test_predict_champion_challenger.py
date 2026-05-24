@@ -45,7 +45,7 @@ def test_predict_batch_preserves_order_with_different_models(fake_customers_df):
         scopes=["predict"],
         key_prefix="prefix",
     )
-    settings = SimpleNamespace(max_batch_size=100)
+    settings = SimpleNamespace(max_batch_size=100, shap_enabled=False)
 
     champion_loaded = (
         _Pipeline(0.1),

@@ -14,10 +14,10 @@ logger = structlog.get_logger()
 _INSERT_SQL = text("""
     INSERT INTO churn.predictions
         (id, tenant_id, project_id, customer_id, model_id,
-         churn_prob, churn_pred, threshold_used, latency_ms, eval_batch_id)
+         churn_prob, churn_pred, threshold_used, latency_ms, eval_batch_id, shap_values)
     VALUES
         (:id, :tenant_id, :project_id, :customer_id, :model_id,
-         :churn_prob, :churn_pred, :threshold_used, :latency_ms, :eval_batch_id)
+         :churn_prob, :churn_pred, :threshold_used, :latency_ms, :eval_batch_id, :shap_values)
 """)
 
 
@@ -33,8 +33,11 @@ def log_prediction_bg(
     threshold_used: float,
     latency_ms: int,
     eval_batch_id: str | None = None,
+    shap_values: dict | None = None,
 ) -> None:
     """Insere registro de predição em churn.predictions com conexão própria."""
+    import json
+
     try:
         with engine.begin() as conn:
             conn.execute(
@@ -50,6 +53,7 @@ def log_prediction_bg(
                     "threshold_used": round(threshold_used, 3),
                     "latency_ms": latency_ms,
                     "eval_batch_id": eval_batch_id,
+                    "shap_values": json.dumps(shap_values) if shap_values is not None else None,
                 },
             )
     except Exception as exc:

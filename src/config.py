@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     # Inferência
     max_batch_size: int = 100
 
+    # Explicabilidade SHAP
+    shap_enabled: bool = False
+    shap_top_n: int = 5
+
     # Logging
     log_level: str = "INFO"
 

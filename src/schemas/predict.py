@@ -86,10 +86,17 @@ class PredictResponse(BaseModel):
                 "churn_probability": 0.8341,
                 "risk_level": "high",
                 "churn_pred": True,
-                "threshold_used": 0.5,
-                "model_version": "1",
-                "model_name": "LogisticRegression",
+                "threshold_used": 0.6,
+                "model_version": "2",
+                "model_name": "XGBClassifier",
                 "model_id": "9b2e1f3a-4c8d-4e1b-b5a7-1f2e3d4c5b6a",
+                "explanation": {
+                    "contract_Month-to-month": 0.312441,
+                    "monthly_charges": 0.181203,
+                    "tenure_months": -0.143870,
+                    "internet_service_Fiber optic": 0.091042,
+                    "online_security_No": 0.074318,
+                },
             }
         }
     )
@@ -114,6 +121,15 @@ class PredictResponse(BaseModel):
         ..., description="Nome do algoritmo registrado (ex.: `LogisticRegression`)."
     )
     model_id: str = Field(..., description="UUID do modelo em `churn.models`.")
+    explanation: dict | None = Field(
+        None,
+        description=(
+            "Top-N contribuições SHAP por feature, ordenadas por valor absoluto decrescente. "
+            "`null` quando `SHAP_ENABLED=false` (padrão) ou se ocorrer erro no cálculo. "
+            "Valores positivos aumentam a probabilidade de churn; negativos reduzem. "
+            "XGBoost usa cálculo nativo (`pred_contribs`); RF usa `shap.TreeExplainer`."
+        ),
+    )
 
 
 class BatchPredictRequest(BaseModel):
