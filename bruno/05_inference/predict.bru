@@ -38,3 +38,37 @@ body:json {
     "payment_method": "Electronic check"
   }
 }
+
+tests {
+  test("status 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("campos obrigatórios presentes", function() {
+    expect(res.body).to.have.property("prediction_id");
+    expect(res.body).to.have.property("churn_probability");
+    expect(res.body).to.have.property("risk_level");
+    expect(res.body).to.have.property("churn_pred");
+    expect(res.body).to.have.property("threshold_used");
+    expect(res.body).to.have.property("explanation");
+  });
+
+  test("churn_probability entre 0 e 1", function() {
+    expect(res.body.churn_probability).to.be.within(0, 1);
+  });
+
+  test("risk_level válido", function() {
+    expect(["low", "medium", "high"]).to.include(res.body.risk_level);
+  });
+
+  test("explanation: dict com features quando SHAP ativo, null caso contrário", function() {
+    var explanation = res.body.explanation;
+    if (explanation !== null) {
+      expect(typeof explanation).to.equal("object");
+      expect(Object.keys(explanation).length).to.be.greaterThan(0);
+      Object.values(explanation).forEach(function(val) {
+        expect(typeof val).to.equal("number");
+      });
+    }
+  });
+}
