@@ -5,7 +5,6 @@ Pré-requisito: sqitch deploy + psql -f db/seed/001_default_tenant.sql
 
 import os
 
-import kagglehub
 import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import text
@@ -80,6 +79,8 @@ def assign_split(customer_id: str, holdout_ratio: float = 0.3) -> str:
 
 
 def fetch_dataset() -> pd.DataFrame:
+    import kagglehub
+
     logger.info("baixando dataset", source="kagglehub")
     path = kagglehub.dataset_download("yeanzc/telco-customer-churn-ibm-dataset")
     xlsx = os.path.join(path, "Telco_customer_churn.xlsx")

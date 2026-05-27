@@ -18,10 +18,10 @@ body:json {
   {
     "customers": [
       {
-        "customer_id": "CUST-8301",
-        "tenure_months": 2,
-        "monthly_charges": 94.5,
-        "total_charges": 189.0,
+        "customer_id": "CUST-HIGHRISK-001",
+        "tenure_months": 1,
+        "monthly_charges": 99.9,
+        "total_charges": 99.9,
         "senior_citizen": 0,
         "partner": 0,
         "dependents": 0,
@@ -40,10 +40,10 @@ body:json {
         "payment_method": "Electronic check"
       },
       {
-        "customer_id": "CUST-1042",
-        "tenure_months": 48,
-        "monthly_charges": 55.0,
-        "total_charges": 2640.0,
+        "customer_id": "CUST-LOWRISK-002",
+        "tenure_months": 72,
+        "monthly_charges": 45.0,
+        "total_charges": 3240.0,
         "senior_citizen": 0,
         "partner": 1,
         "dependents": 1,
@@ -63,19 +63,20 @@ body:json {
       }
     ]
   }
+  
 }
 
 tests {
   test("status 200", function() {
     expect(res.status).to.equal(200);
   });
-
+  
   test("results retorna array com total correto", function() {
     expect(res.body).to.have.property("results");
     expect(res.body).to.have.property("total");
     expect(res.body.results.length).to.equal(res.body.total);
   });
-
+  
   test("cada resultado tem campos obrigatórios", function() {
     res.body.results.forEach(function(item) {
       expect(item).to.have.property("prediction_id");
@@ -85,7 +86,7 @@ tests {
       expect(item).to.have.property("explanation");
     });
   });
-
+  
   test("explanation: dict com features quando SHAP ativo, null caso contrário", function() {
     res.body.results.forEach(function(item) {
       var explanation = item.explanation;
