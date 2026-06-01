@@ -178,6 +178,65 @@ class BatchPredictResponse(BaseModel):
     total: int = Field(..., description="Número total de predições retornadas.")
 
 
+class ExplainResponse(BaseModel):
+    """Resposta do endpoint GET /predictions/{id}/explain."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "prediction_id": "a603f383-0b40-4d4f-b56e-b32e81cb9222",
+                "customer_id": "9912-OMZDS",
+                "explanation_text": (
+                    "Este cliente apresenta um risco de churn moderado devido ao aumento nas "
+                    "cobranças mensais, o que pode causar insatisfação. Embora tenha um baixo "
+                    "risco geral de churn, é importante monitorar sua experiência para evitar "
+                    "possíveis cancelamentos futuros."
+                ),
+                "recommended_actions": (
+                    "Oferecer uma revisão do plano atual para reduzir as cobranças mensais ou "
+                    "adicionar benefícios adicionais, como promoções ou serviços complementares, "
+                    "que podem aumentar o valor percebido pelo cliente."
+                ),
+                "shap_values": {
+                    "dependents": -2.502341,
+                    "tenure_months": -0.726063,
+                    "total_charges": -0.406266,
+                    "monthly_charges": 0.628236,
+                    "contract_Month-to-month": -0.893509,
+                },
+                "cached": True,
+            }
+        }
+    )
+
+    prediction_id: str = Field(..., description="UUID da predição.")
+    customer_id: str = Field(..., description="Identificador do cliente.")
+    explanation_text: str | None = Field(
+        None,
+        description=(
+            "Explicação em linguagem natural gerada por LLM. "
+            "`null` se SHAP não foi calculado, se o LLM está desabilitado ou se a API falhou."
+        ),
+    )
+    recommended_actions: str | None = Field(
+        None,
+        description=(
+            "Ações de retenção recomendadas pelo LLM com base nos fatores de risco. "
+            "`null` nas mesmas condições que `explanation_text`."
+        ),
+    )
+    shap_values: dict | None = Field(
+        None, description="Valores SHAP da predição. `null` se SHAP não foi calculado."
+    )
+    cached: bool = Field(
+        ...,
+        description=(
+            "`true` se a explicação já estava gravada no banco. "
+            "`false` se foi gerada agora pelo LLM."
+        ),
+    )
+
+
 class PredictionRecord(BaseModel):
     """Registro histórico de uma predição armazenada em churn.predictions."""
 
