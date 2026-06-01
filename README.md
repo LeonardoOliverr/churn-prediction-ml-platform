@@ -44,8 +44,16 @@ Plataforma de machine learning end-to-end para previsão de churn de clientes em
     ├── resolve modelo com split determinístico por customer_id:
     │     champion/challenger do projeto (404 explícito se não configurado)
     ├── carrega artefato do MLflow
-    ├── churn.predictions   → log de cada predição
+    ├── churn.predictions   → log de cada predição (shap_values + explanation_text + recommended_actions)
     └── explanation         → top-N contribuições SHAP por feature (quando SHAP_ENABLED=true)
+                │
+                ▼
+[5.5] EXPLICAÇÃO LLM (on-demand)
+    GET /predictions/{id}/explain
+    ├── busca explanation_text no banco (cache)
+    ├── se null: chama OpenAI com prompt de shap_translation_pt.txt
+    ├── grava explanation_text + recommended_actions em churn.predictions
+    └── registra tokens + cost_usd em churn.llm_usage_log (audit trail)
                 │
                 ▼
 [6] AVALIAÇÃO
@@ -110,6 +118,7 @@ Requerem JWT Bearer (`Authorization: Bearer <token>`). Gerado com `APP_SECRET_KE
 | EDA | Jupyter + matplotlib + seaborn + scikit-learn | Análise exploratória e relatório de negócio |
 | Modelagem | Scikit-learn + XGBoost | Baseline: DummyClassifier + Logistic Regression + Random Forest + XGBoost (champion) |
 | Explicabilidade | shap>=0.45 | XGBoost nativo (`pred_contribs`) + TreeExplainer (RF) + LinearExplainer (LR) |
+| Tradução LLM | OpenAI (`gpt-4o-mini`) | Explicação em linguagem de negócio + ações de retenção geradas a partir de SHAP values |
 | Modelagem (deep learning) | PyTorch | _(a implementar)_ |
 | API de inferência | FastAPI | Predição individual e em lote, multi-tenant |
 
@@ -127,7 +136,9 @@ tenant        →  isolamento por empresa/cliente
         ├── model_audit_log         audit trail de aprovações, deployments e aposentadorias
         ├── project_model_config    configuração de produção ativa por project
         ├── api_keys                chaves de autenticação de inferência
-        ├── predictions             log de inferências (eval_batch_id + shap_values JSONB)
+        ├── predictions             log de inferências (eval_batch_id + shap_values + explanation_text + recommended_actions)
+        ├── llm_usage_log           audit trail de chamadas LLM (modelo, tokens, cost_usd por predição)
+        ├── project_llm_config      configuração LLM por projeto (model_id, prompt_file, preço/token)
         ├── outcomes                ground truth de churn real (cross com predictions)
         ├── evaluation_runs         runs de avaliação (período, custos configurados)
         └── evaluation_run_results  métricas por modelo por run (F1, ROC-AUC, FPR, segmentação, promoção)
@@ -296,6 +307,8 @@ cp .env.example .env
 | `DATABASE_URL` | Connection string da API (psycopg2) | — |
 | `SHAP_ENABLED` | Ativa cálculo SHAP inline em `/predict` e `/predict/batch` | `false` |
 | `SHAP_TOP_N` | Número de features SHAP retornadas por predição | `5` |
+| `OPENAI_API_KEY` | Chave da API OpenAI para tradução LLM das explicações SHAP (fallback global) | — |
+| `LLM_ENCRYPTION_KEY` | Chave mestra para `pgp_sym_encrypt/decrypt` das OpenAI keys por projeto | — |
 
 #### Gerando o APP_SECRET_KEY
 
@@ -426,7 +439,7 @@ churn-prediction-ml-platform/
 │   ├── middleware/                 # autenticação, rate limiting, logging estruturado
 │   ├── routers/                    # endpoints: health, predict, predictions, admin
 │   ├── schemas/                    # contratos Pydantic de entrada e saída
-│   └── services/                   # model_resolver, prediction_logger
+│   └── services/                   # model_resolver, prediction_logger, explanation_service
 ├── data/                           # arquivos locais opcionais (não versionados)
 ├── estudos/                        # exercícios de fixação de conceitos de ML
 ├── ml/                             # pipeline de treinamento multi-tenant (ver ml/README.md)
@@ -441,7 +454,10 @@ churn-prediction-ml-platform/
 │   │   ├── random_forest/          # RandomForestClassifier
 │   │   └── xgboost.py              # XGBClassifier (champion em produção)
 │   ├── explainability/
-│   │   └── shap_explainer.py       # SHAP: XGBoost nativo + TreeExplainer RF + LinearExplainer LR
+│   │   ├── shap_explainer.py       # SHAP: XGBoost nativo + TreeExplainer RF + LinearExplainer LR
+│   │   ├── llm_translator.py       # OpenAI: SHAP → explanation + recommended_actions + tokens
+│   │   └── prompts/
+│   │       └── shap_translation_pt.txt  # template de prompt (editável sem alterar código)
 │   └── evaluate_production.py      # avaliação predictions × outcomes → evaluation_run_results
 ├── models/                         # artefatos de modelos exportados — a implementar
 ├── notebooks/
@@ -452,6 +468,7 @@ churn-prediction-ml-platform/
 ├── scripts/
 │   ├── seed_outcomes_from_customers.py  # popula churn.outcomes com ground truth do holdout
 │   ├── predict_holdout_batch.py         # envia clientes holdout para a API em lote
+│   ├── generate_shap_explanations.py    # job batch: LLM traduz shap_values → explanation + llm_usage_log
 │   └── optimize_threshold.py            # varre thresholds → ponto ótimo de custo por modelo
 │
 └── db/
@@ -503,6 +520,7 @@ churn-prediction-ml-platform/
 | Otimização de threshold (`scripts/optimize_threshold.py`) | ✅ Completo |
 | XGBoost (`ml/models/xgboost.py`) — champion em produção | ✅ Completo |
 | Explicabilidade SHAP (`ml/explainability/`) — online via `SHAP_ENABLED` + batch com `--shap` | ✅ Completo |
+| Tradução LLM TC-06b — explicação + ações de retenção via OpenAI + audit `llm_usage_log` | ✅ Completo |
 | Próximos experimentos (`ml/`) — MLP PyTorch | 🔲 Pendente |
 
 ---
@@ -615,6 +633,7 @@ A API FastAPI roda na porta **8000** e expõe os seguintes grupos de endpoints:
 | Health | `GET /health`, `GET /health/ready` | Pública |
 | Inferência | `POST /predict`, `POST /predict/batch` | API Key (`x-api-key`) com escopo `predict` |
 | Histórico | `GET /predictions` | API Key (`x-api-key`) com escopo `predictions:read` |
+| Explicação LLM | `GET /predictions/{id}/explain` | API Key (`x-api-key`) com escopo `predictions:read` |
 | Admin | `POST /admin/tenants`, `POST /admin/projects`, `POST /admin/keys`, `DELETE /admin/keys/{id}`, `/admin/projects/{id}/models/*` | JWT Bearer |
 
 Documentação interativa disponível em `http://localhost:8000/docs` com a API no ar.
@@ -1004,6 +1023,80 @@ data = resp.json()
 print(f"Total: {data['total']} predições")
 for item in data["items"]:
     print(f"  {item['customer_id']} | {float(item['churn_probability']):.2%} | {item['requested_at']}")
+```
+
+---
+
+### 7. Explicação LLM — `GET /predictions/{id}/explain`
+
+Traduz os valores SHAP de uma predição em linguagem de negócio usando OpenAI. Retorna uma **explicação** do risco e **ações de retenção** recomendadas.
+
+**Comportamento de cache:** a explicação é gerada pelo LLM apenas na primeira chamada. Chamadas subsequentes ao mesmo `prediction_id` retornam o texto já gravado em banco (`cached: true`) com latência próxima de zero.
+
+**Pré-condições:** `SHAP_ENABLED=true` ao gerar a predição + `OPENAI_API_KEY` definida (ou `openai_api_key` configurada por projeto em `project_llm_config`) + migrations 33 e 34 aplicadas.
+
+#### WSL (terminal)
+
+```bash
+PREDICTION_ID="<uuid-da-predicao>"  # retornado pelo POST /predict
+
+curl -s "http://localhost:8000/predictions/$PREDICTION_ID/explain" \
+  -H "x-api-key: $API_KEY" | python -m json.tool
+```
+
+Resposta esperada:
+
+```json
+{
+  "prediction_id": "a603f383-0b40-4d4f-b56e-b32e81cb9222",
+  "customer_id": "9912-OMZDS",
+  "explanation_text": "Este cliente apresenta um risco de churn moderado devido ao aumento nas cobranças mensais, o que pode causar insatisfação. Embora tenha um baixo risco geral de churn, é importante monitorar sua experiência para evitar possíveis cancelamentos futuros.",
+  "recommended_actions": "Oferecer uma revisão do plano atual para reduzir as cobranças mensais ou adicionar benefícios adicionais, como promoções ou serviços complementares, que podem aumentar o valor percebido pelo cliente.",
+  "shap_values": {
+    "dependents": -2.502341,
+    "tenure_months": -0.726063,
+    "total_charges": -0.406266,
+    "monthly_charges": 0.628236,
+    "contract_Month-to-month": -0.893509
+  },
+  "cached": true
+}
+```
+
+> Quando LLM está indisponível ou desabilitado para o projeto, `explanation_text` e `recommended_actions` retornam `null` com `HTTP 200` — o fluxo do cliente não é interrompido.
+
+#### Job batch (sem API)
+
+Para gerar explicações em lote para todas as predições pendentes de um ciclo:
+
+```bash
+# dry-run — visualiza sem gravar
+python scripts/generate_shap_explanations.py \
+  --project telco-churn-2018 \
+  --batch-id <uuid-do-eval-batch> \
+  --dry-run \
+  --limit 10
+
+# rodar o lote real
+python scripts/generate_shap_explanations.py \
+  --project telco-churn-2018 \
+  --batch-id <uuid-do-eval-batch>
+```
+
+#### Auditoria de custo LLM
+
+Cada chamada ao LLM gera uma linha em `churn.llm_usage_log` com o modelo usado, tokens consumidos e custo calculado:
+
+```sql
+-- Custo diário por modelo
+SELECT model_id,
+       DATE_TRUNC('day', generated_at) AS dia,
+       COUNT(*)                        AS chamadas,
+       SUM(prompt_tokens + completion_tokens) AS tokens_total,
+       SUM(cost_usd)                   AS custo_usd
+FROM churn.llm_usage_log
+GROUP BY 1, 2
+ORDER BY 2 DESC, 1;
 ```
 
 ---

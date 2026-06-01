@@ -1,0 +1,80 @@
+meta {
+  name: Explicação LLM de predição
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/predictions/{{prediction_id}}/explain
+  body: none
+  auth: none
+}
+
+headers {
+  x-api-key: {{api_key}}
+}
+
+vars:pre-request {
+  prediction_id: a603f383-0b40-4d4f-b56e-b32e81cb9222
+}
+
+tests {
+  test("status 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  
+  test("campos obrigatórios presentes", function() {
+    expect(res.body).to.have.property("prediction_id");
+    expect(res.body).to.have.property("customer_id");
+    expect(res.body).to.have.property("explanation_text");
+    expect(res.body).to.have.property("recommended_actions");
+    expect(res.body).to.have.property("shap_values");
+    expect(res.body).to.have.property("cached");
+  });
+  
+  test("cached é boolean", function() {
+    expect(typeof res.body.cached).to.equal("boolean");
+  });
+  
+  test("explanation_text é string ou null", function() {
+    var text = res.body.explanation_text;
+    expect(text === null || typeof text === "string").to.be.true;
+  });
+  
+  test("recommended_actions é string ou null", function() {
+    var actions = res.body.recommended_actions;
+    expect(actions === null || typeof actions === "string").to.be.true;
+  });
+  
+  test("shap_values é objeto ou null", function() {
+    var shap = res.body.shap_values;
+    if (shap !== null) {
+      expect(typeof shap).to.equal("object");
+      expect(Object.keys(shap).length).to.be.greaterThan(0);
+      Object.values(shap).forEach(function(val) {
+        expect(typeof val).to.equal("number");
+      });
+    }
+  });
+}
+
+docs {
+  # Explicação LLM de predição
+  
+  Retorna a explicação em linguagem natural gerada pelo modelo OpenAI (`gpt-4o-mini`)
+  a partir dos valores SHAP da predição indicada.
+  
+  ## Pré-condições
+  - A predição precisa ter `shap_values` calculados (parâmetro `SHAP_ENABLED=true` na API)
+  - O projeto deve ter tradução LLM habilitada (`project_llm_config.enabled = true`)
+  - **`OPENAI_API_KEY`** deve estar definida no ambiente do container da API
+  
+  ## Cache
+  A explicação é gerada **apenas na primeira chamada** e gravada no banco.
+  Chamadas subsequentes retornam `cached: true` com latência próxima de zero.
+  
+  ## Quando `explanation_text` é `null`
+  - SHAP não foi calculado para a predição
+  - LLM desabilitado no projeto
+  - `OPENAI_API_KEY` ausente ou inválida
+}
