@@ -21,6 +21,7 @@ Plataforma de machine learning end-to-end para previsão de churn de clientes em
 | EDA | Jupyter + matplotlib + seaborn |
 | Treinamento | scikit-learn (baseline + Random Forest + XGBoost) |
 | Explicabilidade | shap>=0.45 — XGBoost nativo (`pred_contribs`) + TreeExplainer (RF) + LinearExplainer (LR) |
+| Tradução LLM | OpenAI (`gpt-4o-mini`) — explicação + ações de retenção a partir de SHAP values |
 | Avaliação | `ml/evaluate_production.py` + `scripts/optimize_threshold.py` |
 | API | FastAPI |
 
@@ -60,8 +61,10 @@ churn.customers              ← dataset IBM Telco (~7k registros, split train/h
 churn.models                 ← statuses: candidate → approved → retired (ou rejected)
 churn.model_audit_log        ← audit trail append-only de transições de status e deployment
 churn.project_model_config
+churn.project_llm_config     ← configuração LLM por projeto (model_id, prompt_file, preço/token, openai_api_key criptografada)
 churn.api_keys               ← autenticação de inferência
-churn.predictions            ← log de inferências (eval_batch_id + shap_values JSONB)
+churn.predictions            ← log de inferências (eval_batch_id + shap_values + explanation_text + recommended_actions)
+churn.llm_usage_log          ← audit trail de chamadas LLM (modelo usado, tokens, cost_usd)
 churn.outcomes               ← ground truth de churn real
 churn.evaluation_runs        ← runs de avaliação (período, custos)
 churn.evaluation_run_results ← métricas por modelo por run
@@ -115,7 +118,7 @@ O agente deve respeitar as seguintes regras:
 | Módulo | Status |
 |---|---|
 | Infraestrutura (Docker + PostgreSQL + MLflow) | ✅ Completo |
-| Schema multi-tenant (Sqitch — migrations 00–31) | ✅ Completo |
+| Schema multi-tenant (Sqitch — migrations 00–34) | ✅ Completo |
 | Pipeline de ingestão (`scripts/load_ibm_telco.py`) | ✅ Completo |
 | EDA (`notebooks/01_eda.ipynb`) | ✅ Completo |
 | Relatório de negócio (`notebooks/relatorio_negocio.md`) | ✅ Completo |
@@ -129,6 +132,8 @@ O agente deve respeitar as seguintes regras:
 | Scripts operacionais (`scripts/`) | ✅ Completo |
 | XGBoost (`ml/models/xgboost.py`) — champion em produção | ✅ Completo |
 | Explicabilidade SHAP (`ml/explainability/`) — online via `SHAP_ENABLED` + batch com `--shap` | ✅ Completo |
+| Tradução LLM TC-06b (`ml/explainability/llm_translator.py`) — explicação + ações via OpenAI + audit `llm_usage_log` | ✅ Completo |
+| API key OpenAI por tenant (`project_llm_config.openai_api_key`) — criptografada com pgcrypto + `LLM_ENCRYPTION_KEY` | ✅ Completo |
 | Próximos experimentos (`ml/`) — MLP PyTorch | 🔲 Pendente |
 
 ---
@@ -140,8 +145,12 @@ O agente deve respeitar as seguintes regras:
 | `docker-compose.yml` | Orquestra PostgreSQL, MLflow, API e Grafana |
 | `Makefile` | Atalhos para lint, test, run, build, logs |
 | `db/sqitch.conf` | Configuração do Sqitch (target: localhost:5434) |
-| `db/deploy/*.sql` | Migrations de schema (00–31) |
+| `db/deploy/*.sql` | Migrations de schema (00–34) |
 | `ml/explainability/shap_explainer.py` | Cálculo SHAP: nativo XGBoost + TreeExplainer RF + LinearExplainer LR |
+| `ml/explainability/llm_translator.py` | Tradução SHAP → texto via OpenAI (retorna explanation + recommended_actions + tokens) |
+| `ml/explainability/prompts/shap_translation_pt.txt` | Template de prompt — editável sem alterar código |
+| `src/services/explanation_service.py` | Lazy computation: busca cache → descriptografa api_key → chama LLM → grava explanation + llm_usage_log |
+| `scripts/generate_shap_explanations.py` | Job batch de tradução LLM com deduplicação por hash e registro de custo |
 | `db/seed/001_default_tenant.sql` | Seed de tenant e projeto padrão |
 | `scripts/load_ibm_telco.py` | Carga do dataset IBM Telco |
 | `ml/evaluate_production.py` | Avalia predictions × outcomes, grava evaluation_run_results |

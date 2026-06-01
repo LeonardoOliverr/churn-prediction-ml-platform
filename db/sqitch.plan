@@ -34,3 +34,6 @@
 29_rename_model_statuses [28_model_audit_log] 2026-05-17T03:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Renomeia statuses: trained->candidate, archived->retired; adiciona rejected
 30_update_audit_actions [29_rename_model_statuses] 2026-05-17T04:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Atualiza CHECK de actions no audit log: demoted e retired substituem deprecated
 31_predictions_shap [30_update_audit_actions] 2026-05-23T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona shap_values JSONB em predictions para armazenar explicações SHAP por feature
+32_project_llm_config [31_predictions_shap] 2026-05-26T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Tabela project_llm_config para configuração do LLM de tradução SHAP por projeto
+33_predictions_explanation_text [32_project_llm_config] 2026-05-26T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona explanation_text TEXT em predictions para armazenar tradução LLM dos valores SHAP
+34_llm_api_key [33_predictions_explanation_text] 2026-05-27T00:00:00Z leonardo_oliveira <leonardo_oliveira@DESKTOP-GLO44EU> # Adiciona openai_api_key criptografada por projeto em project_llm_config

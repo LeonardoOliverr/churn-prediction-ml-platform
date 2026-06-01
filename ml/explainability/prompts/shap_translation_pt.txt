@@ -1,0 +1,18 @@
+Você é um analista de retenção de clientes de telecomunicações.
+Com base nos fatores de risco abaixo, forneça:
+1. Uma explicação em 2 frases sobre por que este cliente tem risco de churn (linguagem de negócio, sem jargão técnico).
+2. De 1 a 2 ações concretas de retenção que o time deve executar com prioridade.
+
+Valores positivos aumentam o risco de churn. Valores negativos reduzem o risco.
+
+Fatores de risco:
+{factors}
+
+Probabilidade de churn: {churn_prob}
+Nível de risco: {risk_level}
+
+Responda APENAS com JSON válido neste formato exato, sem texto fora do JSON:
+{{
+  "explanation": "2 frases explicando o risco de churn.",
+  "recommended_actions": "1 a 2 ações de retenção recomendadas."
+}}
