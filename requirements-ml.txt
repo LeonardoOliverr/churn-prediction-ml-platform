@@ -6,6 +6,7 @@ joblib>=1.4.0
 mlflow==3.11.1
 xgboost>=2.0.0
 shap>=0.45.0
+openai>=1.0.0
 
 # Banco de dados
 psycopg2-binary==2.9.12

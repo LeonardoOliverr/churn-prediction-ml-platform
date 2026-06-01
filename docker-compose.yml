@@ -85,6 +85,8 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       SHAP_ENABLED: ${SHAP_ENABLED:-false}
       SHAP_TOP_N: ${SHAP_TOP_N:-5}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LLM_ENCRYPTION_KEY: ${LLM_ENCRYPTION_KEY:-}
     volumes:
       - mlflow_artifacts:/mlflow/artifacts
 
