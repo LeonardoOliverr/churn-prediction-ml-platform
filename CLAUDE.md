@@ -133,7 +133,7 @@ O agente deve respeitar as seguintes regras:
 | Explicabilidade SHAP (`ml/explainability/`) — online via `SHAP_ENABLED` + batch com `--shap` | ✅ Completo |
 | Tradução LLM TC-06b (`ml/explainability/llm_translator.py`) — explicação + ações via OpenAI + audit `llm_usage_log` | ✅ Completo |
 | API key OpenAI por tenant (`project_llm_config.openai_api_key`) — criptografada com pgcrypto + `LLM_ENCRYPTION_KEY` | ✅ Completo |
-| Próximos experimentos (`ml/`) — MLP PyTorch | 🔲 Pendente |
+| MLP PyTorch (`ml/models/mlp/` + `ml/train_mlp.py`) — candidate F1=0.6563, ROC-AUC=0.8676 | ✅ Completo |
 
 ---
 

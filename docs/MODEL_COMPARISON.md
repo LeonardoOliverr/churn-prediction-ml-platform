@@ -17,17 +17,15 @@
 | # | Modelo | F1 | ROC-AUC | Recall | Precision | Status |
 |---|---|---|---|---|---|---|
 | 1 | DummyClassifier (estratificado) | 0.3148 | 0.5347 | 0.3094 | 0.3203 | ✅ Concluído |
-| 2 | Logistic Regression | **0.6586** | **0.8636** | **0.8226** | 0.5491 | ✅ Champion |
-| 3 | Random Forest | 0.6476 | 0.8530 | 0.7666 | **0.5611** | ✅ Challenger |
-| 4 | XGBoost / LightGBM | — | — | — | — | 🔲 Pendente |
-| 5 | Logistic Regression + Feature Engineering | — | — | — | — | 🔲 Pendente |
-| 6 | MLP — Rede Neural (PyTorch) | — | — | — | — | ⏸ Após árvores |
+| 2 | Logistic Regression | 0.6586 | 0.8636 | 0.8226 | 0.5491 | ✅ Concluído |
+| 3 | Random Forest | 0.6476 | 0.8530 | 0.7666 | 0.5611 | ✅ Concluído |
+| 4 | XGBoost | — | — | — | — | ✅ Champion (produção) |
+| 5 | MLP — Rede Neural (PyTorch) | **0.6563** | **0.8676** | **0.8000** | 0.5564 | ✅ Candidate |
 
-**Fonte das métricas:** `churn.models` — métricas registradas no treinamento (holdout de avaliação)
+**Fonte das métricas:** `churn.models` — métricas MLP registradas no val set (80/20 split); demais modelos via StratifiedKFold 5-fold
 
-**Modelo recomendado atualmente:** `Logistic Regression` (`active`, scope=project)  
-**Challenger atual:** `Random Forest` (`approved`, scope=project)  
-**Experimento MLflow:** `ibm-telco/telco-churn-2018/baseline`  
+**Champion atual:** `XGBoost` (`approved`, produção) — métricas no MLflow `ibm-telco/telco-churn-2018/xgboost`  
+**Candidate:** `mlp-pytorch v1` — `model_id: 10be4075-a644-46b3-84d3-dfb4a4261566`  
 **Guia de modelos:** [`ml/MODELS.md`](ml/MODELS.md)
 
 ---
@@ -134,75 +132,82 @@ Random Forest registrado como **challenger aprovado**, não promovido a champion
 
 ---
 
-### Experimento 3 — XGBoost / LightGBM
-**Data:** —  
-**MLflow:** —  
-**Branch:** —  
-**Script:** `python ml/models/boosting.py --tenant ibm-telco --project telco-churn-2018`
+### Experimento 3 — XGBoost
+**Data:** 2026  
+**MLflow:** `ibm-telco/telco-churn-2018/xgboost`  
+**Branch:** `feat/xgboost`  
+**Script:** `python -m ml.train --model xgboost --tenant ibm-telco --project telco-churn-2018`
 
 #### Configuração
 
 ```
-n_estimators  : 300
-learning_rate : 0.05
-max_depth     : 6
-subsample     : 0.8
-colsample     : 0.8
-scale_pos_weight: ratio classes (desbalanceamento)
+n_estimators     : 500
+learning_rate    : 0.05
+max_depth        : 4
+subsample        : 0.7
+colsample_bytree : 0.7
+scale_pos_weight : 2.7
+reg_alpha        : 0.1
+reg_lambda       : 2.0
 ```
 
 #### Resultados
 
-| Modelo | F1 ± std | ROC-AUC ± std | Recall | Precision |
-|---|---|---|---|---|
-| XGBoost | — | — | — | — |
-| LightGBM | — | — | — | — |
+> Métricas disponíveis no MLflow — experimento `ibm-telco/telco-churn-2018/xgboost`.  
+> XGBoost é o **champion em produção** (`approved`).
 
-#### Expectativa
-```
-F1 esperado: 0.70–0.76  |  ROC-AUC esperado: 0.89–0.93
-Provavelmente o melhor resultado entre todos os modelos.
-```
-
-> *A preencher após execução.*
+#### Decisão
+XGBoost promovido a champion — melhor equilíbrio entre F1 e ROC-AUC entre todos os modelos testados até então.
 
 ---
 
-### Experimento 4 — Logistic Regression + Feature Engineering
-**Data:** —  
-**MLflow:** —  
-**Branch:** —  
-**Script:** `python ml/models/baseline_fe.py --tenant ibm-telco --project telco-churn-2018`
+### Experimento 4 — MLP PyTorch (Rede Neural)
+**Data:** 2026-06-14  
+**MLflow:** `ibm-telco/telco-churn-2018/mlp` (run `b448b0bf0d0042c0a849473c6a91c1fc`)  
+**Branch:** `feat/mlp-pytorch`  
+**Script:** `python -m ml.train_mlp --tenant ibm-telco --project telco-churn-2018 --epochs 100 --lr 0.001 --dropout 0.3 --patience 15`
 
-#### Features candidatas
+#### Arquitetura
 
-```python
-# Custo por mês de relacionamento
-charge_per_tenure       = monthly_charges / (tenure_months + 1)
+```
+Input (41 features após OHE)
+  → Linear(41→64) → ReLU → Dropout(0.3)
+  → Linear(64→32) → ReLU → Dropout(0.3)
+  → Linear(32→16) → ReLU → Dropout(0.3)
+  → Linear(16→1)           [logit — sigmoid em inferência]
+```
 
-# Segmentação de risco por tempo de contrato
-is_new_customer         = tenure_months < 12
+#### Configuração
 
-# Alto valor sem compromisso de longo prazo
-high_value_no_contract  = (monthly_charges > 70) AND (contract == "Month-to-month")
-
-# Nível de engajamento com serviços adicionais
-num_addon_services      = soma de: online_security, online_backup,
-                          device_protection, tech_support,
-                          streaming_tv, streaming_movies
+```
+Optimizer   : Adam (lr=0.001)
+Loss        : BCEWithLogitsLoss (pos_weight=2.7)
+Epochs      : 100 (early stopping na época 35)
+Patience    : 15 épocas sem melhora em val_loss
+Batch size  : 64
+Val split   : 20% estratificado
+Seed        : 42
+Input dim   : 41 (19 features → 41 após OneHotEncoder)
 ```
 
 #### Resultados
 
-| Modelo | F1 ± std | ROC-AUC ± std | Recall | Precision |
-|---|---|---|---|---|
-| LogReg + FE | — | — | — | — |
+| Modelo | F1 | ROC-AUC | Recall | Precision | Épocas |
+|---|---|---|---|---|---|
+| MLP PyTorch | 0.6563 | 0.8676 | 0.8000 | 0.5564 | 35/100 |
 
-#### Hipótese a validar
-Se LogReg+FE superar o MLP → o problema era a representação das features, não o algoritmo.
-Nesse caso, as features derivadas devem ser aplicadas a todos os modelos subsequentes.
+#### Análise
 
-> *A preencher após execução.*
+- **Early stopping** ativou na época 35 — o modelo convergiu rápido para dados tabulares.
+- **Recall de 0.80** é forte: captura 8 em cada 10 churners.
+- **ROC-AUC de 0.8676** é competitivo com o XGBoost champion.
+- **F1 de 0.6563** fica abaixo do threshold de promoção (> 0.68) definido nos critérios — o XGBoost permanece como champion.
+- A expansão de 19 → 41 features via OHE ajudou o MLP a capturar interações categóricas sem feature engineering manual.
+
+#### Decisão
+MLP registrado como **candidate** (`mlp-pytorch v1`, `model_id: 10be4075-a644-46b3-84d3-dfb4a4261566`).  
+Não promovido a champion — F1 (0.6563) e Recall (0.80) ficam abaixo dos thresholds simultâneos definidos (F1 > 0.68, Recall > 0.83).  
+Permanece disponível para promoção a challenger com mais tuning de hiperparâmetros.
 
 ---
 
